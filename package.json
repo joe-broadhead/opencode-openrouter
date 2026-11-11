@@ -1,0 +1,102 @@
+{
+  "name": "@joe-broadhead/opencode-openrouter",
+  "version": "0.0.0",
+  "description": "Unofficial OpenCode plugin for OpenRouter's hosted MCP server: live models, endpoints, routing, documentation, test prompts and images, with ask-first defaults for billable tools",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "openrouter"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joe-broadhead/opencode-openrouter.git"
+  },
+  "homepage": "https://github.com/joe-broadhead/opencode-openrouter#readme",
+  "bugs": {
+    "url": "https://github.com/joe-broadhead/opencode-openrouter/issues"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tui": "./dist/tui.js",
+    "./icon.svg": "./assets/icon.svg",
+    "./icon-128.png": "./assets/icon-128.png",
+    "./icon-256.png": "./assets/icon-256.png"
+  },
+  "files": [
+    "dist",
+    "assets/icon.svg",
+    "assets/icon-128.png",
+    "assets/icon-256.png",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "opencode": {
+    "host": ">=2.2.3 <2.3.0",
+    "icons": [
+      {
+        "src": "assets/icon.svg",
+        "mimeType": "image/svg+xml",
+        "sizes": [
+          "any"
+        ]
+      },
+      {
+        "src": "assets/icon-128.png",
+        "mimeType": "image/png",
+        "sizes": [
+          "128x128"
+        ]
+      },
+      {
+        "src": "assets/icon-256.png",
+        "mimeType": "image/png",
+        "sizes": [
+          "256x256"
+        ]
+      }
+    ],
+    "vendor": {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "domain": "openrouter.ai"
+    }
+  },
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "typecheck": "node scripts/check.mjs typecheck",
+    "build": "node scripts/check.mjs build",
+    "test": "node scripts/check.mjs unit",
+    "test:host": "node scripts/check.mjs host",
+    "test:pack": "node scripts/check.mjs pack",
+    "lint": "node scripts/check.mjs forbidden"
+  },
+  "devDependencies": {
+    "@opencode/client": "2.2.3",
+    "@opencode/plugin": "2.2.3",
+    "@opencode/sdk": "2.2.3",
+    "@opentui/core": "0.8.0",
+    "@opentui/solid": "0.8.0",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "solid-js": "1.9.17",
+    "typescript": "5.9.3"
+  },
+  "jelly": {
+    "title": "OpenRouter",
+    "summary": "Live models, routing, test prompts and images through OpenRouter.",
+    "icon": "assets/icon.svg",
+    "rpc": [],
+    "views": [],
+    "signIns": [
+      {
+        "id": "openrouter",
+        "label": "OpenRouter tools",
+        "server": "openrouter"
+      }
+    ]
+  }
+}

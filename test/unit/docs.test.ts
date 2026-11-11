@@ -1,0 +1,64 @@
+// The docs agree with the code: the README's error table is CODES, the README never claims a release exists, the
+// contract matrix names every reviewed tool and claims nothing live, and no doc carries a machine path or an address.
+import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { CODES, ENDPOINT } from "../../src/constants.js"
+import { TOOL_NAMES } from "../../src/openrouter-tools.js"
+
+const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8")
+const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "CHANGELOG.md", "docs/contract.md"]
+
+/** The rows of the markdown table under a `## heading`, as cells. */
+function table(markdown: string, heading: string) {
+  const section = markdown.split(/^## /m).find((part) => part.startsWith(`${heading}\n`)) ?? ""
+  return section
+    .split("\n")
+    .filter((line) => line.startsWith("|") && !/^\|\s*-/.test(line))
+    .slice(1)
+    .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
+}
+
+describe("the README", () => {
+  const readme = read("README.md")
+
+  test("its Errors table is exactly CODES, in order", () => {
+    expect(table(readme, "Errors")).toEqual(Object.entries(CODES).map(([code, { when }]) => [`\`${code}\``, when]))
+  })
+
+  test("says no release exists yet, and names v0.0.0 only as planned", () => {
+    expect(readme).toContain("**Not yet released.**")
+    expect(readme).toContain("## Installation (planned for v0.0.0)")
+    expect(readme).toContain("## Known limits")
+  })
+
+  test("names the endpoint and the two OpenRouter connections", () => {
+    expect(readme).toContain(ENDPOINT)
+    expect(readme).toContain("**OpenRouter tools**")
+    expect(readme).toContain("built-in model provider")
+  })
+})
+
+describe("the contract matrix", () => {
+  const contract = read("docs/contract.md")
+
+  test("names every reviewed tool", () => {
+    for (const name of TOOL_NAMES) expect(contract).toContain(`\`${name}\``)
+  })
+
+  test("labels no row live-observed until a signed-in capture exists", () => {
+    const labels = contract.split("\n").filter((line) => line.startsWith("|")).map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
+    expect(labels.filter((cells) => cells.length >= 3 && /live-observed/.test(cells[1] ?? ""))).toEqual([])
+    expect(contract).toContain("**No row has this label yet.**")
+  })
+})
+
+describe("every doc", () => {
+  test("carries no machine-local path and no address other than the GitHub noreply one", () => {
+    for (const path of DOCS) {
+      const text = read(path)
+      expect({ path, paths: text.match(/\/(?:home|Users)\/[\w.-]+\//g) ?? [] }).toEqual({ path, paths: [] })
+      const emails = (text.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b/g) ?? []).filter((email) => !email.endsWith("@users.noreply.github.com"))
+      expect({ path, emails }).toEqual({ path, emails: [] })
+    }
+  })
+})

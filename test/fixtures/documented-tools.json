@@ -1,0 +1,76 @@
+{
+  "evidence": "documented",
+  "note": "Derived from OpenRouter's public MCP documentation, not from a signed-in tools/list. Names are verbatim; purposes are paraphrased. No input schema, output schema or annotation was published, so none is recorded. Never treat this file as a live capture.",
+  "source": "https://openrouter.ai/docs/guides/overview/mcp-server",
+  "retrieved": "2026-11-11",
+  "tools": [
+    {
+      "name": "send-message",
+      "purpose": "Sends a message to a model and returns its reply, to test a prompt or compare models. Documented as billable inference; every reply includes the generation id."
+    },
+    {
+      "name": "generate-image",
+      "purpose": "Generates an image from a text prompt and returns it inline as an image content block. Documented as billable inference."
+    },
+    {
+      "name": "list-models",
+      "purpose": "Searches the live model catalogue with free-text search, sorting and filters."
+    },
+    {
+      "name": "get-model",
+      "purpose": "Returns full details for one model by author/slug, with variant suffixes and aliases."
+    },
+    {
+      "name": "list-model-endpoints",
+      "purpose": "Lists the providers that serve a model, with price, latency, throughput and data policy."
+    },
+    {
+      "name": "list-providers",
+      "purpose": "Lists the providers available for routing preferences."
+    },
+    {
+      "name": "list-daily-model-rankings",
+      "purpose": "Lists the most used and trending models by token volume."
+    },
+    {
+      "name": "list-app-rankings",
+      "purpose": "Lists the apps that drive the most traffic, filterable by category."
+    },
+    {
+      "name": "get-credits",
+      "purpose": "Returns the account's remaining credit."
+    },
+    {
+      "name": "get-generation",
+      "purpose": "Returns cost, token counts and serving provider for one generation id."
+    },
+    {
+      "name": "list-benchmarks",
+      "purpose": "Lists third-party quality scores."
+    },
+    {
+      "name": "list-task-classifications",
+      "purpose": "Lists traffic market share by task type, with the top models for each."
+    },
+    {
+      "name": "search-docs",
+      "purpose": "Searches OpenRouter's documentation."
+    },
+    {
+      "name": "send-feedback",
+      "purpose": "Reports a problem with one of the account's own generations to OpenRouter's team. Documented as a write."
+    },
+    {
+      "name": "spawn-ori-eval",
+      "purpose": "Returns instructions for running a model evaluation with Ori."
+    },
+    {
+      "name": "install-ori-harness",
+      "purpose": "Returns the recipe for installing the Ori harness."
+    },
+    {
+      "name": "ping",
+      "purpose": "Health check that verifies the connection."
+    }
+  ]
+}
