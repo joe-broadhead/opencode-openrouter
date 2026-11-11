@@ -1,0 +1,21 @@
+{
+  "captures": [
+    {
+      "fixture": "documented-tools.json",
+      "evidence": "documented",
+      "retrieved": "2026-11-11",
+      "endpoint": "https://mcp.openrouter.ai/mcp",
+      "source": "https://openrouter.ai/docs/guides/overview/mcp-server",
+      "host": null,
+      "protocol": null,
+      "digest": {
+        "algorithm": "sha256",
+        "of": "canonical JSON of the sorted tool names",
+        "value": "afe0baa0fe24753e52618c98ad918b23c77d216df4326253fc438f172e8524b9"
+      },
+      "schemas": "not published"
+    }
+  ],
+  "live": null,
+  "note": "live stays null until an authenticated tools/list is captured into test/fixtures/live-tools.json with its host version and protocol. Digests are for drift detection, not a security signature."
+}

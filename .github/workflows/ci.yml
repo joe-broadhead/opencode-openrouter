@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  workflows:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint the workflows
+        run: |
+          # The archive is checked against the published checksums before it runs.
+          set -euo pipefail
+          version=1.7.12
+          base="https://github.com/rhysd/actionlint/releases/download/v${version}"
+          curl -sSfLO "${base}/actionlint_${version}_linux_amd64.tar.gz"
+          curl -sSfLO "${base}/actionlint_${version}_checksums.txt"
+          grep " actionlint_${version}_linux_amd64.tar.gz$" "actionlint_${version}_checksums.txt" | sha256sum -c -
+          tar xzf "actionlint_${version}_linux_amd64.tar.gz" actionlint
+          ./actionlint -no-color
+
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Public GitHub-hosted runners: Linux x64 and arm64, macOS arm64 and x64.
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-26, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          # Caches ~/.npm per OS and architecture. The host and pack stages install @opencode/sdk and the stock
+          # @opencode/cli for each release in TESTED_HOSTS (src/constants.ts: 2.2.3, 2.2.4, 2.2.5 and 2.2.6) through npm,
+          # so that file is part of the key.
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/constants.ts
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4 # the Bun inside stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6
+      - run: npm ci --ignore-scripts
+      - run: npm run check
