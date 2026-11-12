@@ -5,10 +5,6 @@ live models, endpoints and providers, benchmarks and rankings, OpenRouter's docu
 batch and preset lookups, test prompts, decisions and batches, transcription, and image, speech and video generation,
 through OpenCode's own MCP connection and sign-in.
 
-> **Not yet released.** This repository has no release tag yet, so nothing below can be installed from GitHub today.
-> The installation steps describe the first planned release, `v0.0.0`. Until it exists, run a local checkout (see
-> [CONTRIBUTING.md](CONTRIBUTING.md)).
-
 Unofficial; not affiliated with OpenRouter. OpenRouter and its logo are trademarks of OpenRouter, Inc., used here only to identify the service this plugin connects to. The icon is OpenRouter's published Volt-on-Ink square glyph, only scaled, from [openrouter.ai/brand](https://openrouter.ai/brand).
 
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
@@ -22,7 +18,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 - OpenCode 2.2.3 to 2.2.x (`>=2.2.3 <2.3.0`). The checks run on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 - An OpenRouter account, to sign in to the MCP server.
 
-## Installation (planned for v0.0.0)
+## Install
 
 ```sh
 opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.0
@@ -44,6 +40,9 @@ Or add it to `opencode.json`:
 ```
 
 You can also sign in from `/connect` → **OpenRouter tools**, or from `/mcps` → `openrouter`.
+
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
+release is a new tag: install it with its own `#v<version>` spec.
 
 ## Two OpenRouter connections
 
@@ -188,25 +187,26 @@ Every error reads `CODE: What happened. Next step: What to do.`
 
 ## Known limits
 
-- Not released: there is no `v0.0.0` tag yet.
-- **Live evidence.** One signed-in, read-only capture of OpenRouter's server (2026-11-12) confirmed the 31 tool names,
-  their input and output schemas and annotations, and the text results of nine free reads: `list-models`,
+- **What was checked live.** One signed-in, read-only capture of OpenRouter's server (2026-11-12) observed the 31 tool
+  names, their input and output schemas and annotations, and the result shapes of nine free reads: `list-models`,
   `list-providers`, `list-benchmarks`, `list-daily-model-rankings`, `list-app-rankings`, `list-task-classifications`,
-  `search-docs`, `ping` and `get-credits`. Every other read was not called (its output is known only from its declared
-  schema or the local test server), and OpenRouter may change its tools and schemas at any time. Which tools bill is
-  documented by OpenRouter for all of them but `transcribe-audio` (treated as billable regardless) and the nine newer
-  reads (treated as free): those judgements rest on descriptions the capture did not store.
-- **Paid and feedback tools are never exercised by this project.** `send-message`, `send-batch`, `send-decision`,
-  `transcribe-audio`, `generate-image`, `generate-speech` and `generate-video` (all billable) and `send-feedback` have
-  never been run against OpenRouter by any check or capture; their behaviour here comes from their live descriptions
-  and schemas, OpenRouter's documentation and the local test server. Neither has `spawn-ori-eval`.
-- The plugin does not enforce a spending limit. The cap on the key OpenRouter mints at sign-in, which you set on its
-  consent page, is OpenRouter's control.
+  `search-docs`, `ping` and `get-credits`. No other tool was called live, `get-model` and `list-model-endpoints`
+  included; their output is known from declared schemas or a local test server. OpenRouter may change its tools at any
+  time.
+- **Which tools bill.** OpenRouter's documentation states it for every tool except `transcribe-audio`, which the plugin
+  treats as billable anyway, and the nine reads added after the documentation page (`get-batch`, `list-batches`,
+  `get-video`, `get-preset`, `list-presets`, `list-preset-versions`, `get-current-key`, `get-endpoint-uptime-history`,
+  `get-session-cost`), which it treats as free. Those judgements are assumed from tool descriptions the capture did not
+  store.
+- **Paid and feedback tools were never run by this project.** `send-message`, `send-batch`, `send-decision`,
+  `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` and `send-feedback` were never called
+  against OpenRouter, so how their media reaches you (a video above all) has not been checked live.
+- **Your key, your cap.** You sign in with your own OpenRouter account; the key it mints is yours, with the spend limit
+  you set on OpenRouter's consent page. The plugin enforces no spending limit of its own.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
 - Script methods return text and structured results only. `generate-image`, `generate-speech`, `generate-video` and
-  `get-current-key` run only natively. Speech and video results reach the conversation as OpenCode delivers them: an
-  audio block is saved to a file whose path the model sees; how a finished video is shown has not been checked.
+  `get-current-key` run only natively.
 
 ## License
 

@@ -26,9 +26,17 @@ describe("the README", () => {
     expect(table(readme, "Errors")).toEqual(Object.entries(CODES).map(([code, { when }]) => [`\`${code}\``, when]))
   })
 
-  test("says no release exists yet, and names v0.0.0 only as planned", () => {
-    expect(readme).toContain("**Not yet released.**")
-    expect(readme).toContain("## Installation (planned for v0.0.0)")
+  test("installs from the release tag of package.json's version, with every install spec pinned to it", () => {
+    const { version } = JSON.parse(read("package.json")) as { version: string }
+    for (const path of ["README.md", "CONTRIBUTING.md", "AGENTS.md", "docs/scripting.md", "docs/jelly.md", "docs/contract.md", "src/options.ts"]) {
+      const specs = read(path).match(/github:joe-broadhead\/opencode-openrouter(?:#[^\s"'`)]*)?/g) ?? []
+      // A spec whose tag is a placeholder, such as `#v<x>`, describes the form, not a release.
+      for (const spec of specs.filter((item) => !item.includes("#v<"))) expect({ path, spec }).toEqual({ path, spec: `github:joe-broadhead/opencode-openrouter#v${version}` })
+    }
+    expect(readme.match(/github:joe-broadhead\/opencode-openrouter#/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(readme).not.toContain("Not yet released")
+    expect(readme).toContain("## Install\n")
+    expect(readme).toContain("The install takes the GitHub release tag.")
     expect(readme).toContain("## Known limits")
   })
 
