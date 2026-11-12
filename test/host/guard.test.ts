@@ -90,7 +90,7 @@ describe(`the default access, ask-changes, on OpenCode ${HOST_VERSION}`, () => {
       expect(permissions.filter((rule) => rule.action === `${SERVER_NAME}_*`)).toHaveLength(1)
     }
     expect(host.state().policy()).toEqual({ installation: "ready", problems: [] })
-    expect(await host.state().unguardedAgents()).toEqual([])
+    expect(await host.state().agentCoverage()).toEqual({ unguarded: [], explicitlyAllowed: [] })
     expect(() => host.state().assertOperational()).not.toThrow()
   })
 
@@ -203,7 +203,31 @@ describe("the user's later rules", () => {
     expect(host.fake.calls.slice(before)).toEqual(["send-message"])
     // The other billable tool still asks.
     expect(await attempt(host, build, "build", "generate-image")).toMatchObject({ asked: IMAGE_TOOL, ok: false })
-    expect(await host.state().unguardedAgents()).toEqual([])
+    const coverage = await host.state().agentCoverage()
+    expect(coverage.unguarded).toEqual([])
+    expect(coverage.explicitlyAllowed).toContain("build")
+  })
+})
+
+describe("a later broad allow in the user's permissions", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ config: () => ({ permissions: [{ action: "*", resource: "*", effect: "allow" }] }) })
+    await listed(host)
+    await until("the policy is ready", async () => host.state().policy().installation === "ready")
+  })
+  afterAll(() => host?.close())
+
+  test("runs billable inference with no prompt, and the agent is reported unguarded even though its block is present", async () => {
+    const rules = (await agentRules(host)).get("build")!
+    expect(rules.slice(1, 1 + defaultRules("ask-changes").length)).toEqual(defaultRules("ask-changes"))
+    const build = await session(host)
+    const before = host.fake.calls.length
+    expect(await attempt(host, build, "build", "send-message")).toMatchObject({ asked: undefined, ok: true })
+    expect(host.fake.calls.slice(before)).toEqual(["send-message"])
+    const coverage = await host.state().agentCoverage()
+    expect(coverage.unguarded).toContain("build")
+    expect(coverage.explicitlyAllowed).toEqual([])
   })
 })
 
@@ -224,7 +248,7 @@ describe("a conflicting user openrouter entry", () => {
     const rules = await agentRules(host)
     for (const id of BUILT_IN) expect({ id, rules: rules.get(id)!.filter((rule) => rule.action.startsWith(`${SERVER_NAME}_`)) }).toEqual({ id, rules: [] })
     expect((await listed(host)).find((tool) => tool.id === IMAGE_TOOL)?.options).toEqual({ namespace: SERVER_NAME, codemode: true })
-    expect(await host.state().unguardedAgents()).toEqual([])
+    expect(await host.state().agentCoverage()).toEqual({ unguarded: [], explicitlyAllowed: [] })
   })
 })
 

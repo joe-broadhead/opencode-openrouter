@@ -121,22 +121,29 @@ export const lastMatch = (permissions: readonly Rule[], action: string) =>
 /** A tool name the catalog has never reviewed, used to probe how an agent treats OpenRouter's future tools. */
 const UNREVIEWED_PROBE = nativeToolId("unreviewed-tool")
 
+/** How the agents treat OpenRouter's changes: billable inference, image generation, feedback and unreviewed tools. */
+export interface AgentCoverage {
+  /** Agents where such a call would run with no prompt because a broad `*` allow wins: the base allow with no block after it, or a later `* * allow`. Status gives each the exact block from `defaultRules`. */
+  readonly unguarded: string[]
+  /** Agents whose own rule names OpenRouter and allows such a call: an intentional decision, shown as such. */
+  readonly explicitlyAllowed: string[]
+}
+
 /**
- * Agents where the plugin's block never arrived and an OpenRouter change would run only because of the broad base
- * allow: no block, and a billable, feedback or unreviewed tool's winning rule is a `*` allow. An agent whose own rules
- * name OpenRouter (an explicit allow included) made its own decision and is not listed. Under `all` the block would
- * allow everything too, so no agent is unguarded. Status shows each one with the exact block from `defaultRules`.
+ * Reads each agent's effective rules, as the host evaluates them (the user's and the agent's configured rules after the
+ * plugin's block), for every OpenRouter action that is not a read, and a tool OpenRouter may add later. It looks only
+ * at the winning rule, never at whether the block is present, so a broad allow after the block is caught too. Under
+ * `all` the block allows these calls itself, so both lists are empty.
  */
-export function unguardedAgents(agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[], access: Access) {
-  if (access === "all") return []
+export function agentCoverage(agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[], access: Access): AgentCoverage {
+  const coverage = { unguarded: [] as string[], explicitlyAllowed: [] as string[] }
+  if (access === "all") return coverage
   const probes = [...CHANGE_TOOLS.map(nativeToolId), UNREVIEWED_PROBE]
-  return agents
-    .filter((agent) => !hasDefaultRules(agent.permissions, access))
-    .filter((agent) =>
-      probes.some((action) => {
-        const rule = lastMatch(agent.permissions, action)
-        return rule?.action === "*" && rule.effect === "allow"
-      }),
-    )
-    .map((agent) => agent.id)
+  for (const agent of agents) {
+    // Under `ask-changes` and `read-only` no rule of the block allows these actions, so a winning allow is never the plugin's.
+    const winners = probes.map((action) => lastMatch(agent.permissions, action)).filter((rule) => rule?.effect === "allow")
+    if (winners.some((rule) => rule!.action === "*")) coverage.unguarded.push(agent.id)
+    if (winners.some((rule) => rule!.action !== "*")) coverage.explicitlyAllowed.push(agent.id)
+  }
+  return coverage
 }

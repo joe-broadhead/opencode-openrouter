@@ -21,7 +21,7 @@ import { checkHost, type HostCheck } from "./host-version.js"
 import { watchIntegration } from "./integration.js"
 import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type ServerObservation } from "./mcp.js"
 import { parseOptions, type Options } from "./options.js"
-import { registerDefaultRules, rulesApply, unguardedAgents, type Rule } from "./permissions.js"
+import { agentCoverage, registerDefaultRules, rulesApply, type AgentCoverage, type Rule } from "./permissions.js"
 import { reasonOf } from "./redact.js"
 
 /** Internal seam: tests point the server at a loopback fake and read the plugin's state. Not a public option. */
@@ -46,8 +46,8 @@ export interface PluginState {
   readonly policy: () => PolicyHealth
   /** Throws `POLICY_UNAVAILABLE` unless OpenRouter's tools may run now. The tools RPC calls it before dispatch. */
   readonly assertOperational: () => void
-  /** The agents where an OpenRouter change would run under the base allow because the block is missing. */
-  readonly unguardedAgents: () => Promise<string[]>
+  /** Agents where an OpenRouter change runs under a broad `*` allow, and agents that allow one with their own rule. */
+  readonly agentCoverage: () => Promise<AgentCoverage>
 }
 
 /** Anything the plugin registered that must be undone, newest first. */
@@ -105,9 +105,11 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         owned,
         policy: guard.health,
         assertOperational: guard.assertOperational,
-        // No agent is unguarded for a server the plugin leaves to the user.
-        unguardedAgents: async () =>
-          rulesApply(server.source) ? unguardedAgents((await ctx.agent.list()).data.map((agent) => ({ id: agent.id, permissions: agent.permissions as readonly Rule[] })), options.access) : [],
+        // Nothing to report for a server the plugin leaves to the user.
+        agentCoverage: async () =>
+          rulesApply(server.source)
+            ? agentCoverage((await ctx.agent.list()).data.map((agent) => ({ id: agent.id, permissions: agent.permissions as readonly Rule[] })), options.access)
+            : { unguarded: [], explicitlyAllowed: [] },
       }
 
       try {

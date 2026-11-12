@@ -6,7 +6,7 @@ import { nativeToolId } from "../../src/mcp.js"
 import { BILLABLE_TOOLS, CHANGE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
 import { ACCESS, type Access } from "../../src/options.js"
 import type { ServerSource } from "../../src/mcp.js"
-import { applyDefaultRules, BASE_ALLOW, BASELINE_ACTION, defaultRules, hasDefaultRules, insertRules, lastMatch, registerDefaultRules, rulesApply, unguardedAgents, type Rule } from "../../src/permissions.js"
+import { applyDefaultRules, BASE_ALLOW, BASELINE_ACTION, defaultRules, hasDefaultRules, insertRules, lastMatch, registerDefaultRules, rulesApply, agentCoverage, type Rule } from "../../src/permissions.js"
 import { transforms } from "./fake.js"
 
 const rule = (action: string, effect: Rule["effect"]): Rule => ({ action, resource: "*", effect })
@@ -181,24 +181,33 @@ describe("the server entry the rules are for", () => {
   })
 })
 
-describe("unguarded agents", () => {
+describe("agent coverage", () => {
   const agent = (id: string, permissions: Rule[]) => ({ id, permissions })
 
-  test("names an agent whose OpenRouter changes fall through to the base allow, and gives none under all", () => {
+  test("names an agent whose OpenRouter changes fall through to a broad allow, and gives nothing under all", () => {
     const agents = [
       agent("build", [BASE_ALLOW, ...defaultRules("ask-changes")]),
       agent("custom", [BASE_ALLOW, rule("bash", "ask")]),
       agent("strict", [rule("*", "deny")]),
     ]
-    expect(unguardedAgents(agents, "ask-changes")).toEqual(["custom"])
-    // Rules that name OpenRouter, even a block for another access, are the agent's own decision.
-    expect(unguardedAgents(agents, "read-only")).toEqual(["custom"])
-    expect(unguardedAgents(agents, "all")).toEqual([])
+    expect(agentCoverage(agents, "ask-changes")).toEqual({ unguarded: ["custom"], explicitlyAllowed: [] })
+    expect(agentCoverage(agents, "read-only")).toEqual({ unguarded: ["custom"], explicitlyAllowed: [] })
+    expect(agentCoverage(agents, "all")).toEqual({ unguarded: [], explicitlyAllowed: [] })
   })
 
-  test("an explicit user allow is an intentional decision, not a missing block", () => {
-    const explicit = agent("reviewer", [BASE_ALLOW, rule("openrouter_*", "allow")])
+  test("a later broad allow after the block is unguarded, even though the whole block is present", () => {
+    const later = agent("build", [BASE_ALLOW, ...defaultRules("ask-changes"), rule("bash", "ask"), BASE_ALLOW])
+    expect(hasDefaultRules(later.permissions, "ask-changes")).toBe(true)
+    expect(agentCoverage([later], "ask-changes")).toEqual({ unguarded: ["build"], explicitlyAllowed: [] })
+    // A later broad ask or deny is not.
+    expect(agentCoverage([agent("ask", [BASE_ALLOW, ...defaultRules("read-only"), rule("*", "ask")])], "read-only").unguarded).toEqual([])
+  })
+
+  test("an explicit OpenRouter allow is reported apart, as an intentional decision", () => {
+    const explicit = agent("reviewer", [BASE_ALLOW, ...defaultRules("ask-changes"), rule("openrouter_*", "allow")])
+    const one = agent("tester", [BASE_ALLOW, ...defaultRules("read-only"), rule(nativeToolId("send-message"), "allow")])
     const partial = agent("partial", [BASE_ALLOW, rule(nativeToolId("send-message"), "deny")])
-    expect(unguardedAgents([explicit, partial], "ask-changes")).toEqual(["partial"])
+    const both = agent("both", [BASE_ALLOW, rule(nativeToolId("send-feedback"), "allow")])
+    expect(agentCoverage([explicit, one, partial, both], "read-only")).toEqual({ unguarded: ["partial", "both"], explicitlyAllowed: ["reviewer", "tester", "both"] })
   })
 })

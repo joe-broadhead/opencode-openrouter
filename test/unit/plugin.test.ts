@@ -126,7 +126,7 @@ describe("the plugin", () => {
     expect(agentPass(agent)).toEqual([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules("ask-changes")])
     expect(state!.policy()).toEqual({ installation: "ready", problems: [] })
     expect(() => state!.assertOperational()).not.toThrow()
-    expect(await state!.unguardedAgents()).toEqual(["build"])
+    expect(await state!.agentCoverage()).toEqual({ unguarded: ["build"], explicitlyAllowed: [] })
     // Ownership loss blocks again: the user's entry now points elsewhere. The plugin asks the host to rebuild the tools
     // and agents, whose next pass adds no rule for the user's server.
     const reloads = ctx.tool.reload as unknown as { calls: number }

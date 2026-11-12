@@ -15,7 +15,7 @@ and inserts them with `ctx.agent.transform`; `src/guard.ts` holds the health sta
 The steps marked in brackets there are not built yet, and each has one place:
 
 - **Status, TUI and scripts**: `src/status.ts` reads `PluginState` (`server()`, `owned()`, `policy()`,
-  `unguardedAgents()`, `host`, `options`), never OpenRouter. The tools RPC calls `PluginState.assertOperational()` in its
+  `agentCoverage()`, `host`, `options`), never OpenRouter. The tools RPC calls `PluginState.assertOperational()` in its
   input shaper before every dispatch. `src/tui.ts` is the entry the TUI bundle builds. `src/host/tools-rpc.ts` is the family's shared adapter;
   its methods are `RPC_TOOLS`, and `NATIVE_ONLY` is reported separately.
 - **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`, loaded at step 2 outside every transform. Add `"skills"` to
