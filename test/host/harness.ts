@@ -48,6 +48,8 @@ export interface HostInput {
   readonly fake?: FakeMcpOptions
   /** Seam fault for the default rules, read on every registration and pass. */
   readonly policyFault?: () => "register" | "apply" | undefined
+  /** Runs inside a probe plugin the host sets up before the OpenRouter plugin, so its transforms run before the plugin's. */
+  readonly belowSetup?: (ctx: Plugin.Context) => Promise<void> | void
   /** Runs inside the probe plugin's setup, which the host runs after the OpenRouter plugin's. */
   readonly probeSetup?: (ctx: Plugin.Context) => Promise<void> | void
   /** Wait only until the plugin is active, not for the server to leave pending. */
@@ -98,7 +100,7 @@ export async function startHost(input: HostInput = {}) {
   }
   const { OpenCode } = (await import(pathToFileURL(join(SDK, "dist", "index.js")).href)) as typeof import("@opencode/sdk")
   const client: Client = await OpenCode.create({
-    plugins: [withOptions, probe],
+    plugins: [...(input.belowSetup ? [Plugin.define({ id: "openrouter.host-test.below", setup: input.belowSetup })] : []), withOptions, probe],
     // An embedded host reports "unknown" unless told, and the plugin's host guard refuses that.
     app: { version: HOST_VERSION },
     config: { content: JSON.stringify(config), directory: join(base, "config"), project: false, claude: false },

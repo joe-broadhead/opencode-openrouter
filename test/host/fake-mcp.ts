@@ -31,6 +31,14 @@ export interface FakeMcp {
   challenge: boolean
   /** Upstream tool names called, in order. */
   readonly calls: string[]
+  /** While true, the answer to every `tools/call` waits until `release()`, so a test can abort a call in flight. */
+  hold: boolean
+  /** Sends every held answer. */
+  release(): void
+  /** The `notifications/cancelled` the client sent, by request id. */
+  readonly cancelled: unknown[]
+  /** Tool calls whose HTTP request the client closed before the held answer was sent. */
+  readonly abandoned: string[]
   /** The `authorization` header of every MCP request. */
   readonly authorizations: (string | undefined)[]
   /** The `x-openrouter-test` header of every MCP request, to tell whose server config the host used. */
@@ -54,7 +62,10 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
   const authorizeRequests: Record<string, string>[] = []
   const tokens: Record<string, string>[] = []
   let codes = 0
-  const fake = { challenge: options.challenge ?? false } as FakeMcp
+  const held: (() => void)[] = []
+  const cancelled: unknown[] = []
+  const abandoned: string[] = []
+  const fake = { challenge: options.challenge ?? false, hold: false } as FakeMcp
 
   const answer = (message: Message) => {
     const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result })
@@ -128,7 +139,17 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     }
     if (request.method !== "POST") return void response.writeHead(405, { allow: "POST" }).end()
     const body = JSON.parse(await read(request)) as Message | Message[]
-    const replies = (Array.isArray(body) ? body : [body]).filter((message) => message.id !== undefined).map(answer)
+    const messages = Array.isArray(body) ? body : [body]
+    for (const message of messages) if (message.method === "notifications/cancelled") cancelled.push((message.params as { requestId?: unknown } | undefined)?.requestId)
+    const replies = messages.filter((message) => message.id !== undefined).map(answer)
+    const call = messages.find((message) => message.method === "tools/call")
+    if (fake.hold && call) {
+      const closed = () => void (response.writableEnded || abandoned.push(call.params?.name ?? ""))
+      response.once("close", closed)
+      await new Promise<void>((done) => held.push(done))
+      response.off("close", closed)
+    }
+    if (response.destroyed) return
     if (!replies.length) return void response.writeHead(202).end()
     json(response, 200, Array.isArray(body) ? replies : replies[0])
   })
@@ -138,12 +159,15 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     url: `http://127.0.0.1:${port}/mcp`,
     origin: `http://127.0.0.1:${port}`,
     calls,
+    cancelled,
+    abandoned,
+    release: () => held.splice(0).forEach((done) => done()),
     authorizations,
     markers,
     registrations,
     authorizeRequests,
     tokens,
-    close: () => new Promise<void>((done) => (server.closeAllConnections(), server.close(() => done()))),
+    close: () => new Promise<void>((done) => (held.splice(0).forEach((release) => release()), server.closeAllConnections(), server.close(() => done()))),
   })
   return fake
 }

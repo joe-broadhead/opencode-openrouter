@@ -2,8 +2,8 @@
 // counting the fake's actual `tools/call` requests: what asks, what is denied and what runs under each access; that a
 // later user rule wins; that a failed policy installation (at setup, on a replay and after the plugin is loaded again)
 // refuses every native call before anything is sent; that the guard is on every tool before any listing exposes it,
-// at startup and after a late sign-in and a catalog rebuild; that replays add no second guard; and that text and an
-// image block pass through it unchanged. Each describe owns one host.
+// at startup and after a late sign-in and a catalog rebuild; that replays add no second guard; that an aborted call
+// stops and is never retried; and that text and an image block pass through it unchanged. Each describe owns one host.
 import "./isolate.js"
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Plugin } from "@opencode/plugin"
@@ -490,5 +490,88 @@ describe("a late sign-in and a catalog rebuild", () => {
     expect(host.fake.calls.length).toBe(before + 1)
     fault = undefined
     await host.probe().agent.reload()
+  })
+})
+
+describe("cancellation through the guard", () => {
+  // A probe plugin set up before the OpenRouter plugin wraps the host's own ping executor, underneath the guard, and
+  // records when its signal aborts and when it settles.
+  const below: string[] = []
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({
+      belowSetup: async (ctx) => {
+        await ctx.tool.transform((editor) => {
+          editor.update(nativeToolId("ping"), (draft) => {
+            const original = draft.execute
+            draft.execute = (input, context) => {
+              context.signal.addEventListener("abort", () => void below.push("aborted"), { once: true })
+              return original(input, context).finally(() => void below.push("settled"))
+            }
+          })
+        })
+      },
+    })
+    await listed(host)
+    await until("the policy is ready", async () => host.state().policy().installation === "ready")
+  })
+  afterAll(() => host?.close())
+
+  /** Starts a native call with `controller`'s signal through the listed executor, the guard's. */
+  async function start(tool: string, controller: AbortController) {
+    const executor = (await listed(host)).find((item) => item.id === nativeToolId(tool))!
+    const sessionID = await session(host)
+    const context = { sessionID, agent: "build", messageID: "msg_cancel", id: `call_cancel_${tool}_${Date.now()}`, signal: controller.signal, progress: async () => {} }
+    return (executor.execute as Executor)({}, context).then(
+      () => "resolved",
+      (error: unknown) => describeError(error),
+    )
+  }
+  const settled = (run: Promise<string>, ms = 5_000) => Promise.race([run, Bun.sleep(ms).then(() => "still running")])
+
+  test("an abort while the server holds the call reaches the host's executor and ends the call at once; the server saw it once, and nothing retries", async () => {
+    host.fake.hold = true
+    try {
+      const before = host.fake.calls.length
+      below.length = 0
+      const controller = new AbortController()
+      const run = start("ping", controller)
+      await until("the server has the call", async () => host.fake.calls.length === before + 1)
+      controller.abort()
+      const outcome = await settled(run)
+      expect(outcome).not.toBe("still running")
+      expect(outcome).not.toBe("resolved")
+      // The abort went through the guard to the host's own executor, which ended while the server still held the call.
+      expect(below).toEqual(["aborted", "settled"])
+      // Upstream, the host sends one `notifications/cancelled` and leaves the HTTP request open until the server answers.
+      // Whether a server stops work on that notice is its own choice, so a paid call aborted after dispatch may have run.
+      await until("the host sends its cancellation notice", async () => host.fake.cancelled.length === 1, 5_000)
+      expect(host.fake.abandoned).toEqual([])
+      host.fake.release()
+      await Bun.sleep(1_000)
+      expect(host.fake.calls.slice(before)).toEqual(["ping"])
+      expect(below).toEqual(["aborted", "settled"])
+    } finally {
+      host.fake.hold = false
+      host.fake.release()
+    }
+  })
+
+  test("a call aborted before it starts reaches the server at most once, and nothing retries", async () => {
+    const before = host.fake.calls.length
+    const controller = new AbortController()
+    controller.abort()
+    const outcome = await settled(start("ping", controller))
+    expect(outcome).not.toBe("still running")
+    expect(outcome).not.toBe("resolved")
+    await Bun.sleep(1_000)
+    expect(host.fake.calls.length - before).toBeLessThanOrEqual(1)
+  })
+
+  test("the next call after an abort runs once", async () => {
+    const build = await session(host)
+    const before = host.fake.calls.length
+    expect(await attempt(host, build, "build", "ping")).toMatchObject({ asked: undefined, ok: true })
+    expect(host.fake.calls.slice(before)).toEqual(["ping"])
   })
 })
