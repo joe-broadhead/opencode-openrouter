@@ -164,25 +164,34 @@ describe("the plugin", () => {
   })
 
   test("the seam's faults fail the registration, or one pass, and a later good pass recovers", async () => {
-    let state: PluginState | undefined
-    let fault: "register" | "apply" | undefined = "register"
-    const first = context()
-    await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)
-    expect(first.log).toEqual(["mcp", "tool", "tool"])
-    expect(state!.policy().installation).toBe("failed")
-    fault = undefined
-    const second = context()
-    await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(second.ctx)
-    second.mcp.run(mcpEditor().editor)
-    agentPass(second.agent)
-    expect(state!.policy().installation).toBe("ready")
-    fault = "apply"
-    agentPass(second.agent)
-    expect(state!.policy().installation).toBe("failed")
-    expect(() => state!.assertOperational()).toThrow(/\(injected failure\)/)
-    fault = undefined
-    agentPass(second.agent)
-    expect(() => state!.assertOperational()).not.toThrow()
+    // Each setup starts the /connect watcher, whose startup polling holds a timer for seconds: both are stopped here,
+    // and the probe checks nothing is left for a later test file to count.
+    const timers = timerProbe()
+    const stops: (() => Promise<void>)[] = []
+    try {
+      let state: PluginState | undefined
+      let fault: "register" | "apply" | undefined = "register"
+      const first = context()
+      stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)) as () => Promise<void>)
+      expect(first.log).toEqual(["mcp", "tool", "tool"])
+      expect(state!.policy().installation).toBe("failed")
+      fault = undefined
+      const second = context()
+      stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(second.ctx)) as () => Promise<void>)
+      second.mcp.run(mcpEditor().editor)
+      agentPass(second.agent)
+      expect(state!.policy().installation).toBe("ready")
+      fault = "apply"
+      agentPass(second.agent)
+      expect(state!.policy().installation).toBe("failed")
+      expect(() => state!.assertOperational()).toThrow(/\(injected failure\)/)
+      fault = undefined
+      agentPass(second.agent)
+      expect(() => state!.assertOperational()).not.toThrow()
+    } finally {
+      for (const stop of stops) await stop()
+      expect(timers.stop()).toBe(0)
+    }
   })
 
   test("defaults the options to ask-changes and reports the host as tested", async () => {
