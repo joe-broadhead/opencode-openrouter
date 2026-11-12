@@ -8,6 +8,8 @@ lookups, test prompts and image generation, through OpenCode's own MCP connectio
 > The installation steps describe the first planned release, `v0.0.0`. Until it exists, run a local checkout (see
 > [CONTRIBUTING.md](CONTRIBUTING.md)).
 
+Unofficial; not affiliated with OpenRouter. OpenRouter and its logo are trademarks of OpenRouter, Inc., used here only to identify the service this plugin connects to. The icon is OpenRouter's published Volt-on-Ink square glyph, only scaled, from [openrouter.ai/brand](https://openrouter.ai/brand).
+
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
 every agent, so by default billable inference and feedback ask before they run, and a guard that refuses every
@@ -194,4 +196,4 @@ Every error reads `CODE: What happened. Next step: What to do.`
 
 ## License
 
-[MIT](LICENSE). Not affiliated with or endorsed by OpenRouter.
+[MIT](LICENSE). Not affiliated with or endorsed by OpenRouter. OpenRouter is a trademark of OpenRouter, Inc.

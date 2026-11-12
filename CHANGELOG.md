@@ -37,3 +37,11 @@ All notable changes to this project are documented here. The format follows
 - The `jelly` declaration: all 17 reviewed tools with the default rules' effect (reads allowed and read-only;
   `send-message`, `generate-image` and `send-feedback` ask), the four skills, the "OpenRouter tools" sign-in by server,
   and the `access` setting with `ask-changes` the default. No views, Jelly RPC, feeds or widgets.
+
+### Changed
+
+- The icon is OpenRouter's published Volt-on-Ink square glyph, only scaled, used under OpenRouter's brand guidelines.
+  `opencode.vendor.mark` is `true`, and the README carries OpenRouter's trademark line.
+- `scripts/check-icons.mjs` is the icon contract's revision 2: with `opencode.vendor.mark: true` it accepts the vendor's
+  own mark in place of the family tile (any square viewBox, path numbers bounded by four times its width) and requires
+  the README to say "not affiliated with" the vendor and to carry a trademark line. The sanitizer block is unchanged.

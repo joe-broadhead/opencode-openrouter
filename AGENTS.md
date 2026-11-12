@@ -31,6 +31,7 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.3.0`, never `^2.2.3`. `TESTED_HOSTS` in
   `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4, 2.2.5 and 2.2.6): the host and pack stages and CI
   run on each. Inside the range an untested release, such as 2.2.99, still starts.
+- **The icon is OpenRouter's own glyph.** `assets/icon.svg` (and the two PNGs rendered from it with resvg) is OpenRouter's published Volt-on-Ink square glyph from https://openrouter.ai/brand, only scaled (its path data is pre-scaled to the 48 grid; the Ink backdrop square is the vendor's own and has no rounded corners). Do not stretch, recolour, redraw, round or combine it, and keep the README's trademark line. `opencode.vendor.mark: true` tells `scripts/check-icons.mjs` (contract revision 2) so. Revision 2 of that script is ahead of the kit's copy until the release-kit rollout; do not edit it here.
 - **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead.
 - **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and `@opencode/client`
   are devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs

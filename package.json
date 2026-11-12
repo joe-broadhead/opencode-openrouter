@@ -62,7 +62,8 @@
     "vendor": {
       "id": "openrouter",
       "name": "OpenRouter",
-      "domain": "openrouter.ai"
+      "domain": "openrouter.ai",
+      "mark": true
     }
   },
   "scripts": {
