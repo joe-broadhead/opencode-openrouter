@@ -28,3 +28,9 @@ All notable changes to this project are documented here. The format follows
   connection state, access and rules, the tool catalog with unknown and missing tools and when it was last seen, the
   script capability, skills, agents without the rules or with their own allow, and one next step. It never calls
   OpenRouter. A status that cannot be read is `STATUS_UNAVAILABLE`.
+- The tools RPC `openrouter.models.tools` for scripts and Jobs, the family's shared adapter: `describe` and 16 reviewed
+  methods by their exact hyphenated names, run through OpenCode's own executor as a named session's agent. Only an
+  `allow` runs; an `ask` or a `deny` is refused with nothing sent, and the plugin's guard refuses every method with
+  `POLICY_UNAVAILABLE` while its rules are not in place. `generate-image` is native only, so its route does not exist.
+  After a paid or feedback call that may have run, the next step says to check the generation before sending it again.
+  The methods' output is checked against the test server only, not yet against OpenRouter's live server.

@@ -11,8 +11,8 @@ lookups, test prompts and image generation, through OpenCode's own MCP connectio
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
 every agent, so by default billable inference and feedback ask before they run, and a guard that refuses every
-OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills, and a status
-command and dialog that never call OpenRouter. Script access is not built yet.
+OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills, a status
+command and dialog that never call OpenRouter, and script access to the reviewed tools through a tools RPC.
 
 ## Requirements
 
@@ -148,6 +148,21 @@ Status reads only OpenCode's own lists and the plugin's memory. It never calls `
 looks up a generation, and it never shows a key, a sign-in URL, a balance or an expiry. To check OpenRouter itself, ask
 for `ping` through the ordinary tool path.
 
+## Scripts
+
+Scripts and Jobs call 16 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
+the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs, an `ask` is
+refused because no one can answer it, a `deny` is refused, and while the plugin's rules are not in place every call fails
+with `POLICY_UNAVAILABLE` before anything is sent. Under the default `ask-changes`, `send-message` and `send-feedback`
+need an explicit allow rule for the script's session or agent.
+
+`generate-image` is not a script method: the RPC keeps text and structured results only, so a script would pay for an
+image it never receives. Its route does not exist and sends nothing; generate images in a conversation.
+
+The methods' output has been checked against a test server only, not yet against OpenRouter's live server. See
+[docs/scripting.md](docs/scripting.md) for the methods, the envelope, the errors and how to handle a paid call whose
+outcome is uncertain.
+
 ## Errors
 
 Every error reads `CODE: What happened. Next step: What to do.`
@@ -174,6 +189,8 @@ Every error reads `CODE: What happened. Next step: What to do.`
 - The tool catalog comes from OpenRouter's public documentation. No signed-in tool list has been captured, so input
   schemas are whatever the server reports at run time.
 - The plugin does not enforce a spending limit. The provider-side cap on the MCP key is OpenRouter's control.
+- Script methods return text and structured results only, and their output has not been checked against OpenRouter's
+  live server. `generate-image` runs only natively.
 
 ## License
 

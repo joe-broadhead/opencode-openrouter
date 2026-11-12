@@ -10,6 +10,8 @@ const self = fileURLToPath(import.meta.url)
 const ROOTS = ["src", "test", "scripts", "dist"]
 const MEMBER = String.raw`\s*(?:\?\.|\.)\s*`
 const PERMISSION_HOOK = new RegExp(String.raw`\bpermission${MEMBER}hook\b`)
+/** The copy of the module shared by several plugins, and the bundle that inlines it. */
+const TOOLS_RPC = ["src/host/tools-rpc.ts", "dist/index.js"]
 
 const RULES = [
   { id: "fork-marker", pattern: /dispatch[-_ ]?lease|catalog[-_ ]?ownership|text[-_ ]?only[-_ ]?respons/i, why: "dispatch-lease, ownership and text-only markers are fork-only" },
@@ -23,9 +25,9 @@ const RULES = [
   { id: "opencode-ai-import", pattern: /["'`]@opencode\/ai(?:\/[^"'`]*)?["'`]/, why: "@opencode/ai breaks between patch releases; import only @opencode/plugin" },
   // Internal wording: shipped text states behaviour, never who decided it, and never a lane's name.
   { id: "internal-wording", pattern: /\bowner(?:'s)? (?:decision|ruling|sign-off|call)\b|\bthe lead(?:'s)? (?:decision|ruling|audit|report|review)\b|\bhey-jelly\s*#|\b(?:audit|review|reconcile) lane\s+[A-Z]\d\b|\blane\s+G\d\b/i, why: "no internal wording: state the behaviour, not who decided it, and name no lane" },
-  // No permission hook at all yet. The family's tools RPC carries exactly one evaluate hook, which turns an ask on one of
-  // its own script calls in flight into a deny; when that module is added, this rule gains its exception and count.
-  { id: "permission-hook", pattern: PERMISSION_HOOK, why: "no escalating permission hook; default rules go through ctx.agent.transform" },
+  // No permission hook, except the family's tools RPC's one evaluate hook, which turns an ask on one of its own script
+  // calls in flight into a deny; that file and the bundle that inlines it must hold exactly one.
+  { id: "permission-hook", pattern: PERMISSION_HOOK, why: "no escalating permission hook; default rules go through ctx.agent.transform", except: TOOLS_RPC },
   // OpenCode derives an MCP integration's ID itself. The plugin reads it from ctx.mcp.list() and never recomputes it.
   { id: "integration-hash", pattern: /createHash\(\s*["'`]sha1|["'`]mcp_["'`]\s*\+/, why: "read the MCP integrationID from ctx.mcp.list(); never compute the host's hash", only: ["src", "dist"] },
   { id: "host-source", pattern: /packages\/(?:core|plugin|schema)\/src\b|opencode-[\w-]*-host\b|\bconsumer-host\b/, why: "never reference or import private host source or host checkouts" },
@@ -43,8 +45,13 @@ for (const top of ROOTS) {
     const buffer = readFileSync(file)
     if (buffer.includes(0)) continue
     const lines = buffer.toString("utf8").split(/\r?\n/)
+    if (TOOLS_RPC.includes(path)) {
+      const hooks = lines.filter((text) => PERMISSION_HOOK.test(text)).length
+      if (hooks !== 1) findings.push({ path, line: 0, id: "permission-hook", why: `the tools RPC must have exactly one permission hook, found ${hooks}` })
+    }
     for (const rule of RULES) {
       if (rule.only && !rule.only.includes(top)) continue
+      if (rule.except?.includes(path)) continue
       lines.forEach((text, index) => {
         if (rule.pattern.test(text)) findings.push({ path, line: index + 1, id: rule.id, why: rule.why, text })
       })

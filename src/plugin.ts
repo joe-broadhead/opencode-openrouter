@@ -9,7 +9,7 @@
 //      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and
 //      blocked, so an adopted server's tools refuse every call;
 //   6. the Code Mode namespace text, only for the plugin's own or the user's adopted server;
-//   7. the skills, the `/openrouter-status` command and the status RPC;
+//   7. the skills, the `/openrouter-status` command, the status RPC and the tools RPC for scripts;
 //   8. the `/connect` watcher, last, because it reads what the steps before it registered;
 //   9. return the cleanup, which undoes everything in reverse order.
 // A failure part-way runs every cleanup accumulated so far, then rethrows one sanitised, actionable error. Unloading
@@ -18,6 +18,7 @@ import { Plugin } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { createGuard, registerGuard, type PolicyHealth } from "./guard.js"
 import { checkHost, type HostCheck } from "./host-version.js"
+import { METHODS, operationalShapers, registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type ServerObservation } from "./mcp.js"
 import { parseOptions, type Options } from "./options.js"
@@ -167,6 +168,16 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         const read = () => readStatus(ctx, state)
         cleanup.defer(await registerStatusCommand(ctx, read))
         cleanup.defer(await registerStatusRpc(ctx.rpc, read))
+        // The tools RPC dispatches through the native executor, which carries the guard too, but it skips the host's
+        // tool hooks, so its input shaper runs the guard itself before every dispatch. A conflicting entry is the user's
+        // own server: the RPC refuses it as SERVER_CONFLICT.
+        cleanup.defer(
+          await registerToolsRpc(ctx, {
+            methods: METHODS,
+            shapers: operationalShapers(guard.assertOperational),
+            mcp: { server: SERVER_NAME, managed: () => server.source.type !== "conflict" },
+          }),
+        )
         // 8. Last: the watcher reads the server's row and renames only the MCP integration OpenCode made for it.
         cleanup.defer(watchIntegration(ctx, owned, () => void (serverChangedAt = Date.now())))
       } catch (error) {
