@@ -80,7 +80,7 @@ export const operationalShapers = (assertOperational: () => void): Shapers => ({
  * for them; a read can simply be repeated. Each is one sentence that ends with a full stop.
  */
 const BEFORE_REPEATING =
-  "for send-message or send-feedback the call may already have run and been billed, so look for its generation id in any output and check it with get-generation, or check your activity on openrouter.ai, before you deliberately send it again"
+  "for a billable method (send-message, send-batch, send-decision, transcribe-audio) or send-feedback the call may already have run and been billed, so look for its generation or batch id in any output and check it with get-generation or get-batch, or check your activity on openrouter.ai, before you deliberately send it again"
 export const NEXT_STEPS: NextSteps = {
   SESSION_UNKNOWN: `Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id.`,
   SESSION_AGENT_REQUIRED: `Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id.`,

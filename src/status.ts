@@ -7,7 +7,7 @@ import type { Plugin, Rpc } from "@opencode/plugin"
 import { codeText, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
 import type { ServerSource } from "./mcp.js"
-import { CHANGE_TOOLS, NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES, LIVE_VERIFIED_SCRIPT_METHODS } from "./openrouter-tools.js"
+import { CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, NATIVE_ONLY, reviewedTool, RPC_TOOLS, TOOL_NAMES } from "./openrouter-tools.js"
 import { ACCESS, type Access } from "./options.js"
 import { defaultRules, type AgentCoverage } from "./permissions.js"
 import { shortReason } from "./redact.js"
@@ -241,11 +241,21 @@ function catalogText({ catalog, access }: Status) {
 }
 
 function scriptingText({ scripting }: Status) {
+  const { liveVerifiedCount: live, reviewedMethodCount: total } = scripting
   const verified =
-    scripting.liveVerifiedCount === scripting.reviewedMethodCount
+    live === total
       ? "their output checked against OpenRouter's live server"
-      : `output checked against a test server only, not yet against OpenRouter's live server (${scripting.liveVerifiedCount} of ${scripting.reviewedMethodCount} checked live)`
-  return `${scripting.reviewedMethodCount} methods through ${PLUGIN_ID}.tools, ${verified}; ${list(scripting.nativeOnly)} only as a native tool, because the script result keeps text only`
+      : live === 0
+        ? `output checked against a test server only, not yet against OpenRouter's live server (0 of ${total} checked live)`
+        : `${live} of ${total} with output checked against OpenRouter's live server, the rest against its declared output or a test server`
+  const reason = (exclusion: string) => scripting.nativeOnly.filter((name) => reviewedTool(name)?.rpcExclusion === exclusion)
+  const media = reason("native-media-required")
+  const key = reason("key-metadata")
+  const native = [
+    ...(media.length ? [`${list(media)} (media the script result drops)`] : []),
+    ...(key.length ? [`${list(key)} (the signed-in key's own metadata)`] : []),
+  ]
+  return `${total} methods through ${PLUGIN_ID}.tools, ${verified}${native.length ? `; native only: ${native.join("; ")}` : ""}`
 }
 
 function skillsText({ skills }: Status) {

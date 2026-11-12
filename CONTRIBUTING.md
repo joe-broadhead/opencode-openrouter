@@ -85,10 +85,10 @@ CI (`.github/workflows/ci.yml`) runs `npm ci --ignore-scripts` and `npm run chec
 ## OpenRouter's tools
 
 `src/openrouter-tools.ts` is the one record of the tools the plugin knows, with each tool's effect, billing, visibility
-and script eligibility. Its names come from [OpenRouter's MCP documentation](https://openrouter.ai/docs/guides/overview/mcp-server),
-which publishes no schemas. `test/fixtures/documented-tools.json` records that list, labelled `documented`, and
-`test/fixtures/provenance.json` records its digest. A signed-in `tools/list` capture, when one exists, goes in
-`test/fixtures/live-tools.json` with its own provenance entry; the documented fixture is never relabelled as live.
+and script eligibility. Its 31 names, with their schemas and annotations, come from a signed-in `tools/list` capture in
+`test/fixtures/live-tools.json`, which has its own provenance entry. [OpenRouter's MCP documentation](https://openrouter.ai/docs/guides/overview/mcp-server)
+lists 17 of them, without schemas; `test/fixtures/documented-tools.json` records that list, labelled `documented`, and is
+never relabelled as live.
 
 ### The live capture
 

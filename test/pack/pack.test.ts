@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url"
 import { DISPLAY_NAME, ENDPOINT, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { checkHost } from "../../src/host-version.js"
-import { RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { buildStatus, formatStatus } from "../../src/status.js"
 import { REFRESH_COMMAND_ID, STATUS_COMMAND_ID, TUI_ID } from "../../src/tui.js"
@@ -362,12 +362,12 @@ describe.each(TESTED_HOSTS)("status and the tools RPC on stock OpenCode %s", (ve
         const output = await status()
         return output.state === "connected" && output.catalog.observed === TOOL_NAMES.length + 1 ? output : undefined
       })
-      expect(seen).toMatchObject({ source: "plugin", catalog: { reviewedPresent: 17, unknown: [NEW_TOOL] }, scripting: { reviewedMethodCount: 16, nativeOnly: ["generate-image"] }, nextStep: "Nothing to do." })
+      expect(seen).toMatchObject({ source: "plugin", catalog: { reviewedPresent: TOOL_NAMES.length, unknown: [NEW_TOOL] }, scripting: { reviewedMethodCount: RPC_TOOLS.length, nativeOnly: [...NATIVE_ONLY] }, nextStep: "Nothing to do." })
       expect(fake.calls).toEqual([])
 
       const { value: described } = await script("describe", {})
       expect(described.methods.map((method: { name: string }) => method.name)).toEqual([...RPC_TOOLS])
-      expect(described.unclassified).toEqual(["generate-image", NEW_TOOL])
+      expect(described.unclassified).toEqual([...NATIVE_ONLY, NEW_TOOL].sort())
 
       const build = await create({ agent: "build" })
       expect((await script("ping", { sessionID: build, input: {} })).value).toMatchObject({ text: "synthetic ping" })

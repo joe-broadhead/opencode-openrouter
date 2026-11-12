@@ -1,10 +1,11 @@
 // The one reviewed record of OpenRouter's MCP tools. No imports: everything else (default rules, script methods, status
 // counts, the Jelly declaration and the drift check) derives from this table, never from a hand-written copy.
 //
-// Evidence: the 17 names and their purposes are documented on OpenRouter's MCP page
-// (https://openrouter.ai/docs/guides/overview/mcp-server, read 2026-11-11); see test/fixtures/documented-tools.json.
-// No signed-in tool list has been captured, so no input schema, output schema or annotation is recorded here. The
-// effect, billing, visibility and script columns are this plugin's reviewed policy, not OpenRouter annotations.
+// Evidence: the 31 names, with their descriptions, schemas and annotations, come from a signed-in, read-only capture of
+// OpenRouter's MCP server (test/fixtures/live-tools.json, 2026-11-12); 17 of them are also on OpenRouter's MCP page
+// (test/fixtures/documented-tools.json). The schemas live in the fixture, not here. The effect, billing, visibility and
+// script columns are this plugin's reviewed policy, read from each tool's live description and annotations: a tool
+// whose description says it bills the user, or that may spend in any way, is billable; when in doubt, billable.
 
 /**
  * What a call does. The family's shared script adapter uses the same union and has no spend class, so billing is the
@@ -33,8 +34,12 @@ export interface ReviewedTool {
   readonly visibility: ToolVisibility
   /** Whether scripts may call it through the tools RPC. */
   readonly rpc: boolean
-  /** Why a tool is native-only: the shared script adapter returns text and drops media content. */
-  readonly rpcExclusion?: "native-media-required"
+  /**
+   * Why a tool is native-only: `native-media-required` when its useful result is media the shared script adapter drops
+   * (it keeps text and structured content only); `key-metadata` when its result describes the signed-in API key
+   * (label, limits, usage), which the plugin keeps out of scripts.
+   */
+  readonly rpcExclusion?: "native-media-required" | "key-metadata"
   /**
    * For a script method: the strongest evidence that its useful result fits the tools RPC's `{ output?, text }` result,
    * which keeps structured content and text and drops every other content block. Only a signed-in capture makes it
@@ -44,29 +49,55 @@ export interface ReviewedTool {
   readonly scriptOutput?: Evidence
 }
 
-const read = (name: string, visibility: ToolVisibility): ReviewedTool => ({ name, effect: "read", billable: false, visibility, rpc: true, scriptOutput: "synthetic" })
+const read = (name: string, visibility: ToolVisibility, scriptOutput: Evidence): ReviewedTool => ({ name, effect: "read", billable: false, visibility, rpc: true, scriptOutput })
+const paid = (name: string, scriptOutput: Evidence): ReviewedTool => ({ name, effect: "write", billable: true, visibility: "execution", rpc: true, scriptOutput })
+const media = (name: string): ReviewedTool => ({ name, effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" })
 
-/** Sorted by name within each class: reads first, then the executions. */
+/**
+ * Reads first (public data, the account's own data, then the recipes), then the executions, each group sorted by name.
+ * `scriptOutput`: `live-observed` for the free reads the capture called and whose result was text; `documented` where
+ * OpenRouter declares the result (an output schema on the live server, or its documentation for send-message);
+ * `synthetic` where only the loopback fake has run it.
+ */
 export const REVIEWED_TOOLS: readonly ReviewedTool[] = [
-  read("get-model", "public-data"),
-  read("list-app-rankings", "public-data"),
-  read("list-benchmarks", "public-data"),
-  read("list-daily-model-rankings", "public-data"),
-  read("list-model-endpoints", "public-data"),
-  read("list-models", "public-data"),
-  read("list-providers", "public-data"),
-  read("list-task-classifications", "public-data"),
-  read("ping", "public-data"),
-  read("search-docs", "public-data"),
-  read("get-credits", "account-data"),
-  read("get-generation", "account-data"),
+  read("get-endpoint-uptime-history", "public-data", "synthetic"),
+  read("get-model", "public-data", "synthetic"),
+  // Weekly cost-per-session statistics of published coding harnesses: aggregate public data, not the account's spend.
+  read("get-session-cost", "public-data", "synthetic"),
+  read("list-app-rankings", "public-data", "live-observed"),
+  read("list-benchmarks", "public-data", "live-observed"),
+  read("list-daily-model-rankings", "public-data", "live-observed"),
+  read("list-model-endpoints", "public-data", "synthetic"),
+  read("list-models", "public-data", "live-observed"),
+  read("list-providers", "public-data", "live-observed"),
+  read("list-task-classifications", "public-data", "live-observed"),
+  read("ping", "public-data", "live-observed"),
+  read("search-docs", "public-data", "live-observed"),
+  read("get-batch", "account-data", "documented"),
+  read("get-credits", "account-data", "live-observed"),
+  // The signed-in key's label, spend limit, remaining limit and usage: native only, so a script never receives it.
+  { name: "get-current-key", effect: "read", billable: false, visibility: "account-data", rpc: false, rpcExclusion: "key-metadata" },
+  read("get-generation", "account-data", "documented"),
+  read("get-preset", "account-data", "synthetic"),
+  // A video job's status, cost and output links; it starts nothing. The links are in its structured result.
+  read("get-video", "account-data", "documented"),
+  read("list-batches", "account-data", "documented"),
+  read("list-preset-versions", "account-data", "synthetic"),
+  read("list-presets", "account-data", "synthetic"),
   // Recipe retrieval: the returned text describes later installer or evaluation commands; retrieving it runs nothing.
-  read("install-ori-harness", "recipe"),
-  read("spawn-ori-eval", "recipe"),
-  // Billable inference: a test message to any model. OpenRouter documents its reply as text with the generation id.
-  { name: "send-message", effect: "write", billable: true, visibility: "execution", rpc: true, scriptOutput: "documented" },
-  // Billable inference whose image comes back as a content block. The script RPC would drop it after the spend.
-  { name: "generate-image", effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" },
+  read("install-ori-harness", "recipe", "synthetic"),
+  read("spawn-ori-eval", "recipe", "synthetic"),
+  // Billable inference whose result is media: an image block, an audio block, or a finished video. A script would pay
+  // for a result its RPC drops, so they run only natively.
+  media("generate-image"),
+  media("generate-speech"),
+  media("generate-video"),
+  // Billable inference whose result is text or structured content.
+  paid("send-batch", "documented"),
+  paid("send-decision", "documented"),
+  // OpenRouter documents send-message's reply as text with the generation id.
+  paid("send-message", "documented"),
+  paid("transcribe-audio", "documented"),
   // Feedback on one of the account's own generations, sent to OpenRouter's team.
   { name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true, scriptOutput: "synthetic" },
 ]
@@ -75,9 +106,9 @@ export const REVIEWED_TOOLS: readonly ReviewedTool[] = [
 export const TOOL_NAMES: readonly string[] = REVIEWED_TOOLS.map((tool) => tool.name)
 /** The reads, account and recipe reads included. */
 export const READ_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.effect === "read").map((tool) => tool.name)
-/** Every tool that is not a read: billable inference and feedback. */
+/** Every tool that is not a read: billable inference, media generation and feedback. */
 export const CHANGE_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.effect !== "read").map((tool) => tool.name)
-/** OpenRouter's documented billable inference tools. */
+/** The tools that bill the account: inference, batches, decisions, transcription and media generation. */
 export const BILLABLE_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.billable).map((tool) => tool.name)
 /** The tools scripts may call through the tools RPC. */
 export const RPC_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool) => tool.name)

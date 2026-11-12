@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { SERVER_NAME } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { nativeToolId } from "../../src/mcp.js"
-import { RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { NEW_TOOL } from "./fake-mcp.js"
 import { attempt, cleanup, HOST_VERSION, session, startHost, until, type Host, type Rule } from "./harness.js"
 
@@ -37,13 +37,13 @@ describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-chang
   })
   afterAll(() => host?.close())
 
-  test("describe lists the 16 reviewed methods by hyphenated name, each available, with the native action", async () => {
+  test("describe lists the 27 reviewed methods by hyphenated name, each available, with the native action", async () => {
     const { output } = await script(host, "describe", {})
     expect(output.id).toBe(TOOLS_RPC_ID)
     expect(output.methods.map((method: { name: string }) => method.name)).toEqual([...RPC_TOOLS])
     for (const method of output.methods) expect({ name: method.name, action: method.action, available: method.available }).toEqual({ name: method.name, action: nativeToolId(method.name), available: true })
-    // The shared field names every listed tool that is not a method: the native-only image tool and the unreviewed one.
-    expect(output.unclassified).toEqual(["generate-image", NEW_TOOL])
+    // The shared field names every listed tool that is not a method: the native-only tools and the unreviewed one.
+    expect(output.unclassified).toEqual([...NATIVE_ONLY, NEW_TOOL].sort())
   })
 
   test("a read runs once through the native executor, with no model turn, as it does natively", async () => {
@@ -58,7 +58,7 @@ describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-chang
   test("billable inference and feedback ask natively; a script is refused at once, with no prompt left and nothing sent", async () => {
     const sessionID = await session(host)
     const before = host.fake.calls.length
-    for (const method of ["send-message", "send-feedback"]) {
+    for (const method of ["send-message", "send-batch", "send-decision", "transcribe-audio", "send-feedback"]) {
       const result = await script(host, method, { sessionID, input: { query: "q" } })
       expect(result).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
       expect(result.message).toContain(`${nativeToolId(method)} would ask for this session's agent, and a script cannot answer`)
@@ -80,12 +80,13 @@ describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-chang
     expect(host.fake.calls.slice(before)).toEqual(["send-message"])
   })
 
-  test("generate-image has no route: refused by the host before the plugin runs, and nothing reaches the server", async () => {
+  test("no native-only tool has a route: each is refused by the host before the plugin runs, and nothing reaches the server", async () => {
     const sessionID = await session(host)
     const before = host.fake.calls.length
-    const result = await script(host, "generate-image", { sessionID, input: { query: "a red square" } })
-    expect(result.output).toBeUndefined()
-    expect(result.type).toBe("rpc.method_not_found")
+    for (const name of NATIVE_ONLY) {
+      const result = await script(host, name, { sessionID, input: { query: "a red square" } })
+      expect({ name, output: result.output, type: result.type }).toEqual({ name, output: undefined, type: "rpc.method_not_found" })
+    }
     expect(await script(host, NEW_TOOL, { sessionID, input: {} })).toMatchObject({ type: "rpc.method_not_found" })
     expect(host.fake.calls.length).toBe(before)
   })

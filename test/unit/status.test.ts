@@ -42,8 +42,8 @@ describe("the status model", () => {
       state: "connected",
       access: "ask-changes",
       source: "plugin",
-      catalog: { state: "ready", observed: 17, reviewedPresent: 17, unknownCount: 0, unknown: [], missingReviewed: [], lastObservedAt: "2026-11-12T10:00:00.000Z" },
-      scripting: { reviewedMethodCount: 16, nativeOnly: ["generate-image"], liveVerifiedCount: 0 },
+      catalog: { state: "ready", observed: 31, reviewedPresent: 31, unknownCount: 0, unknown: [], missingReviewed: [], lastObservedAt: "2026-11-12T10:00:00.000Z" },
+      scripting: { reviewedMethodCount: 27, nativeOnly: ["get-current-key", "generate-image", "generate-speech", "generate-video"], liveVerifiedCount: 9 },
       policy: { installation: "ready" },
       skills: SKILL_NAMES.map((name) => ({ name, state: "loaded" })),
       unguardedAgents: [],
@@ -87,9 +87,9 @@ describe("the status model", () => {
   test("counts unknown and missing tools, names at most 20 plain names, and never lists a conflicting server's tools", () => {
     const unknown = Array.from({ length: 23 }, (_, index) => `new-tool-${index}`)
     const status = buildStatus(facts({ tools: [...TOOL_NAMES.filter((name) => name !== "ping"), ...unknown, "Evil‮Name"] }))
-    expect(status.catalog).toMatchObject({ observed: 16 + 24, reviewedPresent: 16, unknownCount: 24, missingReviewed: ["ping"] })
+    expect(status.catalog).toMatchObject({ observed: 30 + 24, reviewedPresent: 30, unknownCount: 24, missingReviewed: ["ping"] })
     expect(status.catalog.unknown).toEqual(unknown.slice(0, 20))
-    expect(formatStatus(status)).toContain("- Tools: 40 listed, 16 reviewed, 24 unknown: new-tool-0,")
+    expect(formatStatus(status)).toContain("- Tools: 54 listed, 30 reviewed, 24 unknown: new-tool-0,")
     expect(formatStatus(status)).toContain("and 4 more (asked about, never a script method); reviewed but not listed: ping; last seen 2026-11-12T10:00:00.000Z")
     const conflict = buildStatus(facts({ source: { type: "conflict", safeDescription: "x" }, problems: [CONFLICT] }))
     expect(conflict.catalog).toMatchObject({ state: "unavailable", observed: 0, unknown: [] })
@@ -97,11 +97,11 @@ describe("the status model", () => {
 
   test("the image tool is reported native-only and never counted as an unknown tool", () => {
     const status = buildStatus(facts())
-    expect(status.scripting.nativeOnly).toEqual(["generate-image"])
-    expect(status.catalog.unknown).not.toContain("generate-image")
+    expect(status.scripting.nativeOnly).toEqual(["get-current-key", "generate-image", "generate-speech", "generate-video"])
+    for (const name of status.scripting.nativeOnly) expect(status.catalog.unknown).not.toContain(name)
     expect(status.catalog.unknownCount).toBe(0)
     expect(formatStatus(status)).toContain(
-      "- Scripts: 16 methods through openrouter.models.tools, output checked against a test server only, not yet against OpenRouter's live server (0 of 16 checked live); generate-image only as a native tool, because the script result keeps text only",
+      "- Scripts: 27 methods through openrouter.models.tools, 9 of 27 with output checked against OpenRouter's live server, the rest against its declared output or a test server; native only: generate-image, generate-speech and generate-video (media the script result drops); get-current-key (the signed-in key's own metadata)",
     )
   })
 
@@ -161,7 +161,7 @@ describe("the report", () => {
     expect(rows).toEqual(["Connection", "Access", "Default rules", "Tools", "Scripts", "Skills", "Agents without default rules", "Agents that allow OpenRouter changes with their own rule", "OpenCode", "Problems", "Next step"])
     expect(text.split("\n")[0]).toBe("OpenRouter status")
     expect(text).toContain("- Connection: connected (registered by this plugin)")
-    expect(text).toContain("- Access: ask-changes: reads run without asking; send-message, generate-image, send-feedback and tools OpenRouter adds later ask first")
+    expect(text).toContain("- Access: ask-changes: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later ask first")
     expect(text).toContain("- Default rules: applied")
     expect(text).toContain("- Skills: 4 of 4 loaded")
     // The exact block for the listed agent, one rule a line.
@@ -171,7 +171,7 @@ describe("the report", () => {
   })
 
   test("says read-only denies and all allows, and an untested host the user allowed", () => {
-    expect(formatStatus(buildStatus(facts({ access: "read-only" })))).toContain("- Access: read-only: reads run without asking; send-message, generate-image, send-feedback and tools OpenRouter adds later are denied")
+    expect(formatStatus(buildStatus(facts({ access: "read-only" })))).toContain("- Access: read-only: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later are denied")
     expect(formatStatus(buildStatus(facts({ access: "all" })))).toContain("- Access: all: every OpenRouter tool is allowed, billable inference and feedback included")
     expect(formatStatus(buildStatus(facts({ host: checkHost("2.3.0", true) })))).toContain("- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range;")
   })
@@ -208,7 +208,7 @@ describe("readStatus", () => {
   test("reads OpenCode's lists and the plugin's state once each, and counts only the openrouter namespace's tools", async () => {
     const { ctx, state, calls } = sources()
     const status = await readStatus(ctx, state)
-    expect(status.catalog).toMatchObject({ state: "ready", observed: 17, unknownCount: 0 })
+    expect(status.catalog).toMatchObject({ state: "ready", observed: 31, unknownCount: 0 })
     expect(status).not.toHaveProperty("error")
     expect(calls.sort()).toEqual(["agents", "mcp", "skills", "tools"])
   })

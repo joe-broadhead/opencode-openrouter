@@ -27,7 +27,7 @@ describe("the generated block", () => {
     }
   })
 
-  test("follows the access matrix: reads allowed everywhere; inference, images, feedback and unknown tools deny, ask or allow", () => {
+  test("follows the access matrix: reads allowed everywhere; billable tools, media, feedback and unknown tools deny, ask or allow", () => {
     const expected: Record<Access, Rule["effect"]> = { "read-only": "deny", "ask-changes": "ask", all: "allow" }
     for (const access of ACCESS) {
       const rules = [BASE_ALLOW, ...defaultRules(access)]
@@ -37,8 +37,11 @@ describe("the generated block", () => {
       // Another server's tools are not matched.
       expect(decide(rules, "github_create_issue")).toBe("allow")
     }
-    expect(BILLABLE_TOOLS).toEqual(["send-message", "generate-image"])
+    // The live server's spenders: speech, video, batches, decisions and transcription ask by default, like send-message.
+    expect([...BILLABLE_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-message", "transcribe-audio"])
     expect(FEEDBACK).toEqual(["send-feedback"])
+    const askChanges = [BASE_ALLOW, ...defaultRules("ask-changes")]
+    for (const name of ["generate-speech", "generate-video", "send-batch", "send-decision", "transcribe-audio"]) expect({ name, effect: decide(askChanges, nativeToolId(name)) }).toEqual({ name, effect: "ask" })
   })
 })
 

@@ -6,6 +6,7 @@
 // and titles, the negotiated protocol and server name, and for each free read the capture called, the shape of its
 // result (types only, never values). Never a key, token, account id, balance, prompt or the text of a result.
 import { createHash } from "node:crypto"
+import { CHANGE_TOOLS } from "../src/openrouter-tools.js"
 
 /** The free reads the capture may call, in order: list-models first, so a model id is known for the two that take one. */
 export const FREE_READS: readonly string[] = [
@@ -28,8 +29,12 @@ export const FREE_READS: readonly string[] = [
  */
 export const ACCOUNT_READS: readonly string[] = ["get-credits"]
 
-/** Tools a capture never calls: billable inference, feedback, and the recipe whose follow-up runs an evaluation. */
-export const NEVER_CALLED: readonly string[] = ["send-message", "generate-image", "send-feedback", "spawn-ori-eval"]
+/**
+ * Tools a capture never calls: every change in the catalog (billable inference, media, batches, decisions,
+ * transcription, feedback) and the recipe whose follow-up runs an evaluation. The capture's real limit is FREE_READS,
+ * an allowlist; this list is what the reconcile checks the fixture against.
+ */
+export const NEVER_CALLED: readonly string[] = [...CHANGE_TOOLS, "spawn-ori-eval"]
 
 export type Schema = Record<string, unknown>
 
@@ -309,6 +314,7 @@ export function assertNoSecrets(text: string) {
 /** A reviewed tool, as the reconcile reads it. */
 export interface Reviewed {
   readonly name: string
+  readonly effect: string
   readonly rpc: boolean
   readonly scriptOutput?: string
 }
@@ -316,9 +322,11 @@ export interface Reviewed {
 /**
  * Every disagreement between a live fixture and the reviewed catalog: an unknown or a missing tool, a script method
  * whose recorded result is dropped by the RPC, a method labelled live-observed that the capture did not confirm, and a
- * method the capture confirmed that is not labelled live-observed. Empty when they agree.
+ * method the capture confirmed that is not labelled live-observed, a tool the server marks as not read-only that the
+ * catalog treats as a read, and a method labelled documented with neither a live output schema nor OpenRouter's
+ * documentation (`documentedByDocs`) behind it. Empty when they agree.
  */
-export function reconcile(fixture: Pick<LiveFixture, "tools" | "calls">, reviewed: readonly Reviewed[]): string[] {
+export function reconcile(fixture: Pick<LiveFixture, "tools" | "calls">, reviewed: readonly Reviewed[], documentedByDocs: readonly string[] = ["send-message"]): string[] {
   const problems: string[] = []
   const live = new Set(fixture.tools.map((tool) => tool.name))
   const known = new Set(reviewed.map((tool) => tool.name))
@@ -330,6 +338,11 @@ export function reconcile(fixture: Pick<LiveFixture, "tools" | "calls">, reviewe
     if (tool.rpc && fit === "fits" && tool.scriptOutput !== "live-observed") problems.push(`script method ${tool.name} is confirmed by the capture; label its output live-observed`)
     if (tool.scriptOutput === "live-observed" && fit !== "fits") problems.push(`script method ${tool.name} is labelled live-observed, but the capture did not confirm it`)
     if (NEVER_CALLED.includes(tool.name) && fixture.calls[tool.name]?.called) problems.push(`${tool.name} must never be called by a capture`)
+    const liveTool = fixture.tools.find((item) => item.name === tool.name)
+    if (liveTool?.annotations?.["readOnlyHint"] === false && tool.effect === "read") problems.push(`${tool.name} is marked not read-only by the server, but the catalog treats it as a read`)
+    if (tool.rpc && tool.scriptOutput === "documented" && liveTool && !liveTool.outputSchema && !documentedByDocs.includes(tool.name)) {
+      problems.push(`script method ${tool.name} is labelled documented, but the server declares no output schema for it`)
+    }
   }
   return problems
 }

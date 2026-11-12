@@ -60,9 +60,10 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - **Transforms are cheap, synchronous and never throw.** No file reads, network calls, awaited work or new timers in a
   transform callback. Record failures for status instead. A replay replaces what it observed, never appends.
 - **`src/openrouter-tools.ts` is the one record of OpenRouter's tools**, with no imports. Everything else derives from it.
-  Its names come from OpenRouter's documentation; `test/fixtures/documented-tools.json` is labelled `documented` and
-  never stands in for a live capture. A signed-in capture goes in `test/fixtures/live-tools.json`, recorded in
-  `test/fixtures/provenance.json` with its host version and protocol. Only `scripts/capture-live.ts` writes it, by
+  Its 31 names, and each tool's class, come from the signed-in capture in `test/fixtures/live-tools.json` (descriptions,
+  schemas and annotations); anything that bills or may spend is billable, and when in doubt it is.
+  `test/fixtures/documented-tools.json` is labelled `documented` and never stands in for a live capture. The capture is recorded in
+  `test/fixtures/provenance.json` with its host version, protocol and digest. Only `scripts/capture-live.ts` writes it, by
   hand, never from `npm run check` or CI; it calls only the free reads in `FREE_READS` (`scripts/live-catalog.ts`) and
   refuses every other `tools/call` before it is sent. A script method's `scriptOutput` becomes `live-observed` only when
   `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms it.
@@ -73,6 +74,8 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `CODES` in `src/constants.ts` is the one table, and the README's `Errors` table is checked equal to it.
 - **Redaction.** Host or network text is shown only through `src/redact.ts`: one line, at most 160 characters, no
   credentials, URL queries or userinfo, controls or bidi characters.
+- **Native-only tools.** A tool whose useful result is media the tools RPC drops (`rpcExclusion: "native-media-required"`)
+  or that describes the signed-in key (`"key-metadata"`) is never a script method. A new media generator joins them.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module several plugins share. Change only its block between
   the `PLUGIN-SPECIFIC` markers; `scripts/check-copies.mjs` (the `copies` stage) fails when the rest differs from the
   family's hash, and a change there is made in every plugin at once. `test/unit/tools-rpc.test.ts` is the family's suite,

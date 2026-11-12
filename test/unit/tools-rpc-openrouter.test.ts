@@ -87,9 +87,9 @@ describe("OpenRouter's block", () => {
     expect(TOOLS_RPC_ID).toBe("openrouter.models.tools")
   })
 
-  test("its methods are the 16 reviewed script tools, by exact hyphenated name, with the catalog's effect as class", () => {
+  test("its methods are the 27 reviewed script tools, by exact hyphenated name, with the catalog's effect as class", () => {
     expect(METHODS.map((method) => method.name)).toEqual([...RPC_TOOLS])
-    expect(METHODS).toHaveLength(16)
+    expect(METHODS).toHaveLength(27)
     for (const method of METHODS) {
       expect(method.kind).toBe("mcp")
       expect(method.name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
@@ -97,7 +97,8 @@ describe("OpenRouter's block", () => {
     }
     expect(METHODS.find((method) => method.name === "send-message")!.class).toBe("write")
     expect(METHODS.find((method) => method.name === "send-feedback")!.class).toBe("send")
-    for (const name of ["generate-image", NEW_TOOL, "send_message", "search-models", "describe"]) expect(METHODS.map((method) => method.name)).not.toContain(name)
+    for (const name of ["generate-image", "generate-speech", "generate-video", "get-current-key", NEW_TOOL, "send_message", "search-models", "describe"]) expect(METHODS.map((method) => method.name)).not.toContain(name)
+    for (const name of ["send-batch", "send-decision", "transcribe-audio"]) expect(METHODS.find((method) => method.name === name)!.class).toBe("write")
   })
 
   test("passes inputs and results through unchanged; the registered shaper runs the guard first", () => {
@@ -127,7 +128,7 @@ describe("OpenRouter's block", () => {
   test("never tells a script to call a paid or feedback method again after an uncertain outcome", () => {
     for (const code of ["CANCELLED", "UPSTREAM_ERROR", "CONNECTING", "CONNECTION_FAILED"] as const) {
       const step = NEXT_STEPS[code]!
-      expect(step).toContain("send-message or send-feedback")
+      for (const name of ["send-message", "send-batch", "send-decision", "transcribe-audio", "send-feedback"]) expect(step).toContain(name)
       expect(step).toContain("get-generation")
       expect(step).toContain("before you deliberately send it again")
       expect(step).not.toMatch(/^Call the method again/)
@@ -142,22 +143,24 @@ describe("OpenRouter's block", () => {
 })
 
 describe("the registered RPC", () => {
-  test("has no generate-image route: its contract and handlers refuse it before anything is dispatched", async () => {
+  test("has no route for a native-only tool: the media generators and get-current-key are refused before anything is dispatched", async () => {
     const h = await setup({ access: "all" })
     expect(Object.keys(h.contract.methods).sort()).toEqual(["describe", ...RPC_TOOLS].sort())
-    expect(h.contract.methods).not.toHaveProperty("generate-image")
-    expect(h.handlers).not.toHaveProperty("generate-image")
+    for (const name of NATIVE_ONLY) {
+      expect(h.contract.methods).not.toHaveProperty(name)
+      expect(h.handlers).not.toHaveProperty(name)
+    }
     expect(h.dispatched).toEqual([])
   })
 
-  test("describe lists generate-image and the unreviewed tool as unclassified, while the catalog keeps generate-image native-only", async () => {
+  test("describe lists the native-only tools and the unreviewed one as unclassified, while the catalog keeps them native-only", async () => {
     const h = await setup()
     const description = await h.describe()
-    expect(description.unclassified).toEqual(["generate-image", NEW_TOOL])
+    expect(description.unclassified).toEqual([...NATIVE_ONLY, NEW_TOOL].sort())
     expect(description.methods.map((method: { name: string }) => method.name)).toEqual([...RPC_TOOLS])
-    // The plugin's own count of unknown tools is a different list: generate-image is native-only, never unknown.
-    expect(NATIVE_ONLY).toEqual(["generate-image"])
-    expect(TOOL_NAMES).toContain("generate-image")
+    // The plugin's own count of unknown tools is a different list: a native-only tool is reviewed, never unknown.
+    expect([...NATIVE_ONLY].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "get-current-key"])
+    for (const name of NATIVE_ONLY) expect(TOOL_NAMES).toContain(name)
     expect(TOOL_NAMES).not.toContain(NEW_TOOL)
     expect(h.dispatched).toEqual([])
   })
@@ -166,7 +169,7 @@ describe("the registered RPC", () => {
     const h = await setup()
     expect(await h.call("ping")).toEqual({ output: { tool: "openrouter_ping" }, text: "synthetic openrouter_ping" })
     expect(h.dispatched).toEqual(["ping"])
-    for (const method of ["send-message", "send-feedback"]) {
+    for (const method of ["send-message", "send-batch", "send-decision", "transcribe-audio", "send-feedback"]) {
       const result = await h.call(method)
       expect(result).toMatchObject({ type: "failed", data: { code: "PERMISSION_DENIED" } })
       expect(result.message).toContain(`openrouter_${method} would ask for this session's agent, and a script cannot answer`)
@@ -177,7 +180,7 @@ describe("the registered RPC", () => {
 
   test("permission parity, read-only: paid and feedback calls are denied with no dispatch; reads still run", async () => {
     const h = await setup({ access: "read-only" })
-    for (const method of ["send-message", "send-feedback"]) expect(await h.call(method)).toMatchObject({ type: "failed", data: { code: "PERMISSION_DENIED" } })
+    for (const method of ["send-message", "send-batch", "send-decision", "transcribe-audio", "send-feedback"]) expect(await h.call(method)).toMatchObject({ type: "failed", data: { code: "PERMISSION_DENIED" } })
     expect(h.dispatched).toEqual([])
     await h.call("list-models")
     expect(h.dispatched).toEqual(["list-models"])

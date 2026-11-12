@@ -56,13 +56,12 @@ describe("the scripting guide", () => {
     expect(rows.map((cells) => cells[0])).toEqual([...RPC_TOOLS, "describe"].map((name) => `\`${name}\``))
   })
 
-  test("gives each method the catalog's class and output evidence, and claims nothing live", () => {
+  test("gives each method the catalog's class and output evidence, live-observed only where the catalog says so", () => {
     for (const name of RPC_TOOLS) {
       const tool = REVIEWED_TOOLS.find((item) => item.name === name)!
       const row = rows.find((cells) => cells[0] === `\`${name}\``)!
       expect({ name, class: row[1], evidence: row[3] } as Record<string, string | undefined>).toEqual({ name, class: `\`${tool.effect}\``, evidence: tool.scriptOutput })
     }
-    expect(scripting).not.toMatch(/\|\s*live-observed\s*\|/)
   })
 
   test("names the native-only tools as not methods", () => {

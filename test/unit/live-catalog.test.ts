@@ -33,7 +33,7 @@ const provenance = JSON.parse(readFileSync(new URL("../fixtures/provenance.json"
 }
 const live = existsSync(FIXTURE) ? (JSON.parse(readFileSync(FIXTURE, "utf8")) as LiveFixture) : undefined
 
-const tool = (name: string): LiveTool => recordTool({ name, description: `about ${name}`, inputSchema: { type: "object" } })
+const tool = (name: string): LiveTool => recordTool({ name, description: `about ${name}`, inputSchema: { type: "object" }, outputSchema: { type: "object" } })
 const fits = { called: true, isError: false, contentTypes: ["text"], structured: null, text: { length: 2, json: null } }
 
 describe("the capture's limits", () => {
@@ -111,8 +111,10 @@ describe("arguments for a free read", () => {
 })
 
 describe("the reconcile", () => {
-  const reviewed = REVIEWED_TOOLS.map(({ name, rpc, scriptOutput }) => ({ name, rpc, ...(scriptOutput ? { scriptOutput } : {}) }))
+  const reviewed = REVIEWED_TOOLS.map(({ name, effect, rpc, scriptOutput }) => ({ name, effect, rpc, ...(scriptOutput ? { scriptOutput } : {}) }))
   const allTools = TOOL_NAMES.map(tool)
+  /** The calls that confirm the methods the catalog already labels live-observed. */
+  const confirmed = Object.fromEntries(LIVE_VERIFIED_SCRIPT_METHODS.map((name) => [name, fits]))
 
   test("whether a recorded result survives the tools RPC", () => {
     expect(scriptFit(fits)).toBe("fits")
@@ -124,26 +126,35 @@ describe("the reconcile", () => {
   })
 
   test("fails on an unknown or a missing tool", () => {
-    expect(reconcile({ tools: [...allTools.filter((item) => item.name !== "ping"), tool("new-tool")], calls: {} }, reviewed)).toEqual([
+    expect(reconcile({ tools: [...allTools.filter((item) => item.name !== "get-model"), tool("new-tool")], calls: confirmed }, reviewed)).toEqual([
       "unknown tool: new-tool is live but not in the reviewed catalog",
-      "missing tool: ping is reviewed but the live server does not list it",
+      "missing tool: get-model is reviewed but the live server does not list it",
     ])
+    expect(reconcile({ tools: allTools, calls: confirmed }, reviewed)).toEqual([])
   })
 
   test("a confirmed method must be labelled live-observed, a dropped one must leave the script methods, and an unconfirmed label fails", () => {
-    expect(reconcile({ tools: allTools, calls: { ping: fits } }, reviewed)).toEqual(["script method ping is confirmed by the capture; label its output live-observed"])
-    const relabelled = reviewed.map((item) => (item.name === "ping" ? { ...item, scriptOutput: "live-observed" } : item))
-    expect(reconcile({ tools: allTools, calls: { ping: fits } }, relabelled)).toEqual([])
-    expect(reconcile({ tools: allTools, calls: {} }, relabelled)).toEqual(["script method ping is labelled live-observed, but the capture did not confirm it"])
-    expect(reconcile({ tools: allTools, calls: { "list-models": { ...fits, contentTypes: ["text", "resource"] } } }, reviewed)).toEqual([
+    expect(reconcile({ tools: allTools, calls: { ...confirmed, "get-model": fits } }, reviewed)).toEqual(["script method get-model is confirmed by the capture; label its output live-observed"])
+    const relabelled = reviewed.map((item) => (item.name === "get-model" ? { ...item, scriptOutput: "live-observed" } : item))
+    expect(reconcile({ tools: allTools, calls: { ...confirmed, "get-model": fits } }, relabelled)).toEqual([])
+    expect(reconcile({ tools: allTools, calls: confirmed }, relabelled)).toEqual(["script method get-model is labelled live-observed, but the capture did not confirm it"])
+    expect(reconcile({ tools: allTools, calls: { ...confirmed, "list-models": { ...fits, contentTypes: ["text", "resource"] } } }, reviewed)).toEqual([
       "script method list-models returns content the tools RPC drops; make it native-only",
+      "script method list-models is labelled live-observed, but the capture did not confirm it",
     ])
-    expect(reconcile({ tools: allTools, calls: { "send-message": fits } }, reviewed)).toContain("send-message must never be called by a capture")
+    for (const name of ["send-message", "send-batch", "transcribe-audio", "generate-speech"]) expect(reconcile({ tools: allTools, calls: { ...confirmed, [name]: fits } }, reviewed)).toContain(`${name} must never be called by a capture`)
+  })
+
+  test("a tool the server marks as not read-only must not be a read, and a documented label needs a live output schema or OpenRouter's documentation", () => {
+    const marked = allTools.map((item) => (item.name === "ping" ? { ...item, annotations: { readOnlyHint: false } } : item))
+    expect(reconcile({ tools: marked, calls: confirmed }, reviewed)).toEqual(["ping is marked not read-only by the server, but the catalog treats it as a read"])
+    const noSchema = allTools.map((item) => (item.name === "get-batch" || item.name === "send-message" ? { ...item, outputSchema: null } : item))
+    expect(reconcile({ tools: noSchema, calls: confirmed }, reviewed)).toEqual(["script method get-batch is labelled documented, but the server declares no output schema for it"])
   })
 
   test("reports schema drift between two captures by kind", () => {
     const before = [tool("a"), tool("b"), { ...tool("c"), annotations: { readOnlyHint: true } }]
-    const after = [{ ...tool("a"), inputSchema: { type: "object", properties: { x: {} } } }, { ...tool("c"), outputSchema: { type: "object" }, description: { sha256: "x", length: 1 } }, tool("d")]
+    const after = [{ ...tool("a"), inputSchema: { type: "object", properties: { x: {} } } }, { ...tool("c"), outputSchema: { type: "object", properties: { y: {} } }, description: { sha256: "x", length: 1 } }, tool("d")]
     expect(drift(before, after)).toEqual({ added: ["d"], removed: ["b"], input: ["a"], output: ["c"], annotations: ["c"], descriptions: ["c"] })
     expect(Object.values(drift(before, before)).flat()).toEqual([])
   })
@@ -181,7 +192,7 @@ describe("the committed live capture", () => {
   })
 
   test("agrees with the reviewed catalog: no unknown or missing tool, and every script label matches the capture", () => {
-    const reviewed = REVIEWED_TOOLS.map(({ name, rpc, scriptOutput }) => ({ name, rpc, ...(scriptOutput ? { scriptOutput } : {}) }))
+    const reviewed = REVIEWED_TOOLS.map(({ name, effect, rpc, scriptOutput }) => ({ name, effect, rpc, ...(scriptOutput ? { scriptOutput } : {}) }))
     expect(reconcile(live, reviewed)).toEqual([])
     for (const name of NEVER_CALLED) expect(live.calls[name]?.called ?? false).toBe(false)
     expect(LIVE_VERIFIED_SCRIPT_METHODS).toEqual(RPC_TOOLS.filter((name) => scriptFit(live.calls[name]) === "fits"))

@@ -14,8 +14,26 @@
         "value": "afe0baa0fe24753e52618c98ad918b23c77d216df4326253fc438f172e8524b9"
       },
       "schemas": "not published"
+    },
+    {
+      "fixture": "live-tools.json",
+      "evidence": "live-observed",
+      "retrieved": "2026-11-12",
+      "endpoint": "https://mcp.openrouter.ai/mcp",
+      "source": "scripts/capture-live.ts, signed in",
+      "host": "2.2.3",
+      "protocol": "2025-11-25",
+      "digest": {
+        "algorithm": "sha256",
+        "of": "canonical JSON of the recorded tools, sorted by name",
+        "value": "c6e4fcf154f212cbf727af3342adea6643419b869ee5820e47564f59020209c2"
+      },
+      "schemas": "recorded"
     }
   ],
-  "live": null,
+  "live": {
+    "fixture": "live-tools.json",
+    "retrieved": "2026-11-12"
+  },
   "note": "live stays null until an authenticated tools/list is captured into test/fixtures/live-tools.json with its host version and protocol. Digests are for drift detection, not a security signature."
 }
