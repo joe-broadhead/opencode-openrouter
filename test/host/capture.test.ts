@@ -5,7 +5,7 @@
 // Synthetic: it proves the tool, not OpenRouter's server.
 import { ROOT, HOST_SDK_DIR } from "./isolate.js"
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { cpSync, mkdirSync, readFileSync } from "node:fs"
+import { cpSync, mkdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { CaptureResult } from "../../scripts/capture-live.js"
@@ -25,8 +25,8 @@ let homes = 0
 type Outcome = { result?: CaptureResult; opened?: string[]; fetchRestored?: boolean; error?: string }
 
 /** One capture in a fresh process against `fake`. */
-async function run(fake: FakeMcp, options: { oauth?: boolean; signIn: "wait" | "until-login" | "never"; browser?: "none" | "follow" }): Promise<Outcome> {
-  const input = { endpoint: fake.url, oauth: options.oauth ?? false, home: join(ROOT, `capture-${++homes}`), sdk: SDK, signIn: options.signIn, browser: options.browser ?? "none" }
+async function run(fake: FakeMcp, options: { oauth?: boolean; signIn: "wait" | "until-login" | "never"; browser?: "none" | "follow"; urlFile?: string }): Promise<Outcome> {
+  const input = { endpoint: fake.url, oauth: options.oauth ?? false, home: join(ROOT, `capture-${++homes}`), sdk: SDK, signIn: options.signIn, browser: options.browser ?? "none", ...(options.urlFile ? { urlFile: options.urlFile } : {}) }
   const child = Bun.spawn([process.execPath, CHILD], { env: { ...process.env, CAPTURE_CHILD: JSON.stringify(input) }, stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   const line = stdout.trim().split("\n").at(-1)
@@ -77,10 +77,14 @@ describe("the live capture tool, against the fake", () => {
   test("stopping at the sign-in page: OpenCode's own sign-in is opened, then cancelled; no token, no tool call", async () => {
     const fake = await startFakeMcp({ challenge: true })
     try {
-      const outcome = await run(fake, { oauth: true, signIn: "until-login" })
+      const urlFile = join(ROOT, "signin-url.txt")
+      const outcome = await run(fake, { oauth: true, signIn: "until-login", urlFile })
       expect(outcome.error).toBeUndefined()
       expect(outcome.result!.login!.page).toBe(`${fake.origin}/oauth/authorize`)
       expect(outcome.opened).toHaveLength(1)
+      // With --url-file, the full URL is in a file only its owner can read.
+      expect(readFileSync(urlFile, "utf8")).toBe(`${outcome.opened![0]}\n`)
+      expect(statSync(urlFile).mode & 0o777).toBe(0o600)
       expect(new URL(outcome.opened![0]!).searchParams.get("code_challenge_method")).toBe("S256")
       expect(fake.tokens).toEqual([])
       expect(fake.calls).toEqual([])

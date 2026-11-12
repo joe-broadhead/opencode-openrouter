@@ -13,6 +13,7 @@ const input = JSON.parse(process.env["CAPTURE_CHILD"] ?? "{}") as {
   signIn: "wait" | "until-login" | "never"
   /** `follow`: act as the person's browser, following the sign-in page to OpenCode's callback. */
   browser: "none" | "follow"
+  urlFile?: string
 }
 
 const real = globalThis.fetch
@@ -38,6 +39,7 @@ try {
     home: input.home,
     sdk: input.sdk,
     signIn: input.signIn,
+    ...(input.urlFile ? { urlFile: input.urlFile } : {}),
     open: (url) => {
       opened.push(url)
       if (input.browser === "follow") void follow(url)

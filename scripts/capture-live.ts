@@ -4,8 +4,13 @@
 //   bun scripts/capture-live.ts --home <scratch folder>               sign in if needed, then capture and write
 //   bun scripts/capture-live.ts --home <scratch folder> --until-login stop once OpenRouter's sign-in page is open
 //   bun scripts/capture-live.ts --home <scratch folder> --check       capture again and report drift, write nothing
-//   add --no-open to print the sign-in URL instead of opening it in the machine's desktop browser, and --keep-browser
-//   to leave that browser open when the script ends
+//   add --no-open to skip opening the sign-in URL in the machine's desktop browser, --keep-browser to leave that browser
+//   open when the script ends, and --url-file <path> to write the full sign-in URL to that file (mode 0600, never the
+//   log), for a person who opens it in a browser of their own on this machine
+//
+// OpenCode's OAuth attempt expires after about ten minutes: sign in within that time, or run the script again for a
+// new URL. The OAuth callback goes to a loopback port on this machine, so the browser must run on this machine (its
+// desktop), not on the person's own computer.
 //
 // It builds the plugin and runs it in an embedded OpenCode host whose home, config, database and project all live in
 // the scratch folder, so no one's own OpenCode setup is read or changed. OpenCode does the sign-in: the script asks it
@@ -18,7 +23,7 @@
 // send-message, generate-image, send-feedback or spawn-ori-eval. It records each tool's name, a digest of its
 // description, its schemas and annotations, and, for each free read it calls, the shape of the result (types only).
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Plugin as PluginApi } from "@opencode/plugin"
@@ -54,6 +59,8 @@ export interface CaptureOptions {
   readonly signIn: "wait" | "until-login" | "never"
   /** Opens the sign-in URL for the person who signs in. */
   readonly open?: (url: string) => void
+  /** Writes the full sign-in URL to this file, mode 0600. It holds a single-use OAuth state, never a credential. */
+  readonly urlFile?: string
   readonly log?: (line: string) => void
   readonly timeoutMs?: number
 }
@@ -189,6 +196,11 @@ export async function capture(options: CaptureOptions): Promise<CaptureResult> {
       const { data: attempt } = await oauth.connect({ integrationID, methodID: method.id, location })
       const page = new URL(attempt.url)
       log(`sign-in page: ${page.origin}${page.pathname}`)
+      if (options.urlFile) {
+        writeFileSync(options.urlFile, `${attempt.url}\n`, { mode: 0o600 })
+        chmodSync(options.urlFile, 0o600)
+        log(`the full sign-in URL is in ${options.urlFile}; OpenCode's attempt expires in about ten minutes`)
+      }
       options.open?.(attempt.url)
       if (options.signIn === "until-login") {
         const answered = await fetch(attempt.url, { redirect: "manual" })
@@ -307,7 +319,7 @@ async function main(argv: readonly string[]) {
   }
   const given = value("--home")
   if (!given) {
-    console.error("usage: bun scripts/capture-live.ts --home <scratch folder> [--until-login | --check] [--no-open] [--keep-browser] [--timeout <minutes>]")
+    console.error("usage: bun scripts/capture-live.ts --home <scratch folder> [--until-login | --check] [--no-open] [--keep-browser] [--url-file <path>] [--timeout <minutes>]")
     process.exit(2)
   }
   const root = fileURLToPath(new URL("..", import.meta.url))
@@ -336,16 +348,28 @@ async function main(argv: readonly string[]) {
   // A browser session of its own, with its profile in the scratch folder, on the machine's desktop, where the person
   // watches and signs in. The machine's default browser profile is never used.
   const browser = ["--session", "openrouter-signin", "--profile", join(home, "browser")]
-  const quote = (text: string) => `'${text.replace(/'/g, "'\\''")}'`
+  const urlFileArg = value("--url-file")
+  const urlFile = urlFileArg ? resolve(urlFileArg) : undefined
+  // agent-browser runs on the desktop's display. Its output goes to <home>/browser.log (its daemon would hold a pipe
+  // open), and a launch that fails prints that log's end, so the failure is visible.
+  const display = { ...caller, DISPLAY: caller["DISPLAY"] ?? ":100" }
+  const browserLog = join(home, "browser.log")
   const open = flag("--no-open")
     ? undefined
     : (url: string) => {
-        const launched = spawnSync("boxd-desktop-launch", [["agent-browser", ...browser, "open", url].map(quote).join(" ")], { env: caller, stdio: "ignore" })
-        if (launched.status !== 0) console.log(`Open this URL in a browser on this machine:\n${url}`)
-        else console.log("Opened the sign-in page in the machine's desktop browser (boxd console: Open, then Desktop).")
+        const out = openSync(browserLog, "a", 0o600)
+        const launched = spawnSync("agent-browser", [...browser, "open", url], { env: display, stdio: ["ignore", out, out], timeout: 120_000 })
+        closeSync(out)
+        if (launched.status === 0) {
+          console.log("Opened the sign-in page in the machine's desktop browser (boxd console: Open, then Desktop).")
+          return
+        }
+        const tail = readFileSync(browserLog, "utf8").trim().split("\n").slice(-6).map((line) => `  ${line.slice(0, 200)}`).join("\n")
+        console.error(`capture-live: the desktop browser did not open (agent-browser ${launched.error ? launched.error.message : `exited ${launched.status}`}):\n${tail}`)
+        console.error(urlFile ? `Open the URL in ${urlFile} in a browser on this machine.` : "Run again with --url-file <path>, and open that URL in a browser on this machine.")
       }
   const closeBrowser = () => {
-    if (open && !flag("--keep-browser")) spawnSync("agent-browser", [...browser, "close"], { env: caller, stdio: "ignore", timeout: 30_000 })
+    if (open && !flag("--keep-browser")) spawnSync("agent-browser", [...browser, "close"], { env: display, stdio: "ignore", timeout: 30_000 })
   }
   const minutes = Number(value("--timeout") ?? 20)
   const result = await capture({
@@ -355,6 +379,7 @@ async function main(argv: readonly string[]) {
     sdk: join(root, "node_modules", "@opencode", "sdk"),
     signIn: flag("--until-login") ? "until-login" : flag("--check") ? "never" : "wait",
     ...(open ? { open } : {}),
+    ...(urlFile ? { urlFile } : {}),
     log: (line) => console.log(line),
     timeoutMs: minutes * 60_000,
   }).finally(closeBrowser)
@@ -362,7 +387,11 @@ async function main(argv: readonly string[]) {
     console.log(`Stopped before signing in: ${result.login.page} answered ${result.login.status}.`)
     return
   }
-  const fixture = result.fixture!
+  if (!result.fixture) {
+    console.log("The openrouter server is already signed in in this scratch folder: there is no sign-in page to stop at.")
+    return
+  }
+  const fixture = result.fixture
   if (flag("--check")) {
     const committed = join(root, "test", "fixtures", "live-tools.json")
     if (!existsSync(committed)) throw new Error("capture-live: there is no committed live-tools.json to compare with")
