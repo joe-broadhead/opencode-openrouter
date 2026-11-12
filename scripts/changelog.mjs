@@ -2,7 +2,7 @@
 // The CHANGELOG's release shape. Each GitHub release is a top-level `## [x.y.z] - YYYY-MM-DD` heading, newest first.
 // While a release is being prepared, its notes sit under `## [Unreleased]`, above the released ones. The npm history
 // stays under `## Earlier releases on npm`, the last section, as `### npm <version> - <date>` headings. The release
-// notes are the section of the version being released. check-release-shape.mjs and release-commit.mjs read the notes
+// notes are the section of the version being released. check-release-shape.mjs and release-github.mjs read the notes
 // and the problems; it works on text only.
 //
 //   node scripts/changelog.mjs release [--date YYYY-MM-DD]   turns `## [Unreleased]` into `## [<version>] - <date>`, for
