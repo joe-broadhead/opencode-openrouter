@@ -186,13 +186,17 @@ Every error reads `CODE: What happened. Next step: What to do.`
 ## Known limits
 
 - Not released: there is no `v0.0.0` tag yet.
+- **Live evidence.** No signed-in capture of OpenRouter's server has been made yet. Tool names and purposes come from
+  OpenRouter's documentation; input schemas are whatever the server reports at run time; every behaviour the checks
+  prove was observed against a local test server, not OpenRouter's.
+- **Paid and feedback tools are never exercised by this project.** `send-message` and `generate-image` (billable
+  inference) and `send-feedback` have never been run against OpenRouter by any check or capture; their behaviour here
+  comes from OpenRouter's documentation and the local test server. Neither has `spawn-ori-eval`.
+- The plugin does not enforce a spending limit. The cap on the key OpenRouter mints at sign-in, which you set on its
+  consent page, is OpenRouter's control.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
-- The tool catalog comes from OpenRouter's public documentation. No signed-in tool list has been captured, so input
-  schemas are whatever the server reports at run time.
-- The plugin does not enforce a spending limit. The provider-side cap on the MCP key is OpenRouter's control.
-- Script methods return text and structured results only, and their output has not been checked against OpenRouter's
-  live server. `generate-image` runs only natively.
+- Script methods return text and structured results only. `generate-image` runs only natively.
 
 ## License
 

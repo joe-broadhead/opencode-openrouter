@@ -27,7 +27,7 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | The sign-in mints a dedicated key, `$10` default spend cap editable on the consent page, at most seven days' lifetime, shortened by an account's key-lifetime policy; a client-requested expiry is ignored. | documented | Same page |
 | The authorization server advertises authorization code, PKCE S256, dynamic client registration, and no refresh-token grant. | assumed | From the design's reading of the public metadata; not re-fetched here. The fake mirrors this shape (synthetic). |
 | Input schemas, output schemas, annotations, pagination of `tools/list`, rate limits and error shapes. | **unknown** | Not published. No signed-in capture exists; `test/fixtures/provenance.json` has `"live": null`. |
-| `get-credits` works with the MCP key (the REST credits endpoint needs a management key). | assumed | To verify in the live spike. |
+| `get-credits` works with the MCP key (the REST credits endpoint needs a management key). | assumed | To verify with `scripts/capture-live.ts`, which calls it and records only whether it answered and its top-level shape. |
 | A trailing-slash URL behaves the same as the canonical one. | **unknown** | Not tested live, so the plugin treats it as a fixable mismatch. |
 | OpenRouter's own OpenCode snippet uses `mcp.openrouter` with `enabled: true`. | documented | Same page, OpenCode tab. That is the older config shape: the 2.2.x schema has `mcp.servers.<name>` and `disabled`, not `enabled` (`schema/dist/config/mcp.d.ts:17`; `schema/dist/mcp.d.ts:39` / `:40`). The plugin uses the V2 API, not the snippet. |
 
@@ -85,6 +85,7 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | A server that needs a sign-in reports `needs_auth` in `ctx.mcp.list()`, and OpenCode's own OAuth starts with dynamic registration and S256 against the server's authorization server. | synthetic | Host and pack tests |
 | Unloading keeps the credential: the plugin registered again connects with the same token, with no new sign-in. | synthetic | Host test |
 | `opencode plugin add`, `opencode reload` and `opencode mcp auth <server>` exist. | source-verified | Stock 2.2.3 CLI `--help` |
+| The host's MCP client sends each request through `globalThis.fetch`, looked up at call time, so `scripts/capture-live.ts`, running the host in its own process, can read the raw `initialize`, `tools/list` and `tools/call` responses and refuse a `tools/call` before it is sent, without reading a header or credential. | source-verified + synthetic | `core/dist/mcp/oauth.js` 2.2.3 `:134-136` (`send` through `noTimeoutFetch`), `util/dist/no-timeout-fetch.js`; `test/host/capture.test.ts` |
 
 ## Where the pinned host does not match the design
 

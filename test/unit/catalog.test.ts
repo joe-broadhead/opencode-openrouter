@@ -58,13 +58,13 @@ describe("the reviewed catalog", () => {
 
   test("every script method carries the evidence that its output fits the script result, and none claims a live capture", () => {
     for (const tool of REVIEWED_TOOLS) expect({ name: tool.name, labelled: tool.scriptOutput !== undefined }).toEqual({ name: tool.name, labelled: tool.rpc })
-    // OpenRouter documents send-message's reply as text with a generation id; every other method is checked only
-    // against the loopback fake. No signed-in capture exists (provenance.json has "live": null).
-    expect(Object.fromEntries(REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool) => [tool.name, tool.scriptOutput]))).toEqual(
-      Object.fromEntries(RPC_TOOLS.map((name) => [name, name === "send-message" ? "documented" : "synthetic"])),
-    )
-    expect(provenance.live).toBeNull()
-    expect(LIVE_VERIFIED_SCRIPT_METHODS).toEqual([])
+    // OpenRouter documents send-message's reply as text with a generation id; every other method is checked against the
+    // loopback fake, until a signed-in capture confirms it (test/unit/live-catalog.test.ts decides which).
+    for (const name of RPC_TOOLS) {
+      const label = reviewedTool(name)!.scriptOutput
+      expect({ name, label }).toEqual({ name, label: label === "live-observed" ? "live-observed" : name === "send-message" ? "documented" : "synthetic" })
+    }
+    expect(LIVE_VERIFIED_SCRIPT_METHODS).toEqual(RPC_TOOLS.filter((name) => reviewedTool(name)!.scriptOutput === "live-observed"))
   })
 
   test("billable tools are never reads", () => {
@@ -83,14 +83,12 @@ describe("the documentation-derived fixture", () => {
     for (const tool of documented.tools) expect(Object.keys(tool).sort()).toEqual(["name", "purpose"])
   })
 
-  test("its provenance matches its digest, names the endpoint, and records no live capture yet", () => {
+  test("its provenance matches its digest and names the endpoint; a live capture is a separate entry", () => {
     const [capture] = provenance.captures
-    expect(provenance.captures).toHaveLength(1)
     expect(capture).toMatchObject({ fixture: "documented-tools.json", evidence: "documented", endpoint: "https://mcp.openrouter.ai/mcp", schemas: "not published" })
     expect(capture!.digest.algorithm).toBe("sha256")
     expect(capture!.digest.value).toBe(sha256(canonicalJson(documented.tools.map((tool) => tool.name).sort())))
-    expect(provenance.live).toBeNull()
-    expect(provenance.captures.every((item) => item.evidence !== "live")).toBe(true)
+    expect(provenance.captures.slice(1).map((item) => [item.fixture, item.evidence])).toEqual(provenance.live ? [["live-tools.json", "live-observed"]] : [])
   })
 })
 

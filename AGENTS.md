@@ -62,7 +62,10 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - **`src/openrouter-tools.ts` is the one record of OpenRouter's tools**, with no imports. Everything else derives from it.
   Its names come from OpenRouter's documentation; `test/fixtures/documented-tools.json` is labelled `documented` and
   never stands in for a live capture. A signed-in capture goes in `test/fixtures/live-tools.json`, recorded in
-  `test/fixtures/provenance.json` with its host version and protocol.
+  `test/fixtures/provenance.json` with its host version and protocol. Only `scripts/capture-live.ts` writes it, by
+  hand, never from `npm run check` or CI; it calls only the free reads in `FREE_READS` (`scripts/live-catalog.ts`) and
+  refuses every other `tools/call` before it is sent. A script method's `scriptOutput` becomes `live-observed` only when
+  `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms it.
 - **The `jelly` section** of `package.json` declares every reviewed tool, the skills, the sign-in, the `access` setting,
   a one-line `summary` and the `icon`, with only the keys Jelly reads. Each tool's effect is the default rules' decision
   under `ask-changes`; `test/unit/jelly.test.ts` keeps it in step with the catalog. See [docs/jelly.md](docs/jelly.md).

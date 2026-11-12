@@ -90,6 +90,30 @@ which publishes no schemas. `test/fixtures/documented-tools.json` records that l
 `test/fixtures/provenance.json` records its digest. A signed-in `tools/list` capture, when one exists, goes in
 `test/fixtures/live-tools.json` with its own provenance entry; the documented fixture is never relabelled as live.
 
+### The live capture
+
+`scripts/capture-live.ts` makes that capture. It is never part of `npm run check` or CI, because it needs a person to
+sign in to OpenRouter. Run it on a machine with a desktop browser:
+
+```sh
+bun scripts/capture-live.ts --home <scratch folder>                # sign in, capture, write the fixture
+bun scripts/capture-live.ts --home <scratch folder> --until-login  # stop once OpenRouter's sign-in page is open
+bun scripts/capture-live.ts --home <scratch folder> --check        # capture again and report drift, write nothing
+```
+
+It builds the plugin and runs it in an embedded OpenCode host whose home, config, database and project are in the
+scratch folder, and opens OpenCode's own sign-in page for the `openrouter` server in a browser profile of its own, also
+in that folder. After the sign-in it records every `tools/list` page (names, description digests, input and output
+schemas, annotations), the protocol, and the result shapes of the free reads in `FREE_READS` (types only, never values).
+It refuses, before it is sent, every `tools/call` outside those reads, so it never calls `send-message`,
+`generate-image`, `send-feedback` or `spawn-ori-eval`, and it records no key, token, account id, balance or result text.
+
+`test/unit/live-catalog.test.ts` then reconciles the fixture with the catalog: it fails on an unknown or a missing tool,
+on a fixture edited without its provenance digest, and on a script method whose label does not match the capture. A
+method whose free read returned text or structured content is labelled `live-observed` in the catalog; one whose
+result holds content the tools RPC drops leaves the script methods. Delete the scratch folder afterwards: it holds the
+signed-in credential.
+
 ## Commits
 
 Use `type(scope): summary`, for example `fix(mcp): treat an explicit default port as a mismatch`. Keep commits small, and
