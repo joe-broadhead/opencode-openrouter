@@ -21,8 +21,11 @@ All notable changes to this project are documented here. The format follows
 - An operational guard on every OpenRouter tool: until the rules are applied and the server entry is the plugin's own or
   the user's exact one, and after the plugin unloads, every call fails with `POLICY_UNAVAILABLE` before anything is sent.
 - `generate-image` runs as a direct tool, outside Code Mode.
-- Four skills: `openrouter` (research and integration), `openrouter-evaluate` (bounded model tests),
-  `openrouter-images` (image generation) and `openrouter-troubleshoot` (diagnosis), registered from the installed
+- Four skills: `openrouter` (research and integration), `openrouter-evaluate` (bounded model tests, and decision tests
+  and batches on explicit request), `openrouter-images` (image generation, and speech, video and transcription on
+  explicit request) and `openrouter-troubleshoot` (diagnosis, with `get-current-key` after an out-of-credit error).
+  Every billable tool is called only on the user's explicit request, once, and never repeated after an uncertain
+  outcome without first checking `get-generation`, `get-batch` or `get-video`. They are registered from the installed
   package. A skill of the same name that you already have is kept and reported as shadowed; a missing or malformed skill
   file is recorded as `SKILLS_INVALID` and does not stop the plugin.
 - One local status model, shown by `/openrouter-status` (a synthetic message, no model turn), the `/openrouter` dialog

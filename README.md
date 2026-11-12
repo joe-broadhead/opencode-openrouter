@@ -113,10 +113,10 @@ describes how to use the tools, and OpenCode's permissions still decide whether 
 
 | Skill | Use it for |
 | --- | --- |
-| `openrouter` | Finding and shortlisting models, comparing endpoints, explaining routing, usage trends, and integration questions answered from OpenRouter's current documentation. Read-only. |
-| `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Ori only when you ask for it. |
-| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you. |
-| `openrouter-troubleshoot` | Connection, sign-in, credit, generation, routing or tool failures, diagnosed with read operations. Feedback only when you ask for it. |
+| `openrouter` | Finding and shortlisting models, comparing endpoints and their uptime, explaining routing, usage trends, harness session costs, your saved presets, and integration questions answered from OpenRouter's current documentation. Read-only. |
+| `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Decision tests (`send-decision`), batches (`send-batch`) and Ori only when you ask for them. |
+| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you; also speech, video and transcription when you ask for them, each called once, a video job followed with `get-video`. |
+| `openrouter-troubleshoot` | Connection, sign-in, credit, key-limit, generation, batch, video-job, routing or tool failures, diagnosed with read operations (`get-current-key` after an out-of-credit error). Feedback only when you ask for it. |
 
 If you already have a skill with one of these names, yours is kept and the plugin's is not registered. A skill file that
 is missing or malformed is skipped with `SKILLS_INVALID`; the server and its tools keep working.
