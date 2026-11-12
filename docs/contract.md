@@ -60,6 +60,12 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | `Rpc.define(definition)` and `ctx.rpc.register(definition, handlers)`. | source-verified | `schema/dist/rpc.d.ts:49`; `plugin/dist/promise/rpc.d.ts:21` |
 | Removing a plugin generation disposes everything it registered, and the plugin's cleanup runs. | synthetic | "unloading" host test |
 | There is no public `ctx.mcp.callTool()`. | source-verified | `plugin/dist/promise/mcp.d.ts:12-15` exposes only `list`, `transform`, `reload` |
+| `ctx.tool.list()` hands a plugin each tool's executor after every transform, so the tools RPC dispatches through the guarded native executor, which asserts `openrouter_<name>` for the call's session and agent. A throw from a plugin executor reaches the caller as a `Tool.Error` that keeps the thrown error as `error`. | source-verified | `plugin/dist/promise/adapter.js` 2.2.3 `:346` (`list`), `:470` (`toolError`) |
+| The tools RPC resolves the session's agent and session rules before dispatch; an `allow` runs once, an `ask` is refused with no prompt left, a `deny` is refused, and a failed policy refuses every method as `POLICY_UNAVAILABLE` in the declared `failed` envelope, with no `tools/call` reaching the server. | synthetic | `test/host/scripts.test.ts`, 2.2.3 to 2.2.6 |
+| A route the RPC contract does not declare, such as `generate-image`, is answered `rpc.method_not_found` by the host before any plugin code runs. | synthetic | `test/host/scripts.test.ts` |
+| The shared tools RPC's result keeps an MCP result's structured content and its text parts, and drops every other content block (images included). | source-verified | `normalise` in `src/host/tools-rpc.ts`, the family's shared part |
+| Each script method's useful result fits that result. | synthetic (`send-message`: documented) | The loopback fake answers text and structured content; OpenRouter documents `send-message`'s reply as text with a generation id. Per-method labels are the `scriptOutput` column of `src/openrouter-tools.ts` and the table in [scripting.md](scripting.md). To confirm with a signed-in capture. |
+| Status reads only `ctx.mcp.list()`, `ctx.tool.list()`, `ctx.agent.list()`, `ctx.skill.list()` and the plugin's own state, and sends no `tools/call`. | synthetic | `test/host/status.test.ts` |
 
 ## MCP identity and naming
 
