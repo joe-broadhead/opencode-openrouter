@@ -20,8 +20,10 @@
 //
 // It watches the MCP server's HTTP responses in this process to record the raw `initialize` and `tools/list` pages
 // (every page), and refuses, before it is sent, every `tools/call` except the free reads in FREE_READS: it never calls
-// send-message, generate-image, send-feedback or spawn-ori-eval. It records each tool's name, a digest of its
-// description, its schemas and annotations, and, for each free read it calls, the shape of the result (types only).
+// send-message, generate-image, send-feedback or spawn-ori-eval. It records each tool's name, its description in full
+// (public tool metadata, with its digest and length, so a billing judgement read from it can be checked later), its
+// schemas and annotations, and, for each free read it calls, the shape of the result (types only). Any request body it
+// cannot read is refused too.
 import { spawnSync } from "node:child_process"
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -271,7 +273,7 @@ export async function capture(options: CaptureOptions): Promise<CaptureResult> {
     const init = watch.initialize()
     const fixture: LiveFixture = {
       evidence: "live-observed",
-      note: "Captured from OpenRouter's MCP server with a signed-in account by scripts/capture-live.ts. Descriptions are recorded as digests; results as types only. No key, token, account id, balance or result text is recorded. No billable or feedback tool was called.",
+      note: "Captured from OpenRouter's MCP server with a signed-in account by scripts/capture-live.ts. Descriptions are public tool metadata, recorded in full; results as types only. No key, token, account id, balance or result text is recorded. No billable or feedback tool was called.",
       retrieved: new Date().toISOString().slice(0, 10),
       endpoint: options.endpoint,
       host: { version: sdkVersion, via: "embedded @opencode/sdk" },
@@ -280,7 +282,7 @@ export async function capture(options: CaptureOptions): Promise<CaptureResult> {
       tools: raw.map(recordTool).sort((a, b) => (a.name < b.name ? -1 : 1)),
       calls,
     }
-    assertNoSecrets(JSON.stringify(fixture))
+    assertNoSecrets(fixture)
     return { fixture }
   } finally {
     await client.close().catch(() => undefined)

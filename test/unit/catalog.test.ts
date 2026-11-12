@@ -6,6 +6,7 @@ import {
   BILLABLE_TOOLS,
   CHANGE_TOOLS,
   LIVE_VERIFIED_SCRIPT_METHODS,
+  MCP_DOCS,
   NATIVE_ONLY,
   READ_TOOLS,
   REVIEWED_TOOLS,
@@ -42,16 +43,16 @@ describe("the reviewed catalog", () => {
     expect([...CHANGE_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-feedback", "send-message", "transcribe-audio"])
     expect([...BILLABLE_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-message", "transcribe-audio"])
     for (const name of ["send-batch", "send-decision", "send-message", "transcribe-audio"]) expect(reviewedTool(name)).toMatchObject({ effect: "write", billable: true, visibility: "execution", rpc: true })
-    expect(reviewedTool("send-feedback")).toEqual({ name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true, scriptOutput: "synthetic" })
+    expect(reviewedTool("send-feedback")).toMatchObject({ name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true, scriptOutput: "synthetic" })
     // Every tool the server marks as not read-only is a change here.
     for (const tool of live.tools) if (tool.annotations?.["readOnlyHint"] === false) expect({ name: tool.name, change: CHANGE_TOOLS.includes(tool.name) }).toEqual({ name: tool.name, change: true })
   })
 
   test("the media generators are native only, like generate-image; get-current-key is native only, so a script never sees key metadata", () => {
     for (const name of ["generate-image", "generate-speech", "generate-video"]) {
-      expect(reviewedTool(name)).toEqual({ name, effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" })
+      expect(reviewedTool(name)).toMatchObject({ name, effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" })
     }
-    expect(reviewedTool("get-current-key")).toEqual({ name: "get-current-key", effect: "read", billable: false, visibility: "account-data", rpc: false, rpcExclusion: "key-metadata" })
+    expect(reviewedTool("get-current-key")).toMatchObject({ name: "get-current-key", effect: "read", billable: false, visibility: "account-data", rpc: false, rpcExclusion: "key-metadata" })
     expect([...NATIVE_ONLY].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "get-current-key"])
     for (const tool of REVIEWED_TOOLS) expect(tool.rpcExclusion !== undefined).toBe(!tool.rpc)
   })
@@ -82,6 +83,22 @@ describe("the reviewed catalog", () => {
       "get-endpoint-uptime-history", "get-model", "get-session-cost", "list-model-endpoints", "get-preset", "list-preset-versions", "list-presets", "install-ori-harness", "spawn-ori-eval", "send-feedback",
     ])
     expect(LIVE_VERIFIED_SCRIPT_METHODS).toEqual(byLabel("live-observed"))
+  })
+
+  test("every effect judgement rests on the live annotations, and every billing judgement names its evidence honestly", () => {
+    for (const tool of REVIEWED_TOOLS) {
+      expect({ name: tool.name, effect: tool.effectEvidence }).toEqual({ name: tool.name, effect: "live-observed" })
+      // Billing is never live-observed: the capture called no paid tool and stored descriptions only as digests.
+      expect(["documented", "assumed"]).toContain(tool.billingEvidence.level)
+      if (tool.billingEvidence.level === "documented") expect(tool.billingEvidence.source).toMatch(/^https:\/\/openrouter\.ai\/docs\//)
+      else expect(tool.billingEvidence.source.length).toBeGreaterThan(40)
+    }
+    // The 17 tools on the MCP page cite it; the rest cite another OpenRouter page or say why nothing confirms them.
+    for (const { name } of documented.tools) expect({ name, source: reviewedTool(name)!.billingEvidence.source }).toEqual({ name, source: MCP_DOCS })
+    const assumed = REVIEWED_TOOLS.filter((tool) => tool.billingEvidence.level === "assumed").map((tool) => tool.name)
+    expect(assumed).toEqual(["get-endpoint-uptime-history", "get-session-cost", "get-batch", "get-current-key", "get-preset", "get-video", "list-batches", "list-preset-versions", "list-presets", "transcribe-audio"])
+    // A paid tool resting on an assumption is still billable: when in doubt, it asks.
+    expect(reviewedTool("transcribe-audio")).toMatchObject({ billable: true, billingEvidence: { level: "assumed" } })
   })
 
   test("the Code Mode namespace text names every billable tool and the feedback tool", () => {

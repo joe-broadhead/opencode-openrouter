@@ -137,6 +137,9 @@ describe("OpenRouter's block", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("never put an OpenRouter key in a script")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.openrouter")
     expect(NEXT_STEPS.PERMISSION_DENIED).toContain("a script cannot answer a prompt")
+    // The methods that ask by default come from the catalog, every billable one and feedback, never a hand-written pair.
+    expect(NEXT_STEPS.PERMISSION_DENIED).toContain("send-batch, send-decision, send-message, transcribe-audio, send-feedback ask by default")
+    for (const name of RPC_TOOLS.filter((method) => REVIEWED_TOOLS.find((tool) => tool.name === method)!.effect !== "read")) expect(NEXT_STEPS.CANCELLED).toContain(name)
     expect(NEXT_STEPS.ACCOUNT_UNKNOWN).toBeUndefined()
     for (const step of Object.values(NEXT_STEPS)) expect(step).toMatch(/[^.]\.$/)
   })

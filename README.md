@@ -193,7 +193,9 @@ Every error reads `CODE: What happened. Next step: What to do.`
   their input and output schemas and annotations, and the text results of nine free reads: `list-models`,
   `list-providers`, `list-benchmarks`, `list-daily-model-rankings`, `list-app-rankings`, `list-task-classifications`,
   `search-docs`, `ping` and `get-credits`. Every other read was not called (its output is known only from its declared
-  schema or the local test server), and OpenRouter may change its tools and schemas at any time.
+  schema or the local test server), and OpenRouter may change its tools and schemas at any time. Which tools bill is
+  documented by OpenRouter for all of them but `transcribe-audio` (treated as billable regardless) and the nine newer
+  reads (treated as free): those judgements rest on descriptions the capture did not store.
 - **Paid and feedback tools are never exercised by this project.** `send-message`, `send-batch`, `send-decision`,
   `transcribe-audio`, `generate-image`, `generate-speech` and `generate-video` (all billable) and `send-feedback` have
   never been run against OpenRouter by any check or capture; their behaviour here comes from their live descriptions

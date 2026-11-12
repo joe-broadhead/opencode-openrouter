@@ -2,9 +2,11 @@
 // reviewed catalog in src/openrouter-tools.ts. Pure functions only, no I/O: scripts/capture-live.ts uses them to build
 // test/fixtures/live-tools.json, and test/unit/live-catalog.test.ts uses them to check that fixture.
 //
-// What a fixture may hold: tool names, a digest and length of each description, input and output schemas, annotations
-// and titles, the negotiated protocol and server name, and for each free read the capture called, the shape of its
-// result (types only, never values). Never a key, token, account id, balance, prompt or the text of a result.
+// What a fixture may hold: tool names, each description's text with its digest and length (descriptions are public
+// tool metadata), input and output schemas, annotations and titles, the negotiated protocol and server name, and for
+// each free read the capture called, the shape of its result (types only, never values). Never a key, token, account
+// id, balance, prompt or the text of a result. The capture of 2026-11-12 predates stored description text and holds
+// digests only.
 import { createHash } from "node:crypto"
 import { CHANGE_TOOLS } from "../src/openrouter-tools.js"
 
@@ -48,11 +50,11 @@ export interface RawTool {
   readonly annotations?: Record<string, unknown>
 }
 
-/** A tool as the fixture records it: the description only as a digest and a length. */
+/** A tool as the fixture records it: the description's digest and length, and its text (absent in older captures). */
 export interface LiveTool {
   readonly name: string
   readonly title?: string
-  readonly description: { readonly sha256: string; readonly length: number }
+  readonly description: { readonly sha256: string; readonly length: number; readonly text?: string }
   readonly inputSchema: Schema | null
   readonly outputSchema: Schema | null
   readonly annotations: Record<string, unknown> | null
@@ -158,7 +160,7 @@ export function recordResult(name: string, result: RawResult, args: Record<strin
 export const recordTool = (tool: RawTool): LiveTool => ({
   name: tool.name,
   ...(tool.title ? { title: tool.title } : {}),
-  description: { sha256: sha256(tool.description ?? ""), length: (tool.description ?? "").length },
+  description: { sha256: sha256(tool.description ?? ""), length: (tool.description ?? "").length, text: tool.description ?? "" },
   inputSchema: tool.inputSchema ?? null,
   outputSchema: tool.outputSchema ?? null,
   annotations: tool.annotations ?? null,
@@ -187,7 +189,8 @@ export function messagesOf(body: string, contentType: string | null): unknown[] 
   return parse(body)
 }
 
-/** A JSON-RPC request body's messages, with their method, id and tool name; anything else is skipped. */
+/** A JSON-RPC request body's messages, with their method, id and tool name; anything else is skipped. A body that is
+ * not a string, or not JSON, yields nothing: `refusal` refuses such a request. */
 export function requestsOf(body: unknown): { readonly method: string; readonly id?: string | number; readonly tool?: string }[] {
   if (typeof body !== "string") return []
   return messagesOf(body, "application/json").flatMap((message) => {
@@ -198,9 +201,14 @@ export function requestsOf(body: unknown): { readonly method: string; readonly i
   })
 }
 
-/** Why a request to the MCP server must not be sent: a `tools/call` of any tool outside the free reads. */
+/**
+ * Why a request to the MCP server must not be sent: a body the capture cannot read (not a string, such as a stream or a
+ * byte array, or not JSON-RPC), or a `tools/call` of any tool outside the free reads. What it cannot read, it refuses.
+ */
 export function refusal(body: unknown): string | undefined {
-  for (const request of requestsOf(body)) {
+  const requests = requestsOf(body)
+  if (requests.length === 0) return "the capture cannot read this request's body, so it never sends it"
+  for (const request of requests) {
     if (request.method !== "tools/call") continue
     if (!request.tool || !FREE_READS.includes(request.tool)) return `the capture never calls ${request.tool ?? "an unnamed tool"}`
   }
@@ -302,13 +310,31 @@ export function scriptFit(call: LiveCall | undefined): "fits" | "drops" | "unkno
   return types.length > 0 || call.structured !== null ? "fits" : "unknown"
 }
 
-/** Secret shapes no fixture may contain. */
-const SECRET = /\bsk-or-[\w-]{8,}|\bBearer\s+[\w.~+/=-]{8,}|\beyJ[\w-]{4,}\.[\w-]{4,}\.[\w-]{4,}|"(?:access|refresh)_token"|\bAuthorization\b/i
+/** Credential values no fixture may contain, anywhere. */
+const SECRET_VALUE = /\bsk-or-[\w-]{8,}|\bBearer\s+[\w.~+/=-]{8,}|\beyJ[\w-]{4,}\.[\w-]{4,}\.[\w-]{4,}/
+/** Credential fields, which may appear only inside a tool's public description (one may say "an Authorization header"). */
+const SECRET_FIELD = /"(?:access|refresh)_token"|\bAuthorization\b/i
 
-/** Throws when a serialised fixture holds anything shaped like a credential. */
-export function assertNoSecrets(text: string) {
-  const found = SECRET.exec(text)
-  if (found) throw new Error(`the capture would record something shaped like a credential (${found[0].slice(0, 12)}…); nothing was written`)
+/**
+ * Throws when a fixture holds anything shaped like a credential: a key, a bearer token or a JWT anywhere, and a credential
+ * field name anywhere outside the tools' description text. Pass the fixture itself, or its serialised text.
+ */
+export function assertNoSecrets(fixture: unknown) {
+  const whole = typeof fixture === "string" ? fixture : JSON.stringify(fixture)
+  const value = SECRET_VALUE.exec(whole)
+  if (value) throw new Error(`the capture would record something shaped like a credential (${value[0].slice(0, 12)}…); nothing was written`)
+  // Text that is not JSON is scanned as it is; otherwise every description's text is left out of the field scan.
+  let parsed: unknown = fixture
+  if (typeof fixture === "string") {
+    try {
+      parsed = JSON.parse(fixture)
+    } catch {
+      parsed = undefined
+    }
+  }
+  const withoutDescriptions = parsed === undefined ? whole : JSON.stringify(parsed, (key, item) => (key === "text" && typeof item === "string" ? "" : item))
+  const field = SECRET_FIELD.exec(withoutDescriptions)
+  if (field) throw new Error(`the capture would record something shaped like a credential (${field[0].slice(0, 12)}…); nothing was written`)
 }
 
 /** A reviewed tool, as the reconcile reads it. */
@@ -339,7 +365,11 @@ export function reconcile(fixture: Pick<LiveFixture, "tools" | "calls">, reviewe
     if (tool.scriptOutput === "live-observed" && fit !== "fits") problems.push(`script method ${tool.name} is labelled live-observed, but the capture did not confirm it`)
     if (NEVER_CALLED.includes(tool.name) && fixture.calls[tool.name]?.called) problems.push(`${tool.name} must never be called by a capture`)
     const liveTool = fixture.tools.find((item) => item.name === tool.name)
-    if (liveTool?.annotations?.["readOnlyHint"] === false && tool.effect === "read") problems.push(`${tool.name} is marked not read-only by the server, but the catalog treats it as a read`)
+    // MCP's defaults: a tool without `readOnlyHint: true` is not read-only, and `destructiveHint: true` is never a read.
+    if (liveTool && tool.effect === "read") {
+      if (liveTool.annotations?.["destructiveHint"] === true) problems.push(`${tool.name} is marked destructive by the server, but the catalog treats it as a read`)
+      else if (liveTool.annotations?.["readOnlyHint"] !== true) problems.push(`${tool.name} is not marked read-only by the server, but the catalog treats it as a read`)
+    }
     if (tool.rpc && tool.scriptOutput === "documented" && liveTool && !liveTool.outputSchema && !documentedByDocs.includes(tool.name)) {
       problems.push(`script method ${tool.name} is labelled documented, but the server declares no output schema for it`)
     }

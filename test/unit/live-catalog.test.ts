@@ -23,7 +23,7 @@ import {
   type LiveTool,
 } from "../../scripts/live-catalog.js"
 import { ENDPOINT } from "../../src/constants.js"
-import { BILLABLE_TOOLS, CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, READ_TOOLS, REVIEWED_TOOLS, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { BILLABLE_TOOLS, CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, READ_TOOLS, REVIEWED_TOOLS, RPC_TOOLS } from "../../src/openrouter-tools.js"
 import { canonicalJson, sha256 } from "./canonical.js"
 
 const FIXTURE = new URL("../fixtures/live-tools.json", import.meta.url)
@@ -52,7 +52,14 @@ describe("the capture's limits", () => {
     expect(refusal(JSON.stringify([call("ping"), call("send-message")]))).toBe("the capture never calls send-message")
     expect(refusal(JSON.stringify(call("ping")))).toBeUndefined()
     expect(refusal(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }))).toBeUndefined()
-    expect(refusal(undefined)).toBeUndefined()
+  })
+
+  test("refuses a request whose body it cannot read: no body, bytes, a stream, a Request, or text that is not JSON-RPC", () => {
+    const unreadable = "the capture cannot read this request's body, so it never sends it"
+    const bytes = new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "send-message" } }))
+    for (const body of [undefined, null, bytes, new Blob([bytes]), new ReadableStream(), new Request("http://127.0.0.1/", { method: "POST", body: "{}" }), "not json", "{}", "[]", '{"id":1}']) {
+      expect(refusal(body)).toBe(unreadable)
+    }
   })
 })
 
@@ -66,7 +73,7 @@ describe("recording", () => {
   test("keeps a description only as a digest and a length", () => {
     expect(recordTool({ name: "ping", description: "Checks the server", inputSchema: { type: "object" }, annotations: { readOnlyHint: true } })).toEqual({
       name: "ping",
-      description: { sha256: sha256("Checks the server"), length: 17 },
+      description: { sha256: sha256("Checks the server"), length: 17, text: "Checks the server" },
       inputSchema: { type: "object" },
       outputSchema: null,
       annotations: { readOnlyHint: true },
@@ -87,6 +94,11 @@ describe("recording", () => {
       expect(() => assertNoSecrets(`{"x":"${secret}"}`)).toThrow(/nothing was written/)
     }
     expect(() => assertNoSecrets(JSON.stringify({ tools: [tool("ping")] }))).not.toThrow()
+    // A public description may name a header; the same word anywhere else, or a real token in a description, may not.
+    const described = recordTool({ name: "get-video", description: "Download with the same API key as an Authorization: Bearer header." })
+    expect(() => assertNoSecrets({ tools: [described] })).not.toThrow()
+    expect(() => assertNoSecrets({ tools: [described], header: "Authorization" })).toThrow(/nothing was written/)
+    expect(() => assertNoSecrets({ tools: [recordTool({ name: "x", description: "use sk-or-v1-0123456789abcdef" })] })).toThrow(/nothing was written/)
   })
 })
 
@@ -112,7 +124,8 @@ describe("arguments for a free read", () => {
 
 describe("the reconcile", () => {
   const reviewed = REVIEWED_TOOLS.map(({ name, effect, rpc, scriptOutput }) => ({ name, effect, rpc, ...(scriptOutput ? { scriptOutput } : {}) }))
-  const allTools = TOOL_NAMES.map(tool)
+  /** The catalog's tools as a capture records them, each with the annotations its classification implies. */
+  const allTools = REVIEWED_TOOLS.map((item) => ({ ...tool(item.name), annotations: { readOnlyHint: item.effect === "read", destructiveHint: false } }))
   /** The calls that confirm the methods the catalog already labels live-observed. */
   const confirmed = Object.fromEntries(LIVE_VERIFIED_SCRIPT_METHODS.map((name) => [name, fits]))
 
@@ -146,8 +159,12 @@ describe("the reconcile", () => {
   })
 
   test("a tool the server marks as not read-only must not be a read, and a documented label needs a live output schema or OpenRouter's documentation", () => {
-    const marked = allTools.map((item) => (item.name === "ping" ? { ...item, annotations: { readOnlyHint: false } } : item))
-    expect(reconcile({ tools: marked, calls: confirmed }, reviewed)).toEqual(["ping is marked not read-only by the server, but the catalog treats it as a read"])
+    const marked = (annotations: Record<string, unknown> | null) => allTools.map((item) => (item.name === "ping" ? { ...item, annotations } : item))
+    expect(reconcile({ tools: marked({ readOnlyHint: false }), calls: confirmed }, reviewed)).toEqual(["ping is not marked read-only by the server, but the catalog treats it as a read"])
+    // MCP's defaults: no readOnlyHint, or no annotations at all, means not read-only; destructiveHint true is never a read.
+    expect(reconcile({ tools: marked({ destructiveHint: false }), calls: confirmed }, reviewed)).toEqual(["ping is not marked read-only by the server, but the catalog treats it as a read"])
+    expect(reconcile({ tools: marked(null), calls: confirmed }, reviewed)).toEqual(["ping is not marked read-only by the server, but the catalog treats it as a read"])
+    expect(reconcile({ tools: marked({ readOnlyHint: true, destructiveHint: true }), calls: confirmed }, reviewed)).toEqual(["ping is marked destructive by the server, but the catalog treats it as a read"])
     const noSchema = allTools.map((item) => (item.name === "get-batch" || item.name === "send-message" ? { ...item, outputSchema: null } : item))
     expect(reconcile({ tools: noSchema, calls: confirmed }, reviewed)).toEqual(["script method get-batch is labelled documented, but the server declares no output schema for it"])
   })
@@ -181,7 +198,11 @@ describe("the committed live capture", () => {
     expect(live.host.version).toMatch(/^\d+\.\d+\.\d+$/)
     expect(live.protocol.version).toBeTruthy()
     expect(() => assertNoSecrets(JSON.stringify(live))).not.toThrow()
-    for (const item of live.tools) expect(Object.keys(item.description).sort()).toEqual(["length", "sha256"])
+    // The first capture stored digests only; a later one stores the text too, which must match its digest.
+    for (const item of live.tools) {
+      expect(["length", "sha256", "text"]).toEqual(expect.arrayContaining(Object.keys(item.description)))
+      if (item.description.text !== undefined) expect(sha256(item.description.text)).toBe(item.description.sha256)
+    }
   })
 
   test("its provenance entry matches its digest, so an edited schema fails here", () => {

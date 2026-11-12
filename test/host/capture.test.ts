@@ -47,6 +47,8 @@ describe("the live capture tool, against the fake", () => {
       for (const tool of fixture.tools) {
         expect(tool.inputSchema).toEqual({ type: "object", properties: { query: { type: "string" } } })
         expect(tool.description.length).toBe(`Synthetic ${tool.name}`.length)
+        // Descriptions are public tool metadata: stored in full, so a judgement read from one can be checked later.
+        expect(tool.description.text).toBe(`Synthetic ${tool.name}`)
       }
       expect(fixture.protocol.server).toEqual({ name: "fake-openrouter", version: "0.0.0" })
       expect(typeof fixture.protocol.version).toBe("string")
