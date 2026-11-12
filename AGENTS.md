@@ -86,8 +86,17 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   search for `.opencode` folders stops there; each stock server has its own port.
 - **Text.** Docs and model-facing text describe what the code does now: no process narrative, machine-local paths,
   secrets or personal data. Never claim an unpublished tag can be installed.
-- **No personal email in anything we publish.** Every commit and tag is authored and committed as
-  `joe-broadhead <91376460+joe-broadhead@users.noreply.github.com>`. Check `git config user.email` before committing.
+- **Releases** come only from `.github/workflows/release.yml` ("Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)). A
+  release-prep PR sets `version` in `package.json` and the install specs and runs `node scripts/changelog.mjs release`;
+  once it is on `master` and CI passed, start the release with
+  `gh workflow run release.yml --ref master -f sha=<its full sha>`. The workflow builds `dist/`, makes the release
+  commit on a temporary `release/v<version>` branch, checks and stages everything, and waits for the owner to approve
+  the `release` environment; only then does it create the tag `v<version>` and the GitHub Release. Never push a tag or a
+  `release/*` branch, and never commit, tag or publish a release by hand. Agents never approve a release, never call the
+  deployment-approval API, and never bypass a ruleset or the environment.
+- **No personal email in anything we publish.** Every commit is authored and committed as
+  `joe-broadhead <91376460+joe-broadhead@users.noreply.github.com>`, except the release commit and tag, which the
+  release workflow makes as `github-actions[bot]`. Check `git config user.email` before committing.
 - **One check command.** `npm run check` passes before every commit. Never skip, weaken or delete a test to get green.
 
 ## Forbidden in this repository
