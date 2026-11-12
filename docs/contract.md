@@ -44,7 +44,14 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | A plugin's tool transform sees the MCP server's native tools in `editor.list()`, with `options` `{ namespace: "openrouter", codemode: true }`. | synthetic | `test/host/contract.test.ts`, 2.2.3 to 2.2.6 |
 | The in-place decorator shape (`const original = draft.execute; draft.execute = async (input, call) => original(input, call)`) runs once per call and dispatches upstream once; after a disconnect and reconnect rebuilds the catalog, the transform replays on the new tools without stacking. | synthetic | `test/host/contract.test.ts` |
 | Tool `options` is `{ namespace?, permission? }` and either `{ codemode?: true, pinned?: boolean }` or `{ codemode: boolean, pinned?: never }`, so `codemode: false` needs `pinned` removed. | source-verified | `schema/dist/tool.d.ts:21-31`, identical in both |
-| Setting `options.codemode = false` (with `pinned` removed) on `openrouter_generate-image` keeps its namespace and is listed. | synthetic | `test/host/contract.test.ts` |
+| Setting `options.codemode = false` (with `pinned` removed) on `openrouter_generate-image` keeps its namespace and is listed. | synthetic | `test/host/contract.test.ts`; the plugin's own guard transform in `test/host/guard.test.ts` |
+| A tool with `codemode: false` is offered to the model as a direct tool; the rest go through Code Mode. A tool whose action's last matching rule is a deny on every resource is left out of the model's tools. | source-verified | `core` 2.2.3 `usage-limits-qbh9qxse.js:217-222`; 2.2.6 `persistent-pty-fre27jqt.js:201-206` (`src/tool/registry.ts`, `snapshot`) |
+| Each registry rebuild runs every transform, in registration order, on a fresh state and publishes that state only after the last one: no listing or snapshot ever holds a tool before every transform has run on it. | source-verified | `core` 2.2.3 and 2.2.6 `usage-limits-40y6dtc2.js` / `persistent-pty-40y6dtc2.js:84-117` (`src/state.ts`, `create`) |
+| A transform that throws disables its plugin's whole registration group, so the plugin's transforms catch every failure. | source-verified | Same function, `:107` in both |
+| The host's MCP tools are already in the editor when the plugin's tool transform runs, at startup, after a late sign-in and after a disconnect and reconnect: a probe transform registered after the plugin's receives only guarded executors in every pass. | synthetic | `test/host/guard.test.ts`, 2.2.3 to 2.2.6 |
+| A plugin executor that throws reaches the host as a `Tool.Error` with the thrown message; a Promise-wrapped host executor that dies with `Permission.DeclinedError` reaches the caller as a `Tool.Error` wrapping it, which the session loop still recognises as a decline. | source-verified + synthetic | `plugin/dist/promise/adapter.js` 2.2.3 `:470`, `:478` / 2.2.6 `:489`, `:497`; session loop 2.2.3 `usage-limits-y5an59n2.js:265`, 2.2.6 `persistent-pty-tz26yf19.js:283`; `test/host/guard.test.ts` |
+| Aborting a native call's signal reaches the host's own executor through the plugin's guard, which ends the call at once with an interruption error. The host then sends the server one `notifications/cancelled` and keeps the HTTP request open until the server answers; nothing retries. A paid call aborted after dispatch may still have run. | synthetic | `test/host/guard.test.ts` ("cancellation through the guard"), 2.2.3 to 2.2.6 |
+| `ctx.agent.transform` sees each agent's built-in rules (the base allow and the agent's own defaults), not the user's `permissions` or the agent's configured `permissions`: the host merges those after every transform, appended after the transformed rules. So they follow the plugin's block and win over it: a user deny on a read the block allows, and an agent allow on a tool the block asks for. `ctx.agent.list()` returns the merged rules, which `agentCoverage` reads. `ctx.agent.reload()` replays the transform. | synthetic | `test/host/guard.test.ts` ("the user's and the agent's configured rules"), 2.2.3 to 2.2.6 |
 | `ctx.agent.transform` with `list`, `get`, `default`, `update`, `remove`. | source-verified | `plugin/dist/promise/agent.d.ts:5-15` |
 | `ctx.skill.transform` with `list`, `get`, `add`, `update`, `remove`. | source-verified | `plugin/dist/promise/skill.d.ts:5-15` |
 | `ctx.command.transform` with `add({ name, description?, execute })`. | source-verified | `plugin/dist/promise/command.d.ts:11-22` |
@@ -58,6 +65,7 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 
 | Claim | Label | Evidence |
 | --- | --- | --- |
+| An MCP image content block reaches the caller as `{ type: "file", uri: "data:<mime>;base64,<data>", mime }`, after the text block, unchanged by the plugin's guard. | source-verified + synthetic | `toContent`, 2.2.3 `usage-limits-6er5y2fs.js:139-145`, 2.2.6 `persistent-pty-psrqx85q.js:146-151`; `test/host/guard.test.ts` with the fake's synthetic PNG |
 | Native MCP tool ids are `<server>_<tool>` with every character outside `[A-Za-z0-9_-]` replaced by `_`, so hyphens survive: `openrouter_send-message`. The permission action is the same string. | source-verified | `core` 2.2.3 `dist/chunks/usage-limits-6er5y2fs.js:49-50` (`src/tool/mcp.ts`), action at `:74`; 2.2.6 `dist/chunks/persistent-pty-psrqx85q.js:54-55` with `normalizedName2` / `effectiveName2` in `persistent-pty-z0h12gs8.js:212-213`, action at `:79` |
 | …and observed so on every tested host, with a native call reaching the server as `list-models`. | synthetic | `test/host/openrouter.test.ts` |
 | Each native MCP tool's executor asserts the permission action, then calls the server: a decorator around it keeps the assertion. | source-verified | 2.2.3 `usage-limits-6er5y2fs.js:73-86`; 2.2.6 `persistent-pty-psrqx85q.js:78-85` |
@@ -81,11 +89,14 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 - **`pool` is newer than the baseline.** 2.2.6 adds an MCP `pool` option (`schema/dist/mcp.d.ts:21`, `:44`) that 2.2.3
   does not have. The plugin never sets it.
 - **2.2.6 adds `ctx.experimental.artifact`** (`plugin/dist/promise/plugin.d.ts:39`). Unused.
-- **Ordering of guard and first exposure is not yet proven.** The contract test shows a transform registered after the
-  tools exist applies to them and replays after a rebuild. That the guard decorates every tool before any model sees it,
-  at startup and on late sign-in, is for the guard work to prove on each host.
-- **Native media.** The host converts MCP content through its own output path (`toContent` in the same `src/tool/mcp.ts`
-  chunk). That an image block survives a decorator and reaches the user is not yet observed.
+- **A declined prompt changes shape through the guard.** Without a decorator the host's executor dies with
+  `Permission.DeclinedError`; through the plugin's Promise decorator it fails with a `Tool.Error` whose `error` is that
+  `DeclinedError`. The session loop of every tested host checks both shapes (see the row above), so a decline still ends
+  the turn as a decline. A host that dropped the second check would turn a declined prompt into a tool error; it would
+  still send nothing.
+- **A failed rules registration does not fail setup.** The design's rollback would remove the guard together with the
+  plugin's server, and leave the tools of a user's adopted entry on the base allow. Setup keeps the guard registered and
+  blocked instead, and records the failure. Recovery needs the plugin loaded again.
 
 ## Plugin policy (assumed, by design)
 
@@ -93,5 +104,8 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | --- | --- |
 | Effect, billing, visibility and script eligibility of each tool (`src/openrouter-tools.ts`). | assumed (reviewed policy, DESIGN §3 and §9) |
 | `ask-changes` is the default access. | assumed (DESIGN §1) |
+| The guard decorates an `openrouter_` tool in the server's namespace, and one with no namespace at all, reported as `TOOL_NAMESPACE_MISSING`: every tested host sets the namespace (synthetic row above), and a host that stopped would fail closed. | assumed (DESIGN §10) |
+| The block goes into the agents while the entry is the plugin's own, adopted, or not checked yet (`pending`, the fail-safe), and never for a conflicting or disabled entry. When the source changes the plugin asks the host to rebuild the tools and agents (`ctx.tool.reload`, `ctx.agent.reload`), and the replay that finds a conflict leaves the block out. That a conflicting entry ends with no rule in any agent is synthetic (`test/host/guard.test.ts`). | assumed (DESIGN §8, §17) |
+| The access matrix: reads allowed; billable inference, image generation, feedback and unreviewed tools deny / ask / allow under `read-only` / `ask-changes` / `all`. That the host then denies, asks and allows as the block says, and sends nothing on a deny or a declined prompt, is synthetic (`test/host/guard.test.ts`). | assumed (DESIGN §10) |
 | Exact-string URL ownership: anything but the canonical URL is a fixable conflict. | assumed (DESIGN §8; trailing slash pending live evidence) |
 | The integration watcher's startup polling (250 ms for 10 s) and resubscribe delay (5 s). | assumed (ported from the family's Notion connector) |

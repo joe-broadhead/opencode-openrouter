@@ -41,7 +41,8 @@ export function pluginError(code: PluginCode, message: string, nextStep: string)
  * Every code this plugin can raise, and where it appears. A code is never invented at a call site: the helpers take
  * `PluginCode`, so a code outside this table does not compile.
  * - `setup`: the plugin refuses a bad option or a host outside the range, or fails part-way and undoes what it did;
- * - `connection`: a diagnostic about the `openrouter` server entry, recorded for status.
+ * - `connection`: a diagnostic about the `openrouter` server entry, recorded for status;
+ * - `dispatch`: a native or scripted OpenRouter call refused before anything is sent.
  */
 export const CODES = {
   HOST_UNTESTED: { surface: "setup", when: "OpenCode is outside the supported range and `allowUntestedHost` is not set." },
@@ -51,6 +52,8 @@ export const CODES = {
   SERVER_CONFLICT: { surface: "connection", when: "`mcp.servers.openrouter` is a local command or points at another URL; it is left untouched." },
   SERVER_DUPLICATE: { surface: "connection", when: "Another server entry points at OpenRouter's MCP host under a different name." },
   NAMESPACE_COLLISION: { surface: "connection", when: "Another server's tool ids would start with `openrouter_`." },
+  TOOL_NAMESPACE_MISSING: { surface: "connection", when: "OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's." },
+  POLICY_UNAVAILABLE: { surface: "dispatch", when: "The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent." },
 } as const
 
 /** One code from {@link CODES}. */

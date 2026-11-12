@@ -46,6 +46,14 @@ export interface HostInput {
   /** Register the server with OAuth, as the published plugin does, so the host gives it a /connect entry. */
   readonly oauth?: true
   readonly fake?: FakeMcpOptions
+  /** Seam fault for the default rules, read on every registration and pass. */
+  readonly policyFault?: () => "register" | "apply" | undefined
+  /** Runs inside a probe plugin the host sets up before the OpenRouter plugin, so its transforms run before the plugin's. */
+  readonly belowSetup?: (ctx: Plugin.Context) => Promise<void> | void
+  /** Runs inside the probe plugin's setup, which the host runs after the OpenRouter plugin's. */
+  readonly probeSetup?: (ctx: Plugin.Context) => Promise<void> | void
+  /** Wait only until the plugin is active, not for the server to leave pending. */
+  readonly early?: true
 }
 
 let hosts = 0
@@ -57,7 +65,14 @@ export async function startHost(input: HostInput = {}) {
   const fake = await startFakeMcp(input.fake)
   const states: PluginState[] = []
   const cleanups = { started: 0, finished: 0 }
-  const seam = { endpoint: fake.url, ...(input.oauth ? {} : { oauth: false as const }), inspect: (state: PluginState) => void states.push(state) }
+  const checks = { count: 0 }
+  const seam = {
+    endpoint: fake.url,
+    ...(input.oauth ? {} : { oauth: false as const }),
+    inspect: (state: PluginState) => void states.push(state),
+    policyFault: () => input.policyFault?.(),
+    guardCheck: () => void checks.count++,
+  }
   const openrouter = createOpenRouterPlugin(seam)
   const withOptions = Plugin.define({
     id: openrouter.id,
@@ -71,7 +86,13 @@ export async function startHost(input: HostInput = {}) {
     },
   })
   const probes = new Map<string, Plugin.Context>()
-  const probe = Plugin.define({ id: "openrouter.host-test.probe", setup: (ctx) => void probes.set(ctx.location.directory, ctx) })
+  const probe = Plugin.define({
+    id: "openrouter.host-test.probe",
+    setup: async (ctx) => {
+      await input.probeSetup?.(ctx)
+      probes.set(ctx.location.directory, ctx)
+    },
+  })
   const config = {
     // Keep the built-in local providers from probing their default ports.
     providers: { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } },
@@ -79,7 +100,7 @@ export async function startHost(input: HostInput = {}) {
   }
   const { OpenCode } = (await import(pathToFileURL(join(SDK, "dist", "index.js")).href)) as typeof import("@opencode/sdk")
   const client: Client = await OpenCode.create({
-    plugins: [withOptions, probe],
+    plugins: [...(input.belowSetup ? [Plugin.define({ id: "openrouter.host-test.below", setup: input.belowSetup })] : []), withOptions, probe],
     // An embedded host reports "unknown" unless told, and the plugin's host guard refuses that.
     app: { version: HOST_VERSION },
     config: { content: JSON.stringify(config), directory: join(base, "config"), project: false, claude: false },
@@ -95,6 +116,8 @@ export async function startHost(input: HostInput = {}) {
     fake,
     seam,
     cleanups,
+    /** How many guard checks the plugin has run. */
+    checks,
     /** The plugin's live state in this host's location: the newest setup's. */
     state: () => {
       const state = states.at(-1)
@@ -118,7 +141,7 @@ export async function startHost(input: HostInput = {}) {
       const state = plugins.find((plugin) => plugin.id === PLUGIN_ID)?.state
       if (state?.status === "failed") throw new Error(`the OpenRouter plugin failed: ${state.error}`)
       const { data: servers } = await client.mcp.list({ location })
-      return state?.status === "active" && servers.some((server) => server.status.status !== "pending") && probes.has(work)
+      return state?.status === "active" && (input.early || servers.some((server) => server.status.status !== "pending")) && probes.has(work)
     })
   } catch (error) {
     await host.close().catch(() => {})
@@ -159,3 +182,59 @@ export async function integration(host: Host, integrationID: string) {
 }
 
 export type { FakeMcp }
+
+export type Rule = { action: string; resource: string; effect: "allow" | "ask" | "deny" }
+
+export const session = async (host: Host, agent = "build") => (await host.client.sessions.create({ agent, location: host.location })).id
+
+let attempts = 0
+
+/**
+ * Runs an OpenRouter tool through the executor the host lists, which a model turn uses too: the plugin's guard, then
+ * the host's own executor, which asserts `openrouter_<tool>` for the session's agent before it calls the server. A
+ * prompt, if one appears, is answered with `decision`. Reports whether it asked and how the call ended.
+ */
+export async function attempt(host: Host, sessionID: string, agent: string, tool: string, decision: "once" | "always" | "reject" = "reject") {
+  const id = `openrouter_${tool}`
+  const executor = await until(`${id} is registered`, async () => (await host.probe().tool.list()).find((item) => item.id === id))
+  const context = { sessionID, agent, messageID: "msg_host_test", id: `call_guard_test_${++attempts}`, signal: new AbortController().signal, progress: async () => {} }
+  let settled = false
+  const run = executor
+    .execute({}, context as never)
+    .then(
+      (result: unknown) => ({ ok: true as const, result }),
+      (error: unknown) => ({ ok: false as const, error: describeError(error) }),
+    )
+    .finally(() => (settled = true))
+  let asked: string | undefined
+  while (!settled) {
+    const pending = await host.client.permission.list({ sessionID })
+    const request = pending.find((item) => item.action === id)
+    if (request) {
+      asked = request.action
+      await host.client.permission.reply({ sessionID, requestID: request.id, decision })
+      break
+    }
+    await Promise.race([run, Bun.sleep(25)])
+  }
+  return { asked, ...(await run) }
+}
+
+/**
+ * A rejection as `name: message`, followed by the name of the error it wraps. A declined prompt reaches the caller as a
+ * `Tool.Error` wrapping `Permission.DeclinedError`, which is how the host's session loop recognises a decline.
+ */
+export function describeError(error: unknown) {
+  if (!(error instanceof Error)) return String(error)
+  const cause = (error as { error?: unknown }).error
+  return `${error.name}: ${error.message}${cause instanceof Error ? ` [${cause.name}]` : ""}`
+}
+
+export const agentRules = async (host: Host) =>
+  new Map((await host.client.agent.list({ location: host.location })).data.map((agent) => [agent.id as string, agent.permissions as Rule[]]))
+
+/** The host's own last-match evaluation for an MCP call (resource `*`), via its permission API. */
+export async function effect(host: Host, agent: string, action: string) {
+  const sessionID = await session(host, agent)
+  return (await host.client.permission.create({ sessionID, agent, action, resources: ["*"] })).effect
+}
