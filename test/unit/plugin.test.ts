@@ -5,15 +5,18 @@ import type { Plugin } from "@opencode/plugin"
 import { ENDPOINT, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "../../src/constants.js"
 import plugin from "../../src/index.js"
 import { cleanupStack, createOpenRouterPlugin, setupFailure, type PluginState } from "../../src/plugin.js"
+import { defaultRules } from "../../src/permissions.js"
 import { mcpEditor, timerProbe, transforms, type McpEditor, type ServerConfig } from "./fake.js"
 
 type ToolEditor = Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>[0]
+type AgentEditor = Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]
 const KEY = "sk-or-v1-0123456789abcdef0123456789abcdef"
 
 /** A context with the members setup uses; `fail` makes one registration throw. */
-function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" } = {}) {
+function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" } = {}) {
   const mcp = transforms<McpEditor>()
   const tool = transforms<ToolEditor>()
+  const agent = transforms<AgentEditor>()
   const log: string[] = []
   const ctx = {
     app: { version: options.version ?? "2.2.3" },
@@ -33,6 +36,14 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
         return tool.transform(callback)
       },
     },
+    agent: {
+      transform: (callback: (editor: AgentEditor) => void) => {
+        log.push("agent")
+        if (options.fail === "agent") return Promise.reject(new Error("agent registry closed"))
+        return agent.transform(callback)
+      },
+      list: async () => ({ data: [{ id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] }] }),
+    },
     integration: { transform: async () => ({ dispose: async () => {} }), get: async () => ({ data: {} }), connection: {} },
     event: {
       subscribe: ({ signal }: { signal: AbortSignal }) => ({
@@ -42,14 +53,21 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
       }),
     },
   } as unknown as Plugin.Context
-  return { ctx, mcp, tool, log }
+  return { ctx, mcp, tool, agent, log }
 }
 
 /** Runs the tool transforms on a fresh editor and returns the namespaces they declared. */
 function namespaces(tool: ReturnType<typeof transforms<ToolEditor>>) {
   const declared: { name: string; description: string }[] = []
-  tool.run({ namespace: (namespace: { name: string; description: string }) => void declared.push(namespace) } as unknown as ToolEditor)
+  tool.run({ list: () => [], update: () => {}, remove: () => {}, namespace: (namespace: { name: string; description: string }) => void declared.push(namespace) } as unknown as ToolEditor)
   return declared
+}
+
+/** Runs the agent transforms on one agent with a base allow, and returns its rules. */
+function agentPass(agent: ReturnType<typeof transforms<AgentEditor>>) {
+  const build = { id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] }
+  agent.run({ list: () => [build], update: (_id: string, update: (info: typeof build) => void) => update(build) } as unknown as AgentEditor)
+  return build.permissions
 }
 
 describe("the plugin", () => {
@@ -59,13 +77,13 @@ describe("the plugin", () => {
     expect(typeof plugin.setup).toBe("function")
   })
 
-  test("registers the server, then the namespace, and the namespace only while the server is the plugin's", async () => {
+  test("registers the server, the guard, the rules, then the namespace, and the namespace only while the server is the plugin's", async () => {
     const timers = timerProbe()
     try {
       let state: PluginState | undefined
-      const { ctx, mcp, tool, log } = context()
+      const { ctx, mcp, tool, agent, log } = context()
       const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-      expect(log).toEqual(["mcp", "tool"])
+      expect(log).toEqual(["mcp", "tool", "agent", "tool"])
       expect(state!.server().source).toEqual({ type: "pending" })
       expect(state!.owned()).toBe(false)
       expect(namespaces(tool)).toEqual([])
@@ -83,10 +101,69 @@ describe("the plugin", () => {
       await (stop as () => Promise<void>)()
       expect(mcp.callbacks).toHaveLength(0)
       expect(tool.callbacks).toHaveLength(0)
+      expect(agent.callbacks).toHaveLength(0)
       expect(timers.pending()).toBe(0)
     } finally {
       timers.stop()
     }
+  })
+
+  test("the guard starts blocked, opens only once the server is owned and the rules applied, and closes on unload", async () => {
+    let state: PluginState | undefined
+    const { ctx, mcp, agent } = context()
+    const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
+    expect(state!.policy()).toEqual({ installation: "pending", problems: [] })
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The plugin has not checked the openrouter server entry yet/)
+    mcp.run(mcpEditor().editor)
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: OpenRouter's default permission rules are not applied yet/)
+    expect(agentPass(agent)).toEqual([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules("ask-changes")])
+    expect(state!.policy()).toEqual({ installation: "ready", problems: [] })
+    expect(() => state!.assertOperational()).not.toThrow()
+    expect(await state!.unguardedAgents()).toEqual(["build"])
+    // Ownership loss blocks again: the user's entry now points elsewhere.
+    mcp.run(mcpEditor({ openrouter: { type: "remote", url: "https://example.com/mcp" } as ServerConfig }).editor)
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The openrouter server entry is no longer the plugin's own/)
+    mcp.run(mcpEditor().editor)
+    expect(() => state!.assertOperational()).not.toThrow()
+    await (stop as () => Promise<void>)()
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
+  })
+
+  test("a failed rules registration keeps setup and the guard, blocked, with the problem for status", async () => {
+    let state: PluginState | undefined
+    const { ctx, mcp, tool, log } = context({ fail: "agent" })
+    const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
+    expect(log).toEqual(["mcp", "tool", "agent", "tool"])
+    expect(tool.callbacks).toHaveLength(2)
+    mcp.run(mcpEditor().editor)
+    expect(state!.policy()).toEqual({
+      installation: "failed",
+      problems: ["POLICY_UNAVAILABLE: OpenRouter's default permission rules could not be applied (agent registry closed), so the plugin blocks its tools before anything is sent. Next step: Restart OpenCode; if it fails again, run /plugins to see the error."],
+    })
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: OpenRouter's default permission rules could not be applied \(agent registry closed\)/)
+    await (stop as () => Promise<void>)()
+  })
+
+  test("the seam's faults fail the registration, or one pass, and a later good pass recovers", async () => {
+    let state: PluginState | undefined
+    let fault: "register" | "apply" | undefined = "register"
+    const first = context()
+    await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)
+    expect(first.log).toEqual(["mcp", "tool", "tool"])
+    expect(state!.policy().installation).toBe("failed")
+    fault = undefined
+    const second = context()
+    await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(second.ctx)
+    second.mcp.run(mcpEditor().editor)
+    agentPass(second.agent)
+    expect(state!.policy().installation).toBe("ready")
+    fault = "apply"
+    agentPass(second.agent)
+    expect(state!.policy().installation).toBe("failed")
+    expect(() => state!.assertOperational()).toThrow(/\(injected failure\)/)
+    fault = undefined
+    agentPass(second.agent)
+    expect(() => state!.assertOperational()).not.toThrow()
   })
 
   test("defaults the options to ask-changes and reports the host as tested", async () => {

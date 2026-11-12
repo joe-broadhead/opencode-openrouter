@@ -3,7 +3,8 @@
 // minimal invented schema, because no signed-in tool list has been captured. Its answers, tokens and clients are
 // invented too.
 //
-// It answers JSON-RPC POSTs with plain JSON and records every tool call. While `challenge` is set, every MCP request
+// It answers JSON-RPC POSTs with plain JSON and records every tool call; `generate-image` answers with a text block and a
+// synthetic PNG image block, the shape OpenRouter documents. While `challenge` is set, every MCP request
 // gets 401 with a bearer challenge that points at its protected-resource metadata, and the same server plays the
 // sign-in server in the shape OpenRouter's public metadata describes: authorization code with PKCE S256 and dynamic
 // client registration, and no refresh-token grant.
@@ -13,6 +14,8 @@ import { TOOL_NAMES } from "../../src/openrouter-tools.js"
 
 /** A tool the plugin has never reviewed. */
 export const NEW_TOOL = "shiny-new-tool"
+/** A synthetic 1x1 PNG, which the fake returns as `generate-image`'s image content block. */
+export const IMAGE_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 const schema = { type: "object", properties: { query: { type: "string" } } }
 const TOOLS = [...TOOL_NAMES, NEW_TOOL].map((name) => ({ name, description: `Synthetic ${name}`, inputSchema: schema }))
 
@@ -63,6 +66,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
       case "tools/call": {
         const name = message.params?.name ?? ""
         calls.push(name)
+        if (name === "generate-image") return reply({ content: [{ type: "text", text: `synthetic ${name}` }, { type: "image", data: IMAGE_PNG, mimeType: "image/png" }] })
         return reply({ content: [{ type: "text", text: `synthetic ${name}` }], structuredContent: { tool: name, arguments: message.params?.arguments ?? {} } })
       }
       case "ping":
