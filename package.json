@@ -90,6 +90,110 @@
     "title": "OpenRouter",
     "summary": "Live models, routing, test prompts and images through OpenRouter.",
     "icon": "assets/icon.svg",
+    "tools": [
+      {
+        "name": "openrouter.get-model",
+        "permission": "openrouter_get-model",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-app-rankings",
+        "permission": "openrouter_list-app-rankings",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-benchmarks",
+        "permission": "openrouter_list-benchmarks",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-daily-model-rankings",
+        "permission": "openrouter_list-daily-model-rankings",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-model-endpoints",
+        "permission": "openrouter_list-model-endpoints",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-models",
+        "permission": "openrouter_list-models",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-providers",
+        "permission": "openrouter_list-providers",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-task-classifications",
+        "permission": "openrouter_list-task-classifications",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.ping",
+        "permission": "openrouter_ping",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.search-docs",
+        "permission": "openrouter_search-docs",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.get-credits",
+        "permission": "openrouter_get-credits",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.get-generation",
+        "permission": "openrouter_get-generation",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.install-ori-harness",
+        "permission": "openrouter_install-ori-harness",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.spawn-ori-eval",
+        "permission": "openrouter_spawn-ori-eval",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.send-message",
+        "permission": "openrouter_send-message",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.generate-image",
+        "permission": "openrouter_generate-image",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.send-feedback",
+        "permission": "openrouter_send-feedback",
+        "effect": "ask",
+        "readOnly": false
+      }
+    ],
     "skills": [
       "openrouter",
       "openrouter-evaluate",
@@ -104,6 +208,20 @@
         "label": "OpenRouter tools",
         "server": "openrouter"
       }
-    ]
+    ],
+    "contributes": {
+      "homeFeeds": [],
+      "homeWidgets": [],
+      "workKinds": [],
+      "settings": [
+        {
+          "key": "access",
+          "label": "Access",
+          "type": "string",
+          "default": "ask-changes",
+          "description": "all, ask-changes or read-only. Generates default rules for agents with a base allow rule."
+        }
+      ]
+    }
   }
 }

@@ -34,3 +34,6 @@ All notable changes to this project are documented here. The format follows
   `POLICY_UNAVAILABLE` while its rules are not in place. `generate-image` is native only, so its route does not exist.
   After a paid or feedback call that may have run, the next step says to check the generation before sending it again.
   The methods' output is checked against the test server only, not yet against OpenRouter's live server.
+- The `jelly` declaration: all 17 reviewed tools with the default rules' effect (reads allowed and read-only;
+  `send-message`, `generate-image` and `send-feedback` ask), the four skills, the "OpenRouter tools" sign-in by server,
+  and the `access` setting with `ask-changes` the default. No views, Jelly RPC, feeds or widgets.

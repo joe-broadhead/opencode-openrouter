@@ -7,7 +7,7 @@ import { NATIVE_ONLY, REVIEWED_TOOLS, RPC_TOOLS, TOOL_NAMES } from "../../src/op
 import { SKILL_NAMES } from "../../src/skills.js"
 
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8")
-const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "CHANGELOG.md", "docs/contract.md", "docs/scripting.md"]
+const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "CHANGELOG.md", "docs/contract.md", "docs/scripting.md", "docs/jelly.md"]
 
 /** The rows of the markdown table under a `## heading`, as cells. */
 function table(markdown: string, heading: string) {
