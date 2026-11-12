@@ -60,6 +60,10 @@ are the same rules the native path uses, and the same operational guard:
   nothing sent, because no one is there to answer it. A `deny` is refused with nothing sent.
 - **Under the default `access: "ask-changes"`, `send-message` and `send-feedback` ask**, so a script needs an explicit
   `allow` for each in the session's or the agent's rules. Reads are allowed. Under `read-only` both are denied.
+- **An unguarded agent runs everything.** A custom agent with OpenCode's base allow (`* * allow`) but without the
+  plugin's block is unguarded: a script on that agent runs `send-message`, `send-feedback` and every other method with
+  no prompt and no refusal, exactly as the model would. `/openrouter-status` lists such agents under
+  `unguardedAgents`, with the exact block; add it to that agent's own rules to restore the default.
 - **A saved approval does not authorise a script.** An earlier "Always allow" in a conversation is not part of the
   agent's and the session's rules.
 - **The guard applies.** While the plugin's default rules are not in place, the `openrouter` entry is not the plugin's or
