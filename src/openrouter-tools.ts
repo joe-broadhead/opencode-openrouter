@@ -18,6 +18,12 @@ export type ToolEffect = "read" | "write" | "send" | "export" | "destructive"
  */
 export type ToolVisibility = "public-data" | "account-data" | "execution" | "recipe"
 
+/**
+ * The evidence labels of docs/contract.md: stated in documentation, read in the pinned host packages, observed against
+ * this repository's loopback fake, or observed against OpenRouter's real server with a signed-in account.
+ */
+export type Evidence = "documented" | "source-verified" | "synthetic" | "live-observed"
+
 export interface ReviewedTool {
   /** The upstream name, hyphens included. The native tool id and permission action is `openrouter_<name>`. */
   readonly name: string
@@ -29,9 +35,16 @@ export interface ReviewedTool {
   readonly rpc: boolean
   /** Why a tool is native-only: the shared script adapter returns text and drops media content. */
   readonly rpcExclusion?: "native-media-required"
+  /**
+   * For a script method: the strongest evidence that its useful result fits the tools RPC's `{ output?, text }` result,
+   * which keeps structured content and text and drops every other content block. Only a signed-in capture makes it
+   * `live-observed`; until then a method stays a script method on this evidence, and a capture whose useful result is
+   * media removes it from the script methods.
+   */
+  readonly scriptOutput?: Evidence
 }
 
-const read = (name: string, visibility: ToolVisibility): ReviewedTool => ({ name, effect: "read", billable: false, visibility, rpc: true })
+const read = (name: string, visibility: ToolVisibility): ReviewedTool => ({ name, effect: "read", billable: false, visibility, rpc: true, scriptOutput: "synthetic" })
 
 /** Sorted by name within each class: reads first, then the executions. */
 export const REVIEWED_TOOLS: readonly ReviewedTool[] = [
@@ -50,12 +63,12 @@ export const REVIEWED_TOOLS: readonly ReviewedTool[] = [
   // Recipe retrieval: the returned text describes later installer or evaluation commands; retrieving it runs nothing.
   read("install-ori-harness", "recipe"),
   read("spawn-ori-eval", "recipe"),
-  // Billable inference: a test message to any model.
-  { name: "send-message", effect: "write", billable: true, visibility: "execution", rpc: true },
+  // Billable inference: a test message to any model. OpenRouter documents its reply as text with the generation id.
+  { name: "send-message", effect: "write", billable: true, visibility: "execution", rpc: true, scriptOutput: "documented" },
   // Billable inference whose image comes back as a content block. The script RPC would drop it after the spend.
   { name: "generate-image", effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" },
   // Feedback on one of the account's own generations, sent to OpenRouter's team.
-  { name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true },
+  { name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true, scriptOutput: "synthetic" },
 ]
 
 /** Every reviewed upstream name. */
@@ -70,6 +83,8 @@ export const BILLABLE_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) =>
 export const RPC_TOOLS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool) => tool.name)
 /** Reviewed tools that run only natively, never as a script method. */
 export const NATIVE_ONLY: readonly string[] = REVIEWED_TOOLS.filter((tool) => !tool.rpc).map((tool) => tool.name)
+/** The script methods whose output has been checked against OpenRouter's live server. */
+export const LIVE_VERIFIED_SCRIPT_METHODS: readonly string[] = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.scriptOutput === "live-observed").map((tool) => tool.name)
 
 /** The reviewed entry for an upstream name, or undefined for a tool this table has not reviewed. */
 export const reviewedTool = (name: string): ReviewedTool | undefined => REVIEWED_TOOLS.find((tool) => tool.name === name)

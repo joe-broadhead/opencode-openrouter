@@ -11,6 +11,7 @@ import { mcpEditor, timerProbe, transforms, type McpEditor, type ServerConfig } 
 type ToolEditor = Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>[0]
 type AgentEditor = Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]
 type SkillEditor = Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]
+type CommandEditor = Parameters<Parameters<Plugin.Context["command"]["transform"]>[0]>[0]
 const KEY = "sk-or-v1-0123456789abcdef0123456789abcdef"
 
 /** An async no-op that counts its calls in `calls`. */
@@ -19,11 +20,16 @@ const counter = () => Object.assign(async function reload(this: unknown) {
 }, { calls: 0 })
 
 /** A context with the members setup uses; `fail` makes one registration throw. */
-function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" | "skill" } = {}) {
+function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" | "skill" | "rpc" } = {}) {
   const mcp = transforms<McpEditor>()
   const tool = transforms<ToolEditor>()
   const agent = transforms<AgentEditor>()
   const skill = transforms<SkillEditor>()
+  const command = transforms<CommandEditor>()
+  /** The RPC contracts registered and not yet disposed, by id. */
+  const rpcs = new Map<string, unknown>()
+  /** The tools RPC's permission hooks registered and not yet disposed. */
+  const hooks = { count: 0 }
   const log: string[] = []
   const ctx = {
     app: { version: options.version ?? "2.2.3" },
@@ -60,6 +66,29 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
         return skill.transform(callback)
       },
     },
+    command: {
+      transform: (callback: (editor: CommandEditor) => void) => {
+        log.push("command")
+        return command.transform(callback)
+      },
+    },
+    session: { synthetic: async () => {} },
+    location: { directory: "project" },
+    permission: {
+      hook: async () => {
+        log.push("permission.evaluate")
+        hooks.count++
+        return { dispose: async () => void hooks.count-- }
+      },
+    },
+    rpc: {
+      register: async (definition: { id: string }, handlers: unknown) => {
+        log.push(`rpc:${definition.id}`)
+        if (options.fail === "rpc") throw new Error("rpc registry closed")
+        rpcs.set(definition.id, handlers)
+        return { dispose: async () => void rpcs.delete(definition.id) }
+      },
+    },
     integration: { transform: async () => ({ dispose: async () => {} }), get: async () => ({ data: {} }), connection: {} },
     event: {
       subscribe: ({ signal }: { signal: AbortSignal }) => ({
@@ -69,7 +98,7 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
       }),
     },
   } as unknown as Plugin.Context
-  return { ctx, mcp, tool, agent, skill, log }
+  return { ctx, mcp, tool, agent, skill, command, rpcs, hooks, log }
 }
 
 /** Runs the tool transforms on a fresh editor and returns the namespaces they declared. */
@@ -97,9 +126,11 @@ describe("the plugin", () => {
     const timers = timerProbe()
     try {
       let state: PluginState | undefined
-      const { ctx, mcp, tool, agent, skill, log } = context()
+      const { ctx, mcp, tool, agent, skill, command, rpcs, hooks, log } = context()
       const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-      expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill"])
+      expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill", "command", "rpc:openrouter.models", "rpc:openrouter.models.tools", "permission.evaluate"])
+      expect([...rpcs.keys()]).toEqual(["openrouter.models", "openrouter.models.tools"])
+      expect(hooks.count).toBe(1)
       expect(state!.server().source).toEqual({ type: "pending" })
       expect(state!.owned()).toBe(false)
       expect(namespaces(tool)).toEqual([])
@@ -119,6 +150,9 @@ describe("the plugin", () => {
       expect(tool.callbacks).toHaveLength(0)
       expect(agent.callbacks).toHaveLength(0)
       expect(skill.callbacks).toHaveLength(0)
+      expect(command.callbacks).toHaveLength(0)
+      expect(rpcs.size).toBe(0)
+      expect(hooks.count).toBe(0)
       expect(timers.pending()).toBe(0)
     } finally {
       timers.stop()
@@ -162,7 +196,7 @@ describe("the plugin", () => {
     let state: PluginState | undefined
     const { ctx, mcp, tool, log } = context({ fail: "agent" })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-    expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill"])
+    expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill", "command", "rpc:openrouter.models", "rpc:openrouter.models.tools", "permission.evaluate"])
     expect(tool.callbacks).toHaveLength(2)
     mcp.run(mcpEditor().editor)
     expect(state!.policy()).toEqual({
@@ -183,7 +217,7 @@ describe("the plugin", () => {
       let fault: "register" | "apply" | undefined = "register"
       const first = context()
       stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)) as () => Promise<void>)
-      expect(first.log).toEqual(["mcp", "tool", "tool", "skill"])
+      expect(first.log).toEqual(["mcp", "tool", "tool", "skill", "command", "rpc:openrouter.models", "rpc:openrouter.models.tools", "permission.evaluate"])
       expect(state!.policy().installation).toBe("failed")
       fault = undefined
       const second = context()
@@ -249,6 +283,14 @@ describe("the plugin", () => {
     expect(mcp.callbacks).toHaveLength(0)
     expect(tool.callbacks).toHaveLength(0)
     expect(agent.callbacks).toHaveLength(0)
+  })
+
+  test("a failure registering the status RPC undoes the command, the skills, the server and the namespace", async () => {
+    const { ctx, mcp, tool, agent, skill, command, rpcs, log } = context({ fail: "rpc" })
+    await expect(createOpenRouterPlugin({ endpoint: ENDPOINT }).setup(ctx)).rejects.toThrow(/^SETUP_FAILED: .*rpc registry closed/)
+    expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill", "command", "rpc:openrouter.models"])
+    for (const registry of [mcp, tool, agent, skill, command]) expect(registry.callbacks).toHaveLength(0)
+    expect(rpcs.size).toBe(0)
   })
 
   test("a failure at the first registration leaves nothing behind", async () => {

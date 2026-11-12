@@ -25,6 +25,7 @@ function fake(initial: { server?: string; integrationID?: string; source?: strin
   const reported: unknown[] = []
   const looked: string[] = []
   let push: (() => void) | undefined
+  let next: { type: string; data: Record<string, unknown> } = { type: "integration.updated", data: {} }
   const name = () => {
     let current = state.hostName
     const editor = {
@@ -77,14 +78,19 @@ function fake(initial: { server?: string; integrationID?: string; source?: strin
               if (!initial.streamIgnoresAbort) signal.addEventListener("abort", () => resolve(), { once: true })
             })
             if (signal.aborted && !initial.streamIgnoresAbort) return
-            yield { type: "integration.updated", data: {} }
+            yield next
           }
         },
       }),
     },
   } as unknown as IntegrationContext
   const settle = () => new Promise((resolve) => setTimeout(resolve, 30))
-  return { ctx, state, transforms, reported, looked, name, emit: () => push?.(), settle }
+  /** Delivers one event, `integration.updated` unless another is given. */
+  const emit = (event: { type: string; data: Record<string, unknown> } = { type: "integration.updated", data: {} }) => {
+    next = event
+    push?.()
+  }
+  return { ctx, state, transforms, reported, looked, name, emit, settle }
 }
 
 describe("watchIntegration", () => {
@@ -100,6 +106,21 @@ describe("watchIntegration", () => {
     expect(view.transforms).toHaveLength(1)
     await stop()
     expect(view.transforms).toHaveLength(0)
+  })
+
+  test("reports each status change of the openrouter server, and no other server's", async () => {
+    const view = fake()
+    let changes = 0
+    const stop = watchIntegration(view.ctx, () => true, () => void changes++)
+    await view.settle()
+    view.emit({ type: "mcp.status.changed", data: { server: "openrouter" } })
+    await view.settle()
+    view.emit({ type: "mcp.status.changed", data: { server: "github" } })
+    await view.settle()
+    view.emit()
+    await view.settle()
+    expect(changes).toBe(1)
+    await stop()
   })
 
   test("reads the integration ID from the server's row, and never looks up the model provider's", async () => {

@@ -9,7 +9,7 @@
 //      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and
 //      blocked, so an adopted server's tools refuse every call;
 //   6. the Code Mode namespace text, only for the plugin's own or the user's adopted server;
-//   7. the skills; (status, tools RPC) the status command, the status RPC and the tools RPC;
+//   7. the skills, the `/openrouter-status` command, the status RPC and the tools RPC for scripts;
 //   8. the `/connect` watcher, last, because it reads what the steps before it registered;
 //   9. return the cleanup, which undoes everything in reverse order.
 // A failure part-way runs every cleanup accumulated so far, then rethrows one sanitised, actionable error. Unloading
@@ -18,12 +18,14 @@ import { Plugin } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { createGuard, registerGuard, type PolicyHealth } from "./guard.js"
 import { checkHost, type HostCheck } from "./host-version.js"
+import { METHODS, operationalShapers, registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type ServerObservation } from "./mcp.js"
 import { parseOptions, type Options } from "./options.js"
 import { agentCoverage, registerDefaultRules, rulesApply, type AgentCoverage, type Rule } from "./permissions.js"
 import { reasonOf } from "./redact.js"
 import { loadSkills, observeSkills, registerSkills, type SkillStatus } from "./skills.js"
+import { readStatus, registerStatusCommand, registerStatusRpc } from "./status.js"
 
 /** Internal seam: tests point the server at a loopback fake and read the plugin's state. Not a public option. */
 export interface OpenRouterSeam extends EndpointSeam {
@@ -58,6 +60,10 @@ export interface PluginState {
   readonly skills: () => Promise<readonly SkillStatus[]>
   /** One `SKILLS_INVALID` line for each packaged skill that is missing or invalid. */
   readonly skillProblems: readonly string[]
+  /** When the plugin's tool transform last found OpenRouter's tools, as an ISO time; undefined before it has. */
+  readonly lastObservedAt: () => string | undefined
+  /** When the `openrouter` server last changed status, or setup started, in milliseconds since the epoch. */
+  readonly serverChangedAt: () => number
 }
 
 /** Anything the plugin registered that must be undone, newest first. */
@@ -109,6 +115,7 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
       const cleanup = cleanupStack()
       let closed = false
       let server: ServerObservation = PENDING
+      let serverChangedAt = Date.now()
       const owned = () => isOwned(server.source)
       const guard = createGuard(() => server.source, seam.guardCheck)
       const state: PluginState = {
@@ -125,6 +132,8 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
             : { unguarded: [], explicitlyAllowed: [] },
         skills: () => observeSkills(ctx.skill, loaded.status),
         skillProblems: loaded.problems,
+        lastObservedAt: guard.lastObservedAt,
+        serverChangedAt: () => serverChangedAt,
       }
 
       try {
@@ -153,10 +162,24 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
             if (owned()) editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION })
           }),
         )
-        // 7. The skills, from their real package paths; a user's skill of the same name is kept and reported.
+        // 7. The skills, from their real package paths; a user's skill of the same name is kept and reported. Then the
+        // status surfaces, which read only the state above and OpenCode's own lists.
         cleanup.defer(await registerSkills(ctx.skill, loaded.skills))
+        const read = () => readStatus(ctx, state)
+        cleanup.defer(await registerStatusCommand(ctx, read))
+        cleanup.defer(await registerStatusRpc(ctx.rpc, read))
+        // The tools RPC dispatches through the native executor, which carries the guard too, but it skips the host's
+        // tool hooks, so its input shaper runs the guard itself before every dispatch. A conflicting entry is the user's
+        // own server: the RPC refuses it as SERVER_CONFLICT.
+        cleanup.defer(
+          await registerToolsRpc(ctx, {
+            methods: METHODS,
+            shapers: operationalShapers(guard.assertOperational),
+            mcp: { server: SERVER_NAME, managed: () => server.source.type !== "conflict" },
+          }),
+        )
         // 8. Last: the watcher reads the server's row and renames only the MCP integration OpenCode made for it.
-        cleanup.defer(watchIntegration(ctx, owned))
+        cleanup.defer(watchIntegration(ctx, owned, () => void (serverChangedAt = Date.now())))
       } catch (error) {
         closed = true
         guard.close()

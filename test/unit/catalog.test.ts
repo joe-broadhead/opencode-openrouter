@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs"
 import {
   BILLABLE_TOOLS,
   CHANGE_TOOLS,
+  LIVE_VERIFIED_SCRIPT_METHODS,
   NATIVE_ONLY,
   READ_TOOLS,
   REVIEWED_TOOLS,
@@ -36,9 +37,9 @@ describe("the reviewed catalog", () => {
 
   test("classifies the three non-reads as the design reviews them", () => {
     expect(CHANGE_TOOLS).toEqual(["send-message", "generate-image", "send-feedback"])
-    expect(reviewedTool("send-message")).toEqual({ name: "send-message", effect: "write", billable: true, visibility: "execution", rpc: true })
+    expect(reviewedTool("send-message")).toEqual({ name: "send-message", effect: "write", billable: true, visibility: "execution", rpc: true, scriptOutput: "documented" })
     expect(reviewedTool("generate-image")).toEqual({ name: "generate-image", effect: "write", billable: true, visibility: "execution", rpc: false, rpcExclusion: "native-media-required" })
-    expect(reviewedTool("send-feedback")).toEqual({ name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true })
+    expect(reviewedTool("send-feedback")).toEqual({ name: "send-feedback", effect: "send", billable: false, visibility: "execution", rpc: true, scriptOutput: "synthetic" })
     expect(BILLABLE_TOOLS).toEqual(["send-message", "generate-image"])
   })
 
@@ -53,6 +54,17 @@ describe("the reviewed catalog", () => {
     expect(RPC_TOOLS).toHaveLength(16)
     expect(NATIVE_ONLY).toEqual(["generate-image"])
     for (const tool of REVIEWED_TOOLS) expect(tool.rpcExclusion !== undefined).toBe(!tool.rpc)
+  })
+
+  test("every script method carries the evidence that its output fits the script result, and none claims a live capture", () => {
+    for (const tool of REVIEWED_TOOLS) expect({ name: tool.name, labelled: tool.scriptOutput !== undefined }).toEqual({ name: tool.name, labelled: tool.rpc })
+    // OpenRouter documents send-message's reply as text with a generation id; every other method is checked only
+    // against the loopback fake. No signed-in capture exists (provenance.json has "live": null).
+    expect(Object.fromEntries(REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool) => [tool.name, tool.scriptOutput]))).toEqual(
+      Object.fromEntries(RPC_TOOLS.map((name) => [name, name === "send-message" ? "documented" : "synthetic"])),
+    )
+    expect(provenance.live).toBeNull()
+    expect(LIVE_VERIFIED_SCRIPT_METHODS).toEqual([])
   })
 
   test("billable tools are never reads", () => {

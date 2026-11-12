@@ -11,8 +11,8 @@ lookups, test prompts and image generation, through OpenCode's own MCP connectio
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
 every agent, so by default billable inference and feedback ask before they run, and a guard that refuses every
-OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills. The status
-command, the status dialog and script access are not built yet.
+OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills, a status
+command and dialog that never call OpenRouter, and script access to the reviewed tools through a tools RPC.
 
 ## Requirements
 
@@ -118,6 +118,51 @@ describes how to use the tools, and OpenCode's permissions still decide whether 
 If you already have a skill with one of these names, yours is kept and the plugin's is not registered. A skill file that
 is missing or malformed is skipped with `SKILLS_INVALID`; the server and its tools keep working.
 
+## Status
+
+`/openrouter-status` posts a report into the session, with no model turn. `/openrouter`, or **OpenRouter: Status** in the
+command palette, opens the same report in a dialog: `r` refreshes it, Escape closes it, and it also refreshes when the
+server's connection, sign-in or agents change while it is open. Scripts read the same model as JSON from the status RPC:
+
+```sh
+opencode api POST /api/rpc/openrouter.models/status -d '{"input":{}}' -H "x-opencode-directory:$PWD"
+```
+
+The report shows:
+
+- **Connection**: `connected`, `connecting`, `sign-in required`, `failed`, `disabled`, `not configured`, `conflict`, or
+  blocked because the plugin's policy is not in place, and whose `openrouter` entry it is.
+- **Access** and **Default rules**: what the rules do under `access`, and whether they applied.
+- **Tools**: how many tools OpenCode lists for the server, how many the plugin has reviewed, the names of up to 20 it has
+  not, reviewed tools that are missing, and when the plugin last saw the catalog. A server that connected moments ago and
+  is still listing its tools is told apart from one that lists none.
+- **Scripts**: the number of script methods, the native-only `generate-image`, and how many methods have their output
+  checked against OpenRouter's live server.
+- **Skills**: loaded, missing, invalid, or shadowed by a skill of yours with the same name.
+- **Agents without default rules**, with the exact block to paste, and agents whose own rule allows OpenRouter's
+  changes, which is your decision and is left alone.
+- **OpenCode**: the version, whether it is tested, and the supported range.
+- **Problems** and one **Next step**.
+
+Status reads only OpenCode's own lists and the plugin's memory. It never calls `ping`, reads credit, lists models or
+looks up a generation, and it never shows a key, a sign-in URL, a balance or an expiry. To check OpenRouter itself, ask
+for `ping` through the ordinary tool path.
+
+## Scripts
+
+Scripts and Jobs call 16 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
+the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs, an `ask` is
+refused because no one can answer it, a `deny` is refused, and while the plugin's rules are not in place every call fails
+with `POLICY_UNAVAILABLE` before anything is sent. Under the default `ask-changes`, `send-message` and `send-feedback`
+need an explicit allow rule for the script's session or agent.
+
+`generate-image` is not a script method: the RPC keeps text and structured results only, so a script would pay for an
+image it never receives. Its route does not exist and sends nothing; generate images in a conversation.
+
+The methods' output has been checked against a test server only, not yet against OpenRouter's live server. See
+[docs/scripting.md](docs/scripting.md) for the methods, the envelope, the errors and how to handle a paid call whose
+outcome is uncertain.
+
 ## Errors
 
 Every error reads `CODE: What happened. Next step: What to do.`
@@ -134,17 +179,18 @@ Every error reads `CODE: What happened. Next step: What to do.`
 | `TOOL_NAMESPACE_MISSING` | OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's. |
 | `POLICY_UNAVAILABLE` | The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent. |
 | `SKILLS_INVALID` | A packaged skill file is missing, unreadable or malformed; that skill is not registered. |
+| `STATUS_UNAVAILABLE` | `/openrouter-status`, the `/openrouter` dialog or the status RPC could not read the plugin's status. |
 
 ## Known limits
 
 - Not released: there is no `v0.0.0` tag yet.
-- No status command, status dialog or script access yet, so a failed rules installation or an agent without the
-  rules is not reported anywhere but in the refused calls.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
 - The tool catalog comes from OpenRouter's public documentation. No signed-in tool list has been captured, so input
   schemas are whatever the server reports at run time.
 - The plugin does not enforce a spending limit. The provider-side cap on the MCP key is OpenRouter's control.
+- Script methods return text and structured results only, and their output has not been checked against OpenRouter's
+  live server. `generate-image` runs only natively.
 
 ## License
 

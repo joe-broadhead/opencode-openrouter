@@ -8,16 +8,19 @@ checks.
 
 ## Where things go
 
-`src/plugin.ts` lists the setup order as numbered steps. Built now: options and host check (1), the skills (2 and 7),
-the cleanup stack, state and guard (3), the server entry and the guard's tool transform (4), the default rules (5), the
-Code Mode namespace (6) and the `/connect` watcher (8). `src/permissions.ts` generates the rules from
-`src/openrouter-tools.ts` and inserts them with `ctx.agent.transform`; `src/guard.ts` holds the health state and the
-in-place executor decorator. The steps marked in brackets there are not built yet, and each has one place:
+`src/plugin.ts` lists the setup order as numbered steps: options and host check (1), the skills (2 and 7), the cleanup
+stack, state and guard (3), the server entry and the guard's tool transform (4), the default rules (5), the Code Mode
+namespace (6), the status command, the status RPC and the tools RPC (7), and the `/connect` watcher (8).
+`src/permissions.ts` generates the rules from `src/openrouter-tools.ts` and inserts them with `ctx.agent.transform`;
+`src/guard.ts` holds the health state and the in-place executor decorator.
 
-- **Status, TUI and scripts**: `src/status.ts` reads `PluginState` (`server()`, `owned()`, `policy()`,
-  `agentCoverage()`, `host`, `options`), never OpenRouter. The tools RPC calls `PluginState.assertOperational()` in its
-  input shaper before every dispatch. `src/tui.ts` is the entry the TUI bundle builds. `src/host/tools-rpc.ts` is the family's shared adapter;
-  its methods are `RPC_TOOLS`, and `NATIVE_ONLY` is reported separately.
+- **Status and TUI**: `src/status.ts` builds the one status model for `/openrouter-status`, the `/openrouter` dialog in
+  `src/tui.ts` and the status RPC `openrouter.models` / `status`. It reads `PluginState` and OpenCode's own lists
+  (`ctx.mcp.list()`, `ctx.tool.list()`, agents, skills), never OpenRouter. The TUI reads the status RPC only; it holds
+  event listeners only while the dialog is open, and never reopens a dialog the user closed.
+- **Scripts**: `src/host/tools-rpc.ts` is the family's shared adapter. Its methods are `RPC_TOOLS`; `NATIVE_ONLY`
+  (`generate-image`) is never a method and is reported separately in status. The plugin registers it with
+  `operationalShapers(guard.assertOperational)`, so the guard runs before every script dispatch.
 - **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`: read at step 2 outside every transform, registered at step 7.
   A new skill is added to `SKILL_NAMES` and to `jelly.skills` in `package.json`. A user's skill of the same name wins and
   is reported `shadowed`; a missing or malformed file is `SKILLS_INVALID` in `PluginState`, never a setup failure.
@@ -59,10 +62,20 @@ in-place executor decorator. The steps marked in brackets there are not built ye
   Its names come from OpenRouter's documentation; `test/fixtures/documented-tools.json` is labelled `documented` and
   never stands in for a live capture. A signed-in capture goes in `test/fixtures/live-tools.json`, recorded in
   `test/fixtures/provenance.json` with its host version and protocol.
+- **The `jelly` section** of `package.json` declares every reviewed tool, the skills, the sign-in, the `access` setting,
+  a one-line `summary` and the `icon`, with only the keys Jelly reads. Each tool's effect is the default rules' decision
+  under `ask-changes`; `test/unit/jelly.test.ts` keeps it in step with the catalog. See [docs/jelly.md](docs/jelly.md).
 - **Errors** read `CODE: What happened. Next step: What to do.`, built by `pluginError`, `errorText` or `codeText`.
   `CODES` in `src/constants.ts` is the one table, and the README's `Errors` table is checked equal to it.
 - **Redaction.** Host or network text is shown only through `src/redact.ts`: one line, at most 160 characters, no
   credentials, URL queries or userinfo, controls or bidi characters.
+- **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module several plugins share. Change only its block between
+  the `PLUGIN-SPECIFIC` markers; `scripts/check-copies.mjs` (the `copies` stage) fails when the rest differs from the
+  family's hash, and a change there is made in every plugin at once. `test/unit/tools-rpc.test.ts` is the family's suite,
+  copied unchanged. Keep the RPC id `openrouter.models.tools` and the hyphenated method names: scripts call them by name.
+  A method's output evidence is the `scriptOutput` column of the catalog; only a signed-in capture may make it
+  `live-observed`, and a method whose live result is media leaves `RPC_TOOLS`. The next steps never tell a script to
+  repeat `send-message` or `send-feedback` after an uncertain outcome.
 - **No paid or signed-in calls from a check.** Tests use the loopback fake with synthetic names, prompts, tokens and
   accounts. Never sign in to OpenRouter or call its API from a check.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
@@ -85,7 +98,9 @@ in-place executor decorator. The steps marked in brackets there are not built ye
 - `Plugin.image` and profile images; imported OAuth grants;
 - the V1 plugin API: `@opencode-ai/*` packages and hooks such as `tool.execute.before`, `chat.message` or
   `permission.ask`; the deprecated `ctx.generate.text` and `experimental.policies`; importing `@opencode/ai`;
-- any permission hook (the family's tools RPC brings its one allowed hook with it);
+- a permission hook, except the one `permission.hook("evaluate")` in `src/host/tools-rpc.ts` (and the bundle that inlines
+  it), exactly once each: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny, because no
+  one can answer it, and touches nothing else;
 - computing the host's MCP integration hash in `src/` or `dist/`;
 - references to private host source or host checkouts; machine-local home and temp paths;
 - `.tsx` or `.jsx` files in `dist/`.

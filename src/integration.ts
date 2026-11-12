@@ -27,10 +27,13 @@ export const RESUBSCRIBE_MS = 5_000
  * host's name comes back. Events trigger a check; the first seconds are also polled, because a subscription has no
  * start acknowledgement. `owned` is false while `openrouter` is another server, which keeps its own name.
  *
+ * `onServerStatus` runs on every `mcp.status.changed` event of the `openrouter` server, so status can tell a server that
+ * connected moments ago, and is still listing its tools, from one that lists none.
+ *
  * Returns the stop function: it aborts the subscription and the polling, waits for the check in flight, and disposes
  * the rename. It never deletes a credential.
  */
-export function watchIntegration(ctx: IntegrationContext, owned: () => boolean) {
+export function watchIntegration(ctx: IntegrationContext, owned: () => boolean, onServerStatus?: () => void) {
   const stopped = new AbortController()
   let registration: Registration | undefined
 
@@ -86,7 +89,11 @@ export function watchIntegration(ctx: IntegrationContext, owned: () => boolean) 
     while (!stopped.signal.aborted) {
       try {
         const stream = ctx.event.subscribe({ types: ["integration.updated", "mcp.status.changed", "credential.updated", "credential.switched"], signal: stopped.signal })
-        for await (const event of stream) if (event.type !== "mcp.status.changed" || event.data.server === SERVER_NAME) schedule()
+        for await (const event of stream) {
+          if (event.type === "mcp.status.changed" && event.data.server !== SERVER_NAME) continue
+          if (event.type === "mcp.status.changed") onServerStatus?.()
+          schedule()
+        }
       } catch {
         // The stream failed; check, then subscribe again.
       }
