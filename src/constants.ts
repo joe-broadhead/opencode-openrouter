@@ -43,6 +43,7 @@ export function pluginError(code: PluginCode, message: string, nextStep: string)
  * - `setup`: the plugin refuses a bad option or a host outside the range, or fails part-way and undoes what it did;
  * - `connection`: a diagnostic about the `openrouter` server entry, recorded for status;
  * - `dispatch`: a native or scripted OpenRouter call refused before anything is sent.
+ * - `skills`: a packaged skill file that could not be read or is malformed, recorded for status.
  */
 export const CODES = {
   HOST_UNTESTED: { surface: "setup", when: "OpenCode is outside the supported range and `allowUntestedHost` is not set." },
@@ -54,6 +55,7 @@ export const CODES = {
   NAMESPACE_COLLISION: { surface: "connection", when: "Another server's tool ids would start with `openrouter_`." },
   TOOL_NAMESPACE_MISSING: { surface: "connection", when: "OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's." },
   POLICY_UNAVAILABLE: { surface: "dispatch", when: "The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent." },
+  SKILLS_INVALID: { surface: "skills", when: "A packaged skill file is missing, unreadable or malformed; that skill is not registered." },
 } as const
 
 /** One code from {@link CODES}. */

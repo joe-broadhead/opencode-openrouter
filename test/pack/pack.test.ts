@@ -15,6 +15,7 @@ import { arch, platform, tmpdir } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { DISPLAY_NAME, ENDPOINT, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "../../src/constants.js"
+import { SKILL_NAMES } from "../../src/skills.js"
 import { TUI_ID } from "../../src/tui.js"
 import { startFakeMcp } from "../host/fake-mcp.js"
 
@@ -131,6 +132,8 @@ describe("package tarball", () => {
     expect(paths.filter((path) => path.includes("node_modules/") || /\.(?:tsx|jsx)$/.test(path))).toEqual([])
     for (const target of Object.values(pkg.exports)) expect(paths).toContain(target.replace(/^\.\//, ""))
     expect(paths.filter((path) => path.endsWith(".d.ts"))).toEqual([])
+    // The four skills, each one file, and nothing else under skills/.
+    expect(paths.filter((path) => path.startsWith("skills/"))).toEqual(SKILL_NAMES.map((name) => `skills/${name}/SKILL.md`).sort())
   }, 120_000)
 
   test("installs with scripts disabled and loads both entry points under Bun, next to the host packages", () => {
@@ -196,6 +199,10 @@ describe.each(TESTED_HOSTS)("installed alone, in stock OpenCode %s", (version) =
       const { data: all } = await host.api<{ data: Listed[] }>("GET", "/api/integration")
       expect(all.find((item) => item.id === "openrouter")).toMatchObject({ id: "openrouter", name: "OpenRouter" })
       expect(all.filter((item) => item.name === DISPLAY_NAME).map((item) => item.id)).toEqual([server.integrationID!])
+      // The four packaged skills load from the installed package, not from this repository.
+      const { data: skills } = await host.api<{ data: { id: string; path: string }[] }>("GET", "/api/skill")
+      const own = skills.filter((skill) => SKILL_NAMES.includes(skill.id)).map(({ id, path }) => ({ id, path }))
+      expect(own.sort((a, b) => a.id.localeCompare(b.id))).toEqual([...SKILL_NAMES].sort().map((id) => ({ id, path: join(installed, "skills", id, "SKILL.md") })))
     } catch (error) {
       throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host.log().slice(-3000)}`)
     } finally {

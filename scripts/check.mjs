@@ -13,8 +13,7 @@ const env = { ...process.env, PATH: `${join(root, "node_modules", ".bin")}${deli
 const { TESTED_HOSTS } = await import(new URL("../src/constants.ts", import.meta.url).href)
 
 // The approved package shape. Change it here only together with the release policy.
-// "skills" joins this list, after "assets/icon-256.png", with the first packaged skill.
-const FILES = ["dist", "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "README.md", "LICENSE", "CHANGELOG.md"]
+const FILES = ["dist", "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "skills", "README.md", "LICENSE", "CHANGELOG.md"]
 const EXPORTS = { ".": "index", "./tui": "tui" }
 // The icon kit's three files, exported exactly so a consumer can resolve them from the installed package.
 const ASSET_EXPORTS = { "./icon.svg": "assets/icon.svg", "./icon-128.png": "assets/icon-128.png", "./icon-256.png": "assets/icon-256.png" }

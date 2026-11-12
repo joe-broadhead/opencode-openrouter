@@ -29,6 +29,7 @@
     "assets/icon.svg",
     "assets/icon-128.png",
     "assets/icon-256.png",
+    "skills",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -89,6 +90,12 @@
     "title": "OpenRouter",
     "summary": "Live models, routing, test prompts and images through OpenRouter.",
     "icon": "assets/icon.svg",
+    "skills": [
+      "openrouter",
+      "openrouter-evaluate",
+      "openrouter-images",
+      "openrouter-troubleshoot"
+    ],
     "rpc": [],
     "views": [],
     "signIns": [

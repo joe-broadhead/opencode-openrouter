@@ -2,14 +2,14 @@
 //
 // Order (each step runs only after the one before it succeeded):
 //   1. parse the options and check the host, before anything is registered;
-//   2. (skills) load and validate the skill files, outside every transform;
+//   2. load and validate the packaged skill files, outside every transform;
 //   3. create the cleanup stack, the diagnostics, the server observation and the guard, which starts blocked;
 //   4. register the `openrouter` server entry, then the in-place native dispatch guard, before any tool exists;
 //   5. the default rules, only while the server is the plugin's own, adopted or still pending, which mark the policy
 //      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and
 //      blocked, so an adopted server's tools refuse every call;
 //   6. the Code Mode namespace text, only for the plugin's own or the user's adopted server;
-//   7. (skills, status, tools RPC) the skills, the status command, the status RPC and the tools RPC;
+//   7. the skills; (status, tools RPC) the status command, the status RPC and the tools RPC;
 //   8. the `/connect` watcher, last, because it reads what the steps before it registered;
 //   9. return the cleanup, which undoes everything in reverse order.
 // A failure part-way runs every cleanup accumulated so far, then rethrows one sanitised, actionable error. Unloading
@@ -23,6 +23,7 @@ import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type
 import { parseOptions, type Options } from "./options.js"
 import { agentCoverage, registerDefaultRules, rulesApply, type AgentCoverage, type Rule } from "./permissions.js"
 import { reasonOf } from "./redact.js"
+import { loadSkills, observeSkills, registerSkills, type SkillStatus } from "./skills.js"
 
 /** Internal seam: tests point the server at a loopback fake and read the plugin's state. Not a public option. */
 export interface OpenRouterSeam extends EndpointSeam {
@@ -32,6 +33,8 @@ export interface OpenRouterSeam extends EndpointSeam {
   readonly policyFault?: () => "register" | "apply" | undefined
   /** Runs on every guard check, so a test can count checks per call. */
   readonly guardCheck?: () => void
+  /** Reads the packaged skills from this folder instead of the installed package's `skills/`. */
+  readonly skillsDir?: string
 }
 
 /** What the plugin knows about itself, in memory only. Later surfaces (status, guard, scripts) read it. */
@@ -48,6 +51,13 @@ export interface PluginState {
   readonly assertOperational: () => void
   /** Agents where an OpenRouter change runs under a broad `*` allow, and agents that allow one with their own rule. */
   readonly agentCoverage: () => Promise<AgentCoverage>
+  /**
+   * What became of each packaged skill, read from OpenCode's list at the time of the call: `loaded`, `missing`,
+   * `invalid`, or `shadowed` by a skill of the same name (the user's own) that OpenCode uses instead.
+   */
+  readonly skills: () => Promise<readonly SkillStatus[]>
+  /** One `SKILLS_INVALID` line for each packaged skill that is missing or invalid. */
+  readonly skillProblems: readonly string[]
 }
 
 /** Anything the plugin registered that must be undone, newest first. */
@@ -92,6 +102,9 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
       const options = parseOptions(ctx.options)
       const host = checkHost(ctx.app.version, options.allowUntestedHost)
 
+      // 2. The skill files are read here, before any transform needs them; a bad file is a problem, not a failure.
+      const loaded = await loadSkills(seam.skillsDir)
+
       // 3. The plugin's memory: replays overwrite the observation, so nothing accumulates.
       const cleanup = cleanupStack()
       let closed = false
@@ -110,6 +123,8 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
           rulesApply(server.source)
             ? agentCoverage((await ctx.agent.list()).data.map((agent) => ({ id: agent.id, permissions: agent.permissions as readonly Rule[] })), options.access)
             : { unguarded: [], explicitlyAllowed: [] },
+        skills: () => observeSkills(ctx.skill, loaded.status),
+        skillProblems: loaded.problems,
       }
 
       try {
@@ -138,6 +153,8 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
             if (owned()) editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION })
           }),
         )
+        // 7. The skills, from their real package paths; a user's skill of the same name is kept and reported.
+        cleanup.defer(await registerSkills(ctx.skill, loaded.skills))
         // 8. Last: the watcher reads the server's row and renames only the MCP integration OpenCode made for it.
         cleanup.defer(watchIntegration(ctx, owned))
       } catch (error) {

@@ -8,18 +8,19 @@ checks.
 
 ## Where things go
 
-`src/plugin.ts` lists the setup order as numbered steps. Built now: options and host check (1), the cleanup stack,
-state and guard (3), the server entry and the guard's tool transform (4), the default rules (5), the Code Mode
-namespace (6) and the `/connect` watcher (8). `src/permissions.ts` generates the rules from `src/openrouter-tools.ts`
-and inserts them with `ctx.agent.transform`; `src/guard.ts` holds the health state and the in-place executor decorator.
-The steps marked in brackets there are not built yet, and each has one place:
+`src/plugin.ts` lists the setup order as numbered steps. Built now: options and host check (1), the skills (2 and 7),
+the cleanup stack, state and guard (3), the server entry and the guard's tool transform (4), the default rules (5), the
+Code Mode namespace (6) and the `/connect` watcher (8). `src/permissions.ts` generates the rules from
+`src/openrouter-tools.ts` and inserts them with `ctx.agent.transform`; `src/guard.ts` holds the health state and the
+in-place executor decorator. The steps marked in brackets there are not built yet, and each has one place:
 
 - **Status, TUI and scripts**: `src/status.ts` reads `PluginState` (`server()`, `owned()`, `policy()`,
   `agentCoverage()`, `host`, `options`), never OpenRouter. The tools RPC calls `PluginState.assertOperational()` in its
   input shaper before every dispatch. `src/tui.ts` is the entry the TUI bundle builds. `src/host/tools-rpc.ts` is the family's shared adapter;
   its methods are `RPC_TOOLS`, and `NATIVE_ONLY` is reported separately.
-- **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`, loaded at step 2 outside every transform. Add `"skills"` to
-  `files` in `package.json` and to `FILES` in `scripts/check.mjs` with the first skill.
+- **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`: read at step 2 outside every transform, registered at step 7.
+  A new skill is added to `SKILL_NAMES` and to `jelly.skills` in `package.json`. A user's skill of the same name wins and
+  is reported `shadowed`; a missing or malformed file is `SKILLS_INVALID` in `PluginState`, never a setup failure.
 
 ## Rules
 

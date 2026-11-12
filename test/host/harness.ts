@@ -54,6 +54,8 @@ export interface HostInput {
   readonly probeSetup?: (ctx: Plugin.Context) => Promise<void> | void
   /** Wait only until the plugin is active, not for the server to leave pending. */
   readonly early?: true
+  /** Read the packaged skills from this folder instead of the repository's `skills/`. */
+  readonly skillsDir?: string
 }
 
 let hosts = 0
@@ -69,6 +71,7 @@ export async function startHost(input: HostInput = {}) {
   const seam = {
     endpoint: fake.url,
     ...(input.oauth ? {} : { oauth: false as const }),
+    ...(input.skillsDir ? { skillsDir: input.skillsDir } : {}),
     inspect: (state: PluginState) => void states.push(state),
     policyFault: () => input.policyFault?.(),
     guardCheck: () => void checks.count++,

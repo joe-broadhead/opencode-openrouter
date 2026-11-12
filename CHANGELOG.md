@@ -19,3 +19,7 @@ All notable changes to this project are documented here. The format follows
 - An operational guard on every OpenRouter tool: until the rules are applied and the server entry is the plugin's own or
   the user's exact one, and after the plugin unloads, every call fails with `POLICY_UNAVAILABLE` before anything is sent.
 - `generate-image` runs as a direct tool, outside Code Mode.
+- Four skills: `openrouter` (research and integration), `openrouter-evaluate` (bounded model tests),
+  `openrouter-images` (image generation) and `openrouter-troubleshoot` (diagnosis), registered from the installed
+  package. A skill of the same name that you already have is kept and reported as shadowed; a missing or malformed skill
+  file is recorded as `SKILLS_INVALID` and does not stop the plugin.
