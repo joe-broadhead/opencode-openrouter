@@ -178,25 +178,52 @@ describe("access read-only", () => {
   })
 })
 
-describe("the user's later rules", () => {
-  const userRules: Rule[] = [{ action: nativeToolId("list-models"), resource: "*", effect: "deny" }]
+// The agent transform sees only each agent's built-in rules; the host appends the user's `permissions` and the
+// agent's configured `permissions` after every transform. These tests depend on that order: the block holds an exact
+// allow for list-models and an exact ask for send-message, so the configured rules win only if they come after it.
+describe("the user's and the agent's configured rules", () => {
+  const userDeny: Rule = { action: nativeToolId("list-models"), resource: "*", effect: "deny" }
   const agentAllow: Rule = { action: nativeToolId("send-message"), resource: "*", effect: "allow" }
+  const seen: Rule[][] = []
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: () => ({ permissions: userRules, agents: { build: { permissions: [agentAllow] } } }) })
+    host = await startHost({
+      config: () => ({ permissions: [userDeny], agents: { build: { permissions: [agentAllow] } } }),
+      // A probe agent transform, run after the plugin's, records what a transform sees of build's rules.
+      probeSetup: async (ctx) => {
+        await ctx.agent.transform((editor) => {
+          const build = editor.get("build")
+          if (build) seen.push(structuredClone(build.permissions) as Rule[])
+        })
+      },
+    })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
   afterAll(() => host?.close())
 
-  test("a user deny on a read wins over the block, and sends nothing", async () => {
+  const same = (a: Rule) => (b: Rule) => a.action === b.action && a.resource === b.resource && a.effect === b.effect
+
+  test("are not visible to a transform, and the host appends them after the plugin's block", async () => {
+    const transformed = seen.at(-1)!
+    expect(transformed.slice(0, 1 + defaultRules("ask-changes").length)).toEqual([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules("ask-changes")])
+    expect(transformed.some(same(userDeny))).toBe(false)
+    expect(transformed.some(same(agentAllow))).toBe(false)
+    const effective = (await agentRules(host)).get("build")!
+    const blockEnd = 1 + defaultRules("ask-changes").length
+    expect(effective.slice(0, blockEnd)).toEqual(transformed.slice(0, blockEnd))
+    expect(effective.findIndex(same(userDeny))).toBeGreaterThanOrEqual(blockEnd)
+    expect(effective.findIndex(same(agentAllow))).toBeGreaterThanOrEqual(blockEnd)
+  })
+
+  test("so a user deny on a read the block allows wins, and sends nothing", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     expect(await attempt(host, build, "build", "list-models")).toEqual({ asked: undefined, ok: false, error: denied("list-models") })
     expect(host.fake.calls.length).toBe(before)
   })
 
-  test("an agent's own allow on billable inference wins too: an intentional decision, and not an unguarded agent", async () => {
+  test("and the agent's own allow on billable inference the block asks for wins, reported as an explicit allow", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     expect(await attempt(host, build, "build", "send-message")).toMatchObject({ asked: undefined, ok: true })
