@@ -23,3 +23,8 @@ All notable changes to this project are documented here. The format follows
   `openrouter-images` (image generation) and `openrouter-troubleshoot` (diagnosis), registered from the installed
   package. A skill of the same name that you already have is kept and reported as shadowed; a missing or malformed skill
   file is recorded as `SKILLS_INVALID` and does not stop the plugin.
+- One local status model, shown by `/openrouter-status` (a synthetic message, no model turn), the `/openrouter` dialog
+  and its palette entry (refresh with `r`, close with Escape), and the status RPC `openrouter.models` / `status`:
+  connection state, access and rules, the tool catalog with unknown and missing tools and when it was last seen, the
+  script capability, skills, agents without the rules or with their own allow, and one next step. It never calls
+  OpenRouter. A status that cannot be read is `STATUS_UNAVAILABLE`.

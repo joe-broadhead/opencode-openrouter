@@ -50,6 +50,7 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
   let policy: { installation: PolicyInstallation; reason?: string } = { installation: "pending" }
   let transformFailure: string | undefined
   let unnamespaced: readonly string[] = []
+  let observedAt: string | undefined
   let closed = false
 
   /** Why a call may not run now; undefined when the plugin is operational. */
@@ -85,7 +86,10 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
     transformReport(pass: GuardPass) {
       transformFailure = pass.failure
       unnamespaced = pass.unnamespaced
+      if (pass.observed > 0) observedAt = new Date().toISOString()
     },
+    /** When a tool transform pass last found OpenRouter's tools, as an ISO time; undefined before the first one. */
+    lastObservedAt: () => observedAt,
     health(): PolicyHealth {
       const problems: string[] = []
       if (policy.installation === "failed") problems.push(text(policyFailed(policy.reason ?? "no reason given")))
@@ -132,6 +136,8 @@ export interface GuardPass {
   readonly failure: string | undefined
   /** `openrouter_` tools listed with no namespace, which the pass decorated anyway, at most 20, one line each. */
   readonly unnamespaced: readonly string[]
+  /** How many OpenRouter tools the pass found and decorated. */
+  readonly observed: number
 }
 
 const NAME_LIMIT = 20
@@ -146,14 +152,16 @@ const NAME_LIMIT = 20
 export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void): GuardPass {
   const failures: string[] = []
   const unnamespaced: string[] = []
+  let observed = 0
   let tools: readonly Listed[]
   try {
     tools = editor.list()
   } catch (error) {
-    return { failure: reasonOf(error), unnamespaced }
+    return { failure: reasonOf(error), unnamespaced, observed }
   }
   for (const tool of tools) {
     if (!isOwnedOpenRouterTool(tool, source)) continue
+    observed++
     if (tool.options?.namespace === undefined && unnamespaced.length < NAME_LIMIT) unnamespaced.push(shortReason(tool.id) ?? "an unnamed tool")
     try {
       editor.update(tool.id, (draft) => {
@@ -177,7 +185,7 @@ export function guardTools(editor: Tools, source: ServerSource, assertOperationa
       }
     }
   }
-  return { failure: failures.length ? `${failures.length} tool${failures.length === 1 ? "" : "s"} failed: ${failures[0]}` : undefined, unnamespaced }
+  return { failure: failures.length ? `${failures.length} tool${failures.length === 1 ? "" : "s"} failed: ${failures[0]}` : undefined, unnamespaced, observed }
 }
 
 /** Registers the guard as a tool transform. Each pass reads the latest server observation and reports its outcome. */

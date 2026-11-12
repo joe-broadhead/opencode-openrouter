@@ -14,6 +14,9 @@ const PLUGIN: ServerSource = { type: "plugin" }
 const CONFLICT: ServerSource = { type: "conflict", safeDescription: "points elsewhere" }
 
 /** A tool editor over fresh tools, as each host rebuild makes them; `calls` counts the host executors' dispatches. */
+/** The OpenRouter tools in `registry()`: ping, send-message and the image tool. */
+const TOOL_COUNT = 3
+
 function registry(extra: Tool[] = []) {
   const calls: string[] = []
   const tool = (id: string, options: Record<string, unknown> = { namespace: id.split("_")[0], codemode: true }): Tool => ({
@@ -72,10 +75,10 @@ describe("health", () => {
     expect(() => guard.assertOperational()).toThrow("POLICY_UNAVAILABLE: OpenRouter's default permission rules could not be applied (agent store closed), so the plugin blocks its tools before anything is sent. Next step: Restart OpenCode; if it fails again, run /plugins to see the error.")
     expect(guard.health()).toMatchObject({ installation: "failed", problems: [expect.stringMatching(/^POLICY_UNAVAILABLE: .*agent store closed/)] })
     guard.policyReport(undefined)
-    guard.transformReport({ failure: "1 tool failed: frozen", unnamespaced: [] })
+    guard.transformReport({ failure: "1 tool failed: frozen", unnamespaced: [], observed: 1 })
     expect(() => guard.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The plugin could not put its guard on OpenRouter's tools \(1 tool failed: frozen\)/)
     expect(guard.health().problems).toHaveLength(1)
-    guard.transformReport({ failure: undefined, unnamespaced: [] })
+    guard.transformReport({ failure: undefined, unnamespaced: [], observed: 1 })
     expect(guard.operational()).toBe(true)
     guard.close()
     guard.policyReport(undefined)
@@ -106,7 +109,7 @@ describe("the decorator", () => {
       results.push(result)
       return result
     }
-    expect(guardTools(editor as never, PLUGIN, () => (checks++, guard.assertOperational()))).toEqual({ failure: undefined, unnamespaced: [] })
+    expect(guardTools(editor as never, PLUGIN, () => (checks++, guard.assertOperational()))).toEqual({ failure: undefined, unnamespaced: [], observed: TOOL_COUNT })
     const wrapped = tools.get("openrouter_ping")!
     const context = { sessionID: "ses_1", signal: new AbortController().signal }
     const result = await wrapped.execute({ query: "q" }, context)
@@ -192,7 +195,7 @@ describe("the decorator", () => {
     const { tools, editor, calls } = registry([bare("openrouter_bare-tool"), bare("openrouter_\u202eevil")])
     const before = tools.get("openrouter_bare-tool")!.execute
     const pass = guardTools(editor as never, source, guard.assertOperational)
-    expect(pass).toEqual({ failure: undefined, unnamespaced: ["openrouter_bare-tool", "openrouter_evil"] })
+    expect(pass).toEqual({ failure: undefined, unnamespaced: ["openrouter_bare-tool", "openrouter_evil"], observed: TOOL_COUNT + 2 })
     const wrapped = tools.get("openrouter_bare-tool")!
     expect(wrapped.execute).not.toBe(before)
     expect(wrapped.options).toBeUndefined()
@@ -207,8 +210,21 @@ describe("the decorator", () => {
     // A conflicting entry leaves even a bare tool alone, and another server's namespaced tools stay untouched.
     expect(isOwnedOpenRouterTool({ id: "openrouter_bare-tool", options: undefined }, CONFLICT)).toBe(false)
     expect(isOwnedOpenRouterTool({ id: "openrouter_x_other", options: { namespace: "openrouter_x" } }, PLUGIN)).toBe(false)
-    guard.transformReport({ failure: undefined, unnamespaced: [] })
+    guard.transformReport({ failure: undefined, unnamespaced: [], observed: 1 })
     expect(guard.health().problems).toEqual([])
+  })
+
+  test("records when a pass last found OpenRouter's tools, and keeps that time over a pass that found none", () => {
+    const guard = healthy()
+    expect(guard.lastObservedAt()).toBeUndefined()
+    guard.transformReport({ failure: undefined, unnamespaced: [], observed: 0 })
+    expect(guard.lastObservedAt()).toBeUndefined()
+    const before = Date.now()
+    guard.transformReport(guardTools(registry().editor as never, PLUGIN, guard.assertOperational))
+    const seen = guard.lastObservedAt()!
+    expect(Date.parse(seen)).toBeGreaterThanOrEqual(before - 1)
+    guard.transformReport({ failure: undefined, unnamespaced: [], observed: 0 })
+    expect(guard.lastObservedAt()).toBe(seen)
   })
 
   test("names at most 20 tools with no namespace", () => {
@@ -232,10 +248,10 @@ describe("the decorator", () => {
     const guard = healthy()
     const { tools, editor } = registry()
     const failing = { ...editor, update: (id: string, update: (draft: Tool) => void) => (id === "openrouter_ping" ? (() => { throw new Error("frozen draft") })() : editor.update(id, update)) }
-    expect(guardTools(failing as never, PLUGIN, guard.assertOperational)).toEqual({ failure: "1 tool failed: frozen draft", unnamespaced: [] })
+    expect(guardTools(failing as never, PLUGIN, guard.assertOperational)).toEqual({ failure: "1 tool failed: frozen draft", unnamespaced: [], observed: TOOL_COUNT })
     expect(tools.has("openrouter_ping")).toBe(false)
     expect(tools.has("openrouter_send-message")).toBe(true)
-    expect(guardTools({ list: () => { throw new Error("registry closed") } } as never, PLUGIN, guard.assertOperational)).toEqual({ failure: "registry closed", unnamespaced: [] })
+    expect(guardTools({ list: () => { throw new Error("registry closed") } } as never, PLUGIN, guard.assertOperational)).toEqual({ failure: "registry closed", unnamespaced: [], observed: 0 })
   })
 
   test("the registered transform reads the latest source and reports each pass to the guard", async () => {
