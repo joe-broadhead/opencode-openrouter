@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { CODES, ENDPOINT } from "../../src/constants.js"
 import { TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { SKILL_NAMES } from "../../src/skills.js"
 
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8")
 const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "CHANGELOG.md", "docs/contract.md"]
@@ -35,6 +36,15 @@ describe("the README", () => {
     expect(readme).toContain(ENDPOINT)
     expect(readme).toContain("**OpenRouter tools**")
     expect(readme).toContain("built-in model provider")
+  })
+})
+
+describe("the README's skills section", () => {
+  const readme = read("README.md")
+
+  test("lists exactly the four packaged skills, and says a user's skill of the same name is kept", () => {
+    expect(table(readme, "Skills").map((cells) => cells[0])).toEqual(SKILL_NAMES.map((name) => `\`${name}\``))
+    expect(readme).toContain("If you already have a skill with one of these names, yours is kept")
   })
 })
 

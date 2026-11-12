@@ -10,6 +10,7 @@ import { mcpEditor, timerProbe, transforms, type McpEditor, type ServerConfig } 
 
 type ToolEditor = Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>[0]
 type AgentEditor = Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]
+type SkillEditor = Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]
 const KEY = "sk-or-v1-0123456789abcdef0123456789abcdef"
 
 /** An async no-op that counts its calls in `calls`. */
@@ -18,10 +19,11 @@ const counter = () => Object.assign(async function reload(this: unknown) {
 }, { calls: 0 })
 
 /** A context with the members setup uses; `fail` makes one registration throw. */
-function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" } = {}) {
+function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" | "skill" } = {}) {
   const mcp = transforms<McpEditor>()
   const tool = transforms<ToolEditor>()
   const agent = transforms<AgentEditor>()
+  const skill = transforms<SkillEditor>()
   const log: string[] = []
   const ctx = {
     app: { version: options.version ?? "2.2.3" },
@@ -51,6 +53,13 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
       list: async () => ({ data: [{ id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] }] }),
       reload: counter(),
     },
+    skill: {
+      transform: (callback: (editor: SkillEditor) => void) => {
+        log.push("skill")
+        if (options.fail === "skill") return Promise.reject(new Error("skill registry closed"))
+        return skill.transform(callback)
+      },
+    },
     integration: { transform: async () => ({ dispose: async () => {} }), get: async () => ({ data: {} }), connection: {} },
     event: {
       subscribe: ({ signal }: { signal: AbortSignal }) => ({
@@ -60,7 +69,7 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
       }),
     },
   } as unknown as Plugin.Context
-  return { ctx, mcp, tool, agent, log }
+  return { ctx, mcp, tool, agent, skill, log }
 }
 
 /** Runs the tool transforms on a fresh editor and returns the namespaces they declared. */
@@ -88,9 +97,9 @@ describe("the plugin", () => {
     const timers = timerProbe()
     try {
       let state: PluginState | undefined
-      const { ctx, mcp, tool, agent, log } = context()
+      const { ctx, mcp, tool, agent, skill, log } = context()
       const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-      expect(log).toEqual(["mcp", "tool", "agent", "tool"])
+      expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill"])
       expect(state!.server().source).toEqual({ type: "pending" })
       expect(state!.owned()).toBe(false)
       expect(namespaces(tool)).toEqual([])
@@ -109,6 +118,7 @@ describe("the plugin", () => {
       expect(mcp.callbacks).toHaveLength(0)
       expect(tool.callbacks).toHaveLength(0)
       expect(agent.callbacks).toHaveLength(0)
+      expect(skill.callbacks).toHaveLength(0)
       expect(timers.pending()).toBe(0)
     } finally {
       timers.stop()
@@ -152,7 +162,7 @@ describe("the plugin", () => {
     let state: PluginState | undefined
     const { ctx, mcp, tool, log } = context({ fail: "agent" })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-    expect(log).toEqual(["mcp", "tool", "agent", "tool"])
+    expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill"])
     expect(tool.callbacks).toHaveLength(2)
     mcp.run(mcpEditor().editor)
     expect(state!.policy()).toEqual({
@@ -173,7 +183,7 @@ describe("the plugin", () => {
       let fault: "register" | "apply" | undefined = "register"
       const first = context()
       stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)) as () => Promise<void>)
-      expect(first.log).toEqual(["mcp", "tool", "tool"])
+      expect(first.log).toEqual(["mcp", "tool", "tool", "skill"])
       expect(state!.policy().installation).toBe("failed")
       fault = undefined
       const second = context()
@@ -230,6 +240,15 @@ describe("the plugin", () => {
     } finally {
       timers.stop()
     }
+  })
+
+  test("a failure registering the skills undoes the server and the namespace", async () => {
+    const { ctx, mcp, tool, agent, log } = context({ fail: "skill" })
+    await expect(createOpenRouterPlugin({ endpoint: ENDPOINT }).setup(ctx)).rejects.toThrow(/^SETUP_FAILED: .*skill registry closed/)
+    expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill"])
+    expect(mcp.callbacks).toHaveLength(0)
+    expect(tool.callbacks).toHaveLength(0)
+    expect(agent.callbacks).toHaveLength(0)
   })
 
   test("a failure at the first registration leaves nothing behind", async () => {

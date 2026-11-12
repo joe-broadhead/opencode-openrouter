@@ -11,8 +11,8 @@ lookups, test prompts and image generation, through OpenCode's own MCP connectio
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
 every agent, so by default billable inference and feedback ask before they run, and a guard that refuses every
-OpenRouter tool call before anything is sent while those rules are not in place. Skills, the status command, the status
-dialog and script access are not built yet.
+OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills. The status
+command, the status dialog and script access are not built yet.
 
 ## Requirements
 
@@ -103,6 +103,21 @@ decision still follows it, and the tool's result passes through unchanged.
 - Another entry, under a different name, pointing at OpenRouter's MCP host: the plugin reports `SERVER_DUPLICATE` and
   does not take it over.
 
+## Skills
+
+The package ships four skills. OpenCode lists them and a model loads one on demand; none is added to every prompt. A skill
+describes how to use the tools, and OpenCode's permissions still decide whether a call runs.
+
+| Skill | Use it for |
+| --- | --- |
+| `openrouter` | Finding and shortlisting models, comparing endpoints, explaining routing, usage trends, and integration questions answered from OpenRouter's current documentation. Read-only. |
+| `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Ori only when you ask for it. |
+| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you. |
+| `openrouter-troubleshoot` | Connection, sign-in, credit, generation, routing or tool failures, diagnosed with read operations. Feedback only when you ask for it. |
+
+If you already have a skill with one of these names, yours is kept and the plugin's is not registered. A skill file that
+is missing or malformed is skipped with `SKILLS_INVALID`; the server and its tools keep working.
+
 ## Errors
 
 Every error reads `CODE: What happened. Next step: What to do.`
@@ -118,11 +133,12 @@ Every error reads `CODE: What happened. Next step: What to do.`
 | `NAMESPACE_COLLISION` | Another server's tool ids would start with `openrouter_`. |
 | `TOOL_NAMESPACE_MISSING` | OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's. |
 | `POLICY_UNAVAILABLE` | The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent. |
+| `SKILLS_INVALID` | A packaged skill file is missing, unreadable or malformed; that skill is not registered. |
 
 ## Known limits
 
 - Not released: there is no `v0.0.0` tag yet.
-- No skills, status command, status dialog or script access yet, so a failed rules installation or an agent without the
+- No status command, status dialog or script access yet, so a failed rules installation or an agent without the
   rules is not reported anywhere but in the refused calls.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
