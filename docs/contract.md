@@ -65,7 +65,10 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | A route the RPC contract does not declare, such as `generate-image`, is answered `rpc.method_not_found` by the host before any plugin code runs. | synthetic | `test/host/scripts.test.ts` |
 | The shared tools RPC's result keeps an MCP result's structured content and its text parts, and drops every other content block (images included). | source-verified | `normalise` in `src/host/tools-rpc.ts`, the family's shared part |
 | Each script method's useful result fits that result. | synthetic (`send-message`: documented) | The loopback fake answers text and structured content; OpenRouter documents `send-message`'s reply as text with a generation id. Per-method labels are the `scriptOutput` column of `src/openrouter-tools.ts` and the table in [scripting.md](scripting.md). To confirm with a signed-in capture. |
-| Status reads only `ctx.mcp.list()`, `ctx.tool.list()`, `ctx.agent.list()`, `ctx.skill.list()` and the plugin's own state, and sends no `tools/call`. | synthetic | `test/host/status.test.ts` |
+| Status reads only `ctx.mcp.list()`, `ctx.tool.list()`, `ctx.agent.list()`, `ctx.skill.list()` and the plugin's own state, and sends no `tools/call`. | synthetic | `test/host/status.test.ts`; stock `opencode serve` in `test/pack/pack.test.ts` |
+| `ctx.command.transform` registers `/openrouter-status`, and `ctx.session.synthetic({ resume: false })` posts its text with no model turn. | source-verified + synthetic | `plugin/dist/promise/command.d.ts:11-22`; `test/host/status.test.ts` |
+| The installed `dist/tui.js` sets up its dialog against a TUI context: a global palette entry and `/openrouter`, an `r` key enabled only while the dialog is open, event listeners only while it is open, and a cleanup that clears an open dialog. | synthetic | `test/pack/pack.test.ts`, with the host packages installed next to the tarball |
+| Each stock TUI resolves a plugin's `ui.dialog.alert` promise on every path that closes it (replace, clear, Escape, Ctrl+C), so the dialog's `r` key and listeners stop when it closes. | source-verified | The stock binary of 2.2.3 to 2.2.6, matched by `test/pack/pack.test.ts` |
 
 ## MCP identity and naming
 

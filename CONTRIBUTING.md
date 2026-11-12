@@ -42,7 +42,7 @@ npm run check
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
 | `icons` | `node scripts/check-icons.mjs`, the family's icon check, copied verbatim |
 | `host` | `bun test ./test/host`: the plugin and the host contract facts inside an embedded OpenCode host, once on each tested release |
-| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 |
+| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, sets up the installed TUI bundle's status dialog against a fake TUI context, checks that each stock TUI closes a plugin's alert on every path, and loads the package in stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6, where status and the tools RPC run against the loopback fake |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
 | `copies` | `node scripts/check-copies.mjs`: the shared part of `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, still has the family's hash |
 | `release-kit` | `node --test scripts/release-kit.test.mjs`: the family's release kit, copied unchanged |

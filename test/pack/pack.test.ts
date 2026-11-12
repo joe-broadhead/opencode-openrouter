@@ -15,9 +15,13 @@ import { arch, platform, tmpdir } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { DISPLAY_NAME, ENDPOINT, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "../../src/constants.js"
+import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { checkHost } from "../../src/host-version.js"
+import { RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { SKILL_NAMES } from "../../src/skills.js"
-import { TUI_ID } from "../../src/tui.js"
-import { startFakeMcp } from "../host/fake-mcp.js"
+import { buildStatus, formatStatus } from "../../src/status.js"
+import { REFRESH_COMMAND_ID, STATUS_COMMAND_ID, TUI_ID } from "../../src/tui.js"
+import { NEW_TOOL, startFakeMcp, type FakeMcp } from "../host/fake-mcp.js"
 
 const root = fileURLToPath(new URL("../..", import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
@@ -154,6 +158,66 @@ describe("package tarball", () => {
     })
   }, 300_000)
 
+  // The installed TUI bundle, not the source: its dialog sets up against a fake TUI context, opens with the status the
+  // server part's RPC returns, shows the same report /openrouter-status posts, refreshes only while open, and cleans up.
+  test("the installed TUI entry opens the status dialog from the status RPC, and its cleanup closes it", () => {
+    const consumer = install(true)
+    const status = buildStatus({
+      host: checkHost("2.2.3", false),
+      access: "ask-changes",
+      source: { type: "plugin" },
+      server: { status: "connected" },
+      tools: [...TOOL_NAMES],
+      settling: false,
+      policy: { installation: "ready", problems: [] },
+      coverage: { unguarded: [], explicitlyAllowed: [] },
+      skills: SKILL_NAMES.map((name) => ({ name, state: "loaded" as const })),
+      problems: [],
+    })
+    const probe = join(consumer, "tui-probe.mjs")
+    writeFileSync(probe, [
+      `const plugin = (await import(${JSON.stringify(`${pkg.name}/tui`)})).default`,
+      `const status = ${JSON.stringify(status)}`,
+      "const out = { rpc: [], alerts: [], sizes: [], cleared: 0, listeners: 0 }",
+      "let layer",
+      "const listeners = new Set()",
+      "const context = {",
+      "  location: { directory: 'project' },",
+      "  client: { rpc: (definition) => ({ status: async (input, request) => (out.rpc.push({ id: definition.id, input, request }), status) }) },",
+      "  data: { on: (type, handler) => { const entry = { type, handler }; listeners.add(entry); return () => listeners.delete(entry) } },",
+      "  ui: { dialog: { alert: (alert) => (out.alerts.push(alert), new Promise(() => {})), set: (value) => void out.sizes.push(value), clear: () => void out.cleared++ } },",
+      "  keymap: { layer: (factory) => void (layer = factory()) },",
+      "}",
+      "const stop = plugin.setup(context)",
+      "out.id = plugin.id",
+      "out.commands = layer.commands.map(({ id, slash, palette, bind }) => ({ id, slash, palette, bind }))",
+      "const [open, refresh] = layer.commands",
+      "out.refreshBeforeOpen = refresh.enabled()",
+      "await open.run()",
+      "out.refreshWhileOpen = refresh.enabled()",
+      "out.listeners = listeners.size",
+      "stop()",
+      "out.listenersAfterStop = listeners.size",
+      "console.log(JSON.stringify(out))",
+    ].join("\n"))
+    const output = JSON.parse(run(process.execPath, [probe], consumer, { PATH: process.env.PATH, ...isolated(join(work, "tui-probe")) }).trim().split("\n").at(-1)!)
+    expect(output).toMatchObject({
+      id: TUI_ID,
+      commands: [
+        { id: STATUS_COMMAND_ID, slash: { name: "openrouter" }, palette: true },
+        { id: REFRESH_COMMAND_ID, bind: "r" },
+      ],
+      rpc: [{ id: PLUGIN_ID, input: {}, request: { location: { directory: "project" } } }],
+      sizes: [{ size: "large" }],
+      refreshBeforeOpen: false,
+      refreshWhileOpen: true,
+      listeners: 6,
+      listenersAfterStop: 0,
+      cleared: 1,
+    })
+    expect(output.alerts).toEqual([{ title: "OpenRouter status", message: `${formatStatus(status).split("\n").slice(1).join("\n")}\n\nr refresh · esc close` }])
+  }, 300_000)
+
   // OpenCode reloads a plugin in place and reuses the module records it holds for unchanged paths, so an entry that
   // imported a sibling module could get an older cached copy of it. Each entry must stand alone.
   test("dist holds only the two entry bundles, and they import no sibling module", () => {
@@ -244,6 +308,90 @@ describe.each(TESTED_HOSTS)("installed alone, in stock OpenCode %s", (version) =
     } finally {
       await host.close()
       await fake.close()
+    }
+  }, 600_000)
+})
+
+// The `/openrouter` dialog is a `ui.dialog.alert`. Its `r` key is live only until the alert's promise resolves, so the
+// stock TUI must resolve it on every way the dialog can close. Each release's own code shows that it does: an alert
+// resolves on its dialog's `onClose`, and every path that removes a dialog (replace, which another dialog opening uses,
+// clear, which a click outside uses, Escape and Ctrl+C) calls `onClose` first. A release whose code differs fails here,
+// and needs the dialog's close paths checked again. Ported from the family's other status dialogs.
+describe.each(TESTED_HOSTS)("the stock TUI of OpenCode %s", (version) => {
+  test("resolves a plugin's alert on every path that closes it, replacement by another dialog included", () => {
+    const code = readFileSync(stockBinary(version)).toString("latin1")
+    const facts = {
+      "show passes onClose to replace": /show\((\w),(\w)\)\{\w\.replace\(\(\)=>\w\(\1\),\2\)\}/,
+      "alert resolves on onClose": /alert\((\w)\)\{return new Promise\(\((\w)\)=>\{let (\w)=\w+\(\2\);\w\.show\(\(\)=>[^]{1,200}?onConfirm:\3\}\),\3\)\}\)\}/,
+      "replace closes every dialog it removes": /replace\((\w),(\w),(\w)\)\{if\(\w\.stack\.length===0\)[^;]{1,80};for\(let (\w) of \w\.stack\)if\(\4\.onClose\)\4\.onClose\(\);/,
+      "clear closes every dialog": /clear\(\)\{for\(let (\w) of \w\.stack\)if\(\1\.onClose\)\1\.onClose\(\);/,
+    }
+    expect(Object.fromEntries(Object.entries(facts).map(([fact, pattern]) => [fact, pattern.test(code)]))).toEqual(Object.fromEntries(Object.keys(facts).map((fact) => [fact, true])))
+    // Escape and Ctrl+C each close the top dialog through its onClose.
+    expect(code.match(/\.stack\.at\(-1\)\?\.onClose\?\.\(\),\w\("stack",\w\.stack\.slice\(0,-1\)\)/g)).toHaveLength(2)
+  }, 600_000)
+})
+
+// The installed package on stock `opencode serve`, pointed at the loopback fake (which needs no sign-in here): the status
+// RPC and /openrouter-status read local state only, and the tools RPC gives a script the native path's decision, with
+// the image route absent. Counted against the fake's actual tools/call requests.
+describe.each(TESTED_HOSTS)("status and the tools RPC on stock OpenCode %s", (version) => {
+  let fake: FakeMcp
+  let host: Awaited<ReturnType<typeof serve>>
+  const rule = (action: string, effect: "allow" | "ask" | "deny") => ({ action, resource: "*", effect })
+
+  /** A tools RPC call: its output, or the error's `{ type, code, next, message }`. */
+  async function script(method: string, input: unknown): Promise<Record<string, any>> {
+    const response = await host.request("POST", `/api/rpc/${TOOLS_RPC_ID}/${method}`, { input })
+    const body = response.body as Record<string, any>
+    if (response.ok) return { value: body.output }
+    const error = (body?.error ?? body) as Record<string, any>
+    return { status: response.status, type: error?.type ?? error?._tag, code: error?.data?.code, next: error?.data?.next, message: String(error?.message ?? response.text) }
+  }
+  const status = async () => (await host.api<{ output: Record<string, any> }>("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })).output
+  const create = async (body: Record<string, unknown>) => {
+    const created = await host.api<Record<string, any>>("POST", "/api/session", { ...body, location: { directory: host.directory } })
+    return (created.id ?? created.data?.id) as string
+  }
+
+  test("status sees the catalog, and a script gets the native decision: read runs, ask and deny refused, no image route", async () => {
+    fake = await startFakeMcp()
+    host = await serve(version, pointedAt(fake.url, `rpc-${version}`), { name: `rpc-${version}` })
+    try {
+      const seen = await host.until("status sees the connected catalog", async () => {
+        const output = await status()
+        return output.state === "connected" && output.catalog.observed === TOOL_NAMES.length + 1 ? output : undefined
+      })
+      expect(seen).toMatchObject({ source: "plugin", catalog: { reviewedPresent: 17, unknown: [NEW_TOOL] }, scripting: { reviewedMethodCount: 16, nativeOnly: ["generate-image"] }, nextStep: "Nothing to do." })
+      expect(fake.calls).toEqual([])
+
+      const { value: described } = await script("describe", {})
+      expect(described.methods.map((method: { name: string }) => method.name)).toEqual([...RPC_TOOLS])
+      expect(described.unclassified).toEqual(["generate-image", NEW_TOOL])
+
+      const build = await create({ agent: "build" })
+      expect((await script("ping", { sessionID: build, input: {} })).value).toMatchObject({ text: "synthetic ping" })
+      expect(fake.calls).toEqual(["ping"])
+      // Under the default ask-changes, a paid call would ask: refused at once, with no prompt left waiting.
+      const asked = await script("send-message", { sessionID: build, input: { query: "q" } })
+      expect(asked).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+      expect(asked.message).toContain("would ask")
+      const { data: pending } = await host.api<{ data: unknown[] }>("GET", "/api/permission/request")
+      expect(pending.filter((request) => JSON.stringify(request).includes(build))).toEqual([])
+      // A session's own deny refuses a read.
+      const denied = await create({ agent: "build", permissions: [rule("openrouter_ping", "deny")] })
+      expect(await script("ping", { sessionID: denied, input: {} })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+      // An explicit allow is the grant a script needs for a paid call: it runs once.
+      const granted = await create({ agent: "build", permissions: [rule("openrouter_send-message", "allow")] })
+      expect((await script("send-message", { sessionID: granted, input: { query: "q" } })).value).toMatchObject({ text: "synthetic send-message" })
+      // The image route does not exist.
+      expect(await script("generate-image", { sessionID: granted, input: { query: "q" } })).toMatchObject({ type: "rpc.method_not_found" })
+      expect(fake.calls).toEqual(["ping", "send-message"])
+    } catch (error) {
+      throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host?.log().slice(-3000)}`)
+    } finally {
+      await host?.close()
+      await fake?.close()
     }
   }, 600_000)
 })
