@@ -8,7 +8,7 @@
 // rules, the user's `permissions`, a session's rules and saved approvals) still wins over it.
 import type { Plugin } from "@opencode/plugin"
 import { SERVER_NAME } from "./constants.js"
-import { nativeToolId } from "./mcp.js"
+import { nativeToolId, type ServerSource } from "./mcp.js"
 import { CHANGE_TOOLS, REVIEWED_TOOLS, type ReviewedTool } from "./openrouter-tools.js"
 import type { Access } from "./options.js"
 import { reasonOf } from "./redact.js"
@@ -93,13 +93,22 @@ export function applyDefaultRules(editor: Agents, access: Access): string | unde
 }
 
 /**
- * Registers the default rules for every agent. Each pass reports its outcome: `undefined` when the block is in every
- * agent with a base allow, or the reason it is not. Synchronous and never throws.
+ * Whether the block belongs in the agents for this server entry: the plugin's own or the user's exact entry, and a
+ * pending one, as the fail-safe before the first check. A conflicting or disabled entry is the user's own server, and
+ * the plugin adds no rule for it; the replay that finds the conflict leaves the block out, so it ends with none.
  */
-export function registerDefaultRules(agent: Pick<Plugin.Context["agent"], "transform">, access: Access, report: (failure: string | undefined) => void, fault?: () => boolean) {
+export const rulesApply = (source: ServerSource) => source.type === "plugin" || source.type === "adopted" || source.type === "pending"
+
+/**
+ * Registers the default rules for every agent. Each pass reports its outcome: `undefined` when the block is in every
+ * agent with a base allow, or when the entry is not the plugin's and there is nothing to apply; otherwise the reason it
+ * is not in place. Every pass starts from the agents' configured rules, so a pass that applies nothing removes the
+ * block. Synchronous and never throws.
+ */
+export function registerDefaultRules(agent: Pick<Plugin.Context["agent"], "transform">, access: Access, source: () => ServerSource, report: (failure: string | undefined) => void, fault?: () => boolean) {
   return agent.transform((editor) => {
     if (fault?.()) return report("injected failure")
-    report(applyDefaultRules(editor, access))
+    report(rulesApply(source()) ? applyDefaultRules(editor, access) : undefined)
   })
 }
 

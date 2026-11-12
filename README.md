@@ -75,6 +75,9 @@ reviewed tool:
 | Feedback: `send-feedback` | deny | ask | allow |
 | A tool OpenRouter adds later | deny | ask | allow |
 
+The block is added only while `openrouter` is the plugin's own entry or your exact one, and while the plugin has not
+checked the entry yet. A conflicting or disabled entry is your own server: it gets no rules, no guard and no label.
+
 These are defaults, not an administrative policy: a later allow in your config or an approval you save changes the
 result. An agent without the base allow, such as one you wrote with its own `* * deny`, is left unchanged. A custom
 agent can miss the block; give it the block yourself, the same rules in the same order, before its own rules.

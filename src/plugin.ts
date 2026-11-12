@@ -5,8 +5,9 @@
 //   2. (skills) load and validate the skill files, outside every transform;
 //   3. create the cleanup stack, the diagnostics, the server observation and the guard, which starts blocked;
 //   4. register the `openrouter` server entry, then the in-place native dispatch guard, before any tool exists;
-//   5. the default rules, which mark the policy installation ready only when they apply. A failure here does not
-//      abort setup: the guard stays registered and blocked, so an adopted server's tools refuse every call;
+//   5. the default rules, only while the server is the plugin's own, adopted or still pending, which mark the policy
+//      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and
+//      blocked, so an adopted server's tools refuse every call;
 //   6. the Code Mode namespace text, only for the plugin's own or the user's adopted server;
 //   7. (skills, status, tools RPC) the skills, the status command, the status RPC and the tools RPC;
 //   8. the `/connect` watcher, last, because it reads what the steps before it registered;
@@ -20,7 +21,7 @@ import { checkHost, type HostCheck } from "./host-version.js"
 import { watchIntegration } from "./integration.js"
 import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type ServerObservation } from "./mcp.js"
 import { parseOptions, type Options } from "./options.js"
-import { registerDefaultRules, unguardedAgents, type Rule } from "./permissions.js"
+import { registerDefaultRules, rulesApply, unguardedAgents, type Rule } from "./permissions.js"
 import { reasonOf } from "./redact.js"
 
 /** Internal seam: tests point the server at a loopback fake and read the plugin's state. Not a public option. */
@@ -93,6 +94,7 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
 
       // 3. The plugin's memory: replays overwrite the observation, so nothing accumulates.
       const cleanup = cleanupStack()
+      let closed = false
       let server: ServerObservation = PENDING
       const owned = () => isOwned(server.source)
       const guard = createGuard(() => server.source, seam.guardCheck)
@@ -103,18 +105,28 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         owned,
         policy: guard.health,
         assertOperational: guard.assertOperational,
-        unguardedAgents: async () => unguardedAgents((await ctx.agent.list()).data.map((agent) => ({ id: agent.id, permissions: agent.permissions as readonly Rule[] })), options.access),
+        // No agent is unguarded for a server the plugin leaves to the user.
+        unguardedAgents: async () =>
+          rulesApply(server.source) ? unguardedAgents((await ctx.agent.list()).data.map((agent) => ({ id: agent.id, permissions: agent.permissions as readonly Rule[] })), options.access) : [],
       }
 
       try {
         // 4. The server entry. The user's config is applied before plugin transforms, so an existing entry is theirs.
-        cleanup.defer(await registerServer(ctx.mcp, serverConfig(seam), (next) => void (server = next)))
+        // The guard, the rules and the namespace read the entry's source on their own passes, which the MCP pass does not
+        // replay: when the source changes, ask the host to rebuild them, after this pass returns.
+        cleanup.defer(
+          await registerServer(ctx.mcp, serverConfig(seam), (next) => {
+            const changed = next.source.type !== server.source.type
+            server = next
+            if (changed && !closed) void Promise.resolve().then(() => (closed ? undefined : Promise.all([ctx.tool.reload(), ctx.agent.reload()]))).catch(() => undefined)
+          }),
+        )
         // The guard, registered before the host has discovered any tool, so every pass that adds one decorates it.
         cleanup.defer(await registerGuard(ctx.tool, guard, () => server.source))
         // 5. The default rules. Only their success makes the guard healthy; a failure leaves it blocked, not setup.
         try {
           if (seam.policyFault?.() === "register") throw new Error("injected registration failure")
-          cleanup.defer(await registerDefaultRules(ctx.agent, options.access, guard.policyReport, () => seam.policyFault?.() === "apply"))
+          cleanup.defer(await registerDefaultRules(ctx.agent, options.access, () => server.source, guard.policyReport, () => seam.policyFault?.() === "apply"))
         } catch (error) {
           guard.policyReport(reasonOf(error))
         }
@@ -127,12 +139,14 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         // 8. Last: the watcher reads the server's row and renames only the MCP integration OpenCode made for it.
         cleanup.defer(watchIntegration(ctx, owned))
       } catch (error) {
+        closed = true
         guard.close()
         await cleanup.run()
         throw setupFailure(error)
       }
       seam.inspect?.(state)
       return async () => {
+        closed = true
         guard.close()
         await cleanup.run()
       }

@@ -207,6 +207,46 @@ describe("the user's later rules", () => {
   })
 })
 
+describe("a conflicting user openrouter entry", () => {
+  let host: Host
+  beforeAll(async () => {
+    // A trailing slash: the user's own server, which the plugin leaves untouched.
+    host = await startHost({ config: (url) => ({ mcp: { servers: { openrouter: { type: "remote", url: `${url}/`, oauth: false } } } }) })
+    await listed(host)
+  })
+  afterAll(() => host?.close())
+
+  test("gets no rule in any agent once the check settles, and its tools are left as the host made them", async () => {
+    expect(host.state().server().source.type).toBe("conflict")
+    // Let any rebuild the plugin asked for run, then read the agents' effective rules.
+    await host.probe().agent.reload()
+    await Bun.sleep(200)
+    const rules = await agentRules(host)
+    for (const id of BUILT_IN) expect({ id, rules: rules.get(id)!.filter((rule) => rule.action.startsWith(`${SERVER_NAME}_`)) }).toEqual({ id, rules: [] })
+    expect((await listed(host)).find((tool) => tool.id === IMAGE_TOOL)?.options).toEqual({ namespace: SERVER_NAME, codemode: true })
+    expect(await host.state().unguardedAgents()).toEqual([])
+  })
+})
+
+describe("the user's exact openrouter entry", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ config: (url) => ({ mcp: { servers: { openrouter: { type: "remote", url, oauth: false } } } }) })
+    await listed(host)
+    await until("the policy is ready", async () => host.state().policy().installation === "ready")
+  })
+  afterAll(() => host?.close())
+
+  test("is adopted and gets the block in every built-in agent", async () => {
+    expect(host.state().server().source).toEqual({ type: "adopted", signIn: "user-managed" })
+    const rules = await agentRules(host)
+    for (const id of BUILT_IN) expect({ id, block: rules.get(id)!.slice(1, 1 + defaultRules("ask-changes").length) }).toEqual({ id, block: defaultRules("ask-changes") })
+    const build = await session(host)
+    expect(await attempt(host, build, "build", "send-message")).toMatchObject({ asked: nativeToolId("send-message"), ok: false })
+    expect(host.fake.calls).toEqual([])
+  })
+})
+
 describe("a permission-registration failure at setup", () => {
   const recorder = passRecorder()
   let host: Host

@@ -5,7 +5,8 @@ import { describe, expect, test } from "bun:test"
 import { nativeToolId } from "../../src/mcp.js"
 import { BILLABLE_TOOLS, CHANGE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
 import { ACCESS, type Access } from "../../src/options.js"
-import { applyDefaultRules, BASE_ALLOW, BASELINE_ACTION, defaultRules, hasDefaultRules, insertRules, lastMatch, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
+import type { ServerSource } from "../../src/mcp.js"
+import { applyDefaultRules, BASE_ALLOW, BASELINE_ACTION, defaultRules, hasDefaultRules, insertRules, lastMatch, registerDefaultRules, rulesApply, unguardedAgents, type Rule } from "../../src/permissions.js"
 import { transforms } from "./fake.js"
 
 const rule = (action: string, effect: Rule["effect"]): Rule => ({ action, resource: "*", effect })
@@ -147,13 +148,36 @@ describe("one transform pass", () => {
     const agent = transforms<never>()
     const reports: (string | undefined)[] = []
     let fault = false
-    await registerDefaultRules({ transform: agent.transform } as never, "read-only", (failure) => reports.push(failure), () => fault)
+    await registerDefaultRules({ transform: agent.transform } as never, "read-only", () => ({ type: "plugin" }), (failure) => reports.push(failure), () => fault)
     const agents: Agent[] = [{ id: "build", permissions: [BASE_ALLOW] }]
     agent.run(editor(agents) as never)
     fault = true
     agent.run(editor([{ id: "plan", permissions: [BASE_ALLOW] }]) as never)
     expect(reports).toEqual([undefined, "injected failure"])
     expect(agents[0]!.permissions).toEqual([BASE_ALLOW, ...defaultRules("read-only")])
+  })
+})
+
+describe("the server entry the rules are for", () => {
+  type Agent = { id: string; permissions: Rule[] }
+  const editor = (agents: Agent[]) => ({ list: () => agents, update: (id: string, update: (agent: Agent) => void) => update(agents.find((agent) => agent.id === id)!) })
+
+  test("the block goes in for the plugin's own, an adopted and a pending entry, and never for a conflict or a disabled one", async () => {
+    const sources: ServerSource[] = [{ type: "plugin" }, { type: "adopted", signIn: "oauth" }, { type: "pending" }, { type: "conflict", safeDescription: "x" }, { type: "disabled" }]
+    expect(sources.map(rulesApply)).toEqual([true, true, true, false, false])
+    let source: ServerSource = { type: "pending" }
+    const agent = transforms<never>()
+    const reports: (string | undefined)[] = []
+    await registerDefaultRules({ transform: agent.transform } as never, "ask-changes", () => source, (failure) => reports.push(failure))
+    const pending: Agent[] = [{ id: "build", permissions: [BASE_ALLOW] }]
+    agent.run(editor(pending) as never)
+    expect(pending[0]!.permissions).toEqual([BASE_ALLOW, ...defaultRules("ask-changes")])
+    // The replay that finds the conflict starts from the configured rules again and adds nothing.
+    source = { type: "conflict", safeDescription: "ends with a trailing slash" }
+    const conflict: Agent[] = [{ id: "build", permissions: [BASE_ALLOW] }]
+    agent.run(editor(conflict) as never)
+    expect(conflict[0]!.permissions).toEqual([BASE_ALLOW])
+    expect(reports).toEqual([undefined, undefined])
   })
 })
 

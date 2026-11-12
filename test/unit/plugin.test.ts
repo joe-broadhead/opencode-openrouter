@@ -12,6 +12,11 @@ type ToolEditor = Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>
 type AgentEditor = Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]
 const KEY = "sk-or-v1-0123456789abcdef0123456789abcdef"
 
+/** An async no-op that counts its calls in `calls`. */
+const counter = () => Object.assign(async function reload(this: unknown) {
+  ;(reload as unknown as { calls: number }).calls++
+}, { calls: 0 })
+
 /** A context with the members setup uses; `fail` makes one registration throw. */
 function context(options: { version?: string; options?: unknown; fail?: "mcp" | "tool" | "agent" } = {}) {
   const mcp = transforms<McpEditor>()
@@ -30,6 +35,7 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
       list: async () => ({ data: [] }),
     },
     tool: {
+      reload: counter(),
       transform: (callback: (editor: ToolEditor) => void) => {
         log.push("tool")
         if (options.fail === "tool") return Promise.reject(new Error(`tool registry closed\nsecond line ${KEY}`))
@@ -43,6 +49,7 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
         return agent.transform(callback)
       },
       list: async () => ({ data: [{ id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] }] }),
+      reload: counter(),
     },
     integration: { transform: async () => ({ dispose: async () => {} }), get: async () => ({ data: {} }), connection: {} },
     event: {
@@ -120,10 +127,22 @@ describe("the plugin", () => {
     expect(state!.policy()).toEqual({ installation: "ready", problems: [] })
     expect(() => state!.assertOperational()).not.toThrow()
     expect(await state!.unguardedAgents()).toEqual(["build"])
-    // Ownership loss blocks again: the user's entry now points elsewhere.
+    // Ownership loss blocks again: the user's entry now points elsewhere. The plugin asks the host to rebuild the tools
+    // and agents, whose next pass adds no rule for the user's server.
+    const reloads = ctx.tool.reload as unknown as { calls: number }
+    const before = reloads.calls
     mcp.run(mcpEditor({ openrouter: { type: "remote", url: "https://example.com/mcp" } as ServerConfig }).editor)
     expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The openrouter server entry is no longer the plugin's own/)
+    await Bun.sleep(0)
+    expect(reloads.calls).toBe(before + 1)
+    expect((ctx.agent.reload as unknown as { calls: number }).calls).toBe(before + 1)
+    expect(agentPass(agent)).toEqual([{ action: "*", resource: "*", effect: "allow" }])
+    // An unchanged source asks for no rebuild.
+    mcp.run(mcpEditor({ openrouter: { type: "remote", url: "https://example.com/mcp" } as ServerConfig }).editor)
+    await Bun.sleep(0)
+    expect(reloads.calls).toBe(before + 1)
     mcp.run(mcpEditor().editor)
+    agentPass(agent)
     expect(() => state!.assertOperational()).not.toThrow()
     await (stop as () => Promise<void>)()
     expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
