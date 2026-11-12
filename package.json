@@ -93,8 +93,20 @@
     "icon": "assets/icon.svg",
     "tools": [
       {
+        "name": "openrouter.get-endpoint-uptime-history",
+        "permission": "openrouter_get-endpoint-uptime-history",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "openrouter.get-model",
         "permission": "openrouter_get-model",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.get-session-cost",
+        "permission": "openrouter_get-session-cost",
         "effect": "allow",
         "readOnly": true
       },
@@ -153,14 +165,56 @@
         "readOnly": true
       },
       {
+        "name": "openrouter.get-batch",
+        "permission": "openrouter_get-batch",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "openrouter.get-credits",
         "permission": "openrouter_get-credits",
         "effect": "allow",
         "readOnly": true
       },
       {
+        "name": "openrouter.get-current-key",
+        "permission": "openrouter_get-current-key",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "openrouter.get-generation",
         "permission": "openrouter_get-generation",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.get-preset",
+        "permission": "openrouter_get-preset",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.get-video",
+        "permission": "openrouter_get-video",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-batches",
+        "permission": "openrouter_list-batches",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-preset-versions",
+        "permission": "openrouter_list-preset-versions",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "openrouter.list-presets",
+        "permission": "openrouter_list-presets",
         "effect": "allow",
         "readOnly": true
       },
@@ -177,14 +231,44 @@
         "readOnly": true
       },
       {
+        "name": "openrouter.generate-image",
+        "permission": "openrouter_generate-image",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.generate-speech",
+        "permission": "openrouter_generate-speech",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.generate-video",
+        "permission": "openrouter_generate-video",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.send-batch",
+        "permission": "openrouter_send-batch",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "openrouter.send-decision",
+        "permission": "openrouter_send-decision",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
         "name": "openrouter.send-message",
         "permission": "openrouter_send-message",
         "effect": "ask",
         "readOnly": false
       },
       {
-        "name": "openrouter.generate-image",
-        "permission": "openrouter_generate-image",
+        "name": "openrouter.transcribe-audio",
+        "permission": "openrouter_transcribe-audio",
         "effect": "ask",
         "readOnly": false
       },

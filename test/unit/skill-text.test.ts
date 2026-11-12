@@ -3,13 +3,14 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
-import { TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { BILLABLE_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { parseSkill, SKILL_NAMES, SKILLS_DIR } from "../../src/skills.js"
 
 const read = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8")
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { files: string[]; jelly: { skills: string[] } }
 // Code spans that are hyphenated words but not tools.
 const NOT_TOOLS = new Set(["ask-changes"])
+const MAX_LINES = 80
 
 /**
  * Every tool name a skill mentions, in the three forms it teaches: the native id `openrouter_list-models`, the Code Mode
@@ -20,7 +21,7 @@ function mentioned(text: string) {
   const members = [...text.matchAll(/\btools\.openrouter\[["']([^"']+)["']\]/g)].map((match) => match[1]!)
   const spans = [...text.matchAll(/`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`/g)].map((match) => match[1]!).filter((span) => !NOT_TOOLS.has(span))
   // A verb-led hyphenated word in prose is a tool name too, so one that is mistyped or invented cannot hide unquoted.
-  const prose = [...text.matchAll(/\b((?:list|get|send|search|spawn|install|generate)-[a-z0-9-]*[a-z0-9])\b/g)].map((match) => match[1]!)
+  const prose = [...text.matchAll(/\b((?:list|get|send|search|spawn|install|generate|transcribe)-[a-z0-9-]*[a-z0-9])\b/g)].map((match) => match[1]!)
   return { native, members, spans, prose }
 }
 
@@ -43,6 +44,9 @@ describe("the shipped skills", () => {
     expect(skill.content.length).toBeGreaterThan(500)
     // A YAML reader would split a description at either of these.
     expect(skill.description).not.toMatch(/: | #/)
+    // Short enough to load whole: the family's length rule, and the limit a host truncates a description at.
+    expect(read(name).split("\n").length).toBeLessThan(MAX_LINES)
+    expect(skill.description!.length).toBeLessThanOrEqual(1024)
   })
 
   test("carry the descriptions that route a request to each skill", () => {
@@ -71,11 +75,32 @@ describe("the shipped skills", () => {
     expect([...new Set([...found.native, ...found.members, ...found.spans, ...found.prose])].filter((tool) => !TOOL_NAMES.includes(tool)).sort()).toEqual(["get-widget", "list-everything", "make-coffee"])
   })
 
-  test("together the skills use every tool their workflows depend on", () => {
+  test("together the skills name every tool in the catalog, by its exact name", () => {
     const all = new Set(SKILL_NAMES.flatMap((name) => Object.values(mentioned(read(name))).flat()).filter((tool) => TOOL_NAMES.includes(tool)))
-    for (const tool of ["list-models", "get-model", "list-model-endpoints", "send-message", "generate-image", "get-generation", "ping", "send-feedback", "spawn-ori-eval", "install-ori-harness", "search-docs"]) {
-      expect({ tool, used: all.has(tool) }).toEqual({ tool, used: true })
-    }
+    for (const tool of TOOL_NAMES) expect({ tool, used: all.has(tool) }).toEqual({ tool, used: true })
+  })
+
+  test("the research skill calls no billable tool, and routes paid and media requests to the other skills", () => {
+    const research = read("openrouter")
+    for (const tool of BILLABLE_TOOLS) expect(research).toContain(`\`${tool}\``)
+    expect(research).toContain("Route paid tests to the evaluate skill and media requests to the images skill")
+    expect(research).toContain("not the user's own spend")
+  })
+
+  test("every billable tool is used only on an explicit request, called once, and checked before any repeat", () => {
+    const evaluate = read("openrouter-evaluate")
+    expect(evaluate).toContain("use those two only when the user explicitly asks")
+    expect(evaluate).toContain("Use `send-batch` only when the user explicitly asks for an offline batch")
+    expect(evaluate).toContain("Never resubmit a batch after a timeout or an unclear answer")
+    expect(evaluate).toContain("after a timeout or ambiguous failure, look the call up this way before deciding whether to repeat it")
+    const images = read("openrouter-images")
+    expect(images).toContain("only on the user's explicit request, one agreed call, the native tool only (never a script), no automatic retry")
+    expect(images).toContain("Never call `generate-video` again to check on a job")
+    expect(images).toContain("check `get-generation` or `get-video` before deciding with the user whether to repeat the call")
+    const troubleshoot = read("openrouter-troubleshoot")
+    expect(troubleshoot).toContain("use `get-current-key` first")
+    expect(troubleshoot).toContain("check `get-generation`, `get-batch`, or `get-video` for what actually ran")
+    for (const tool of BILLABLE_TOOLS) expect(troubleshoot).toContain(`\`${tool}\``)
   })
 
   test("name no script surface for the image tool, and keep it out of Code Mode", () => {

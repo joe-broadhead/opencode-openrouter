@@ -1,6 +1,6 @@
 ---
 name: openrouter-images
-description: Generate requested images through OpenRouter's connected MCP service using a live compatible model, explicit input scope, and the host's native media output. Use when the user asks for OpenRouter image generation; do not assume image editing or reference-image inputs are supported unless the discovered tool schema confirms them.
+description: Generate requested images through OpenRouter's connected MCP service using a live compatible model, explicit input scope, and the host's native media output. Use when the user asks for OpenRouter image generation, and also for explicitly requested speech or video generation or audio transcription; do not assume image editing or reference-image inputs are supported unless the discovered tool schema confirms them.
 ---
 
 # OpenRouter image generation
@@ -24,6 +24,15 @@ Use `generate-image` for an authorized image-generation request. It is a billabl
 6. Call `generate-image` once for the agreed generation. Do not automatically retry, switch models, increase output count, or regenerate after a timeout or rendering problem. The first request may have completed and been billed.
 7. Preserve each returned image content block and associated supported metadata through the native OpenCode rendering path. Do not stringify the entire result, print base64 image bytes, or replace media with a text-only summary. Do not fetch unrequested URLs or upload the result to another service merely to display it.
 8. If a generation identifier is returned, use `get-generation` when appropriate to obtain actual available cost information. Do not invent an identifier or assume image results include one. Report unavailable cost as unknown.
+
+## Speech, video, and transcription
+
+These are billable too, and follow the same rules: only on the user's explicit request, one agreed call, the native tool only (never a script), no automatic retry, and actual cost from `get-generation` when an identifier is returned.
+
+- `generate-speech` returns audio, which OpenCode saves to a file it names. Pick a speech model and voice from `list-models` and `get-model`; report the file and do not regenerate to change one word.
+- `generate-video` starts a job and may take minutes. Call it once, then poll `get-video` with the returned job id every 15 to 20 seconds until it completes, fails, or expires. Never call `generate-video` again to check on a job: that starts and bills another one. Output links are the user's: show them, do not upload or re-share them elsewhere.
+- `transcribe-audio` sends audio to a model. Send only audio the user named for this request; prefer a URL they gave over reading a local file.
+- After a timeout or unclear failure, check `get-generation` or `get-video` before deciding with the user whether to repeat the call.
 
 ## Result handling
 

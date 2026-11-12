@@ -1,7 +1,7 @@
 // The docs agree with the code: the README's error table is CODES, the README never claims a release exists, the
 // contract matrix names every reviewed tool and claims nothing live, and no doc carries a machine path or an address.
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { CODES, ENDPOINT } from "../../src/constants.js"
 import { NATIVE_ONLY, REVIEWED_TOOLS, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { SKILL_NAMES } from "../../src/skills.js"
@@ -56,13 +56,12 @@ describe("the scripting guide", () => {
     expect(rows.map((cells) => cells[0])).toEqual([...RPC_TOOLS, "describe"].map((name) => `\`${name}\``))
   })
 
-  test("gives each method the catalog's class and output evidence, and claims nothing live", () => {
+  test("gives each method the catalog's class and output evidence, live-observed only where the catalog says so", () => {
     for (const name of RPC_TOOLS) {
       const tool = REVIEWED_TOOLS.find((item) => item.name === name)!
       const row = rows.find((cells) => cells[0] === `\`${name}\``)!
       expect({ name, class: row[1], evidence: row[3] } as Record<string, string | undefined>).toEqual({ name, class: `\`${tool.effect}\``, evidence: tool.scriptOutput })
     }
-    expect(scripting).not.toMatch(/\|\s*live-observed\s*\|/)
   })
 
   test("names the native-only tools as not methods", () => {
@@ -77,10 +76,16 @@ describe("the contract matrix", () => {
     for (const name of TOOL_NAMES) expect(contract).toContain(`\`${name}\``)
   })
 
-  test("labels no row live-observed until a signed-in capture exists", () => {
+  test("labels no row live-observed until a signed-in capture exists, and then cites it", () => {
     const labels = contract.split("\n").filter((line) => line.startsWith("|")).map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()))
-    expect(labels.filter((cells) => cells.length >= 3 && /live-observed/.test(cells[1] ?? ""))).toEqual([])
-    expect(contract).toContain("**No row has this label yet.**")
+    const live = labels.filter((cells) => cells.length >= 3 && /live-observed/.test(cells[1] ?? ""))
+    if (!existsSync(new URL("../../test/fixtures/live-tools.json", import.meta.url))) {
+      expect(live).toEqual([])
+      expect(contract).toContain("**No row has this label yet.**")
+    } else {
+      expect(live.length).toBeGreaterThan(0)
+      for (const cells of live) expect(cells[2]).toContain("live-tools.json")
+    }
   })
 })
 

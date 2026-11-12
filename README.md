@@ -1,8 +1,9 @@
 # OpenRouter for OpenCode
 
 An unofficial OpenCode plugin for [OpenRouter's hosted MCP server](https://openrouter.ai/docs/guides/overview/mcp-server):
-live models, endpoints and providers, benchmarks and rankings, OpenRouter's documentation, account credit and generation
-lookups, test prompts and image generation, through OpenCode's own MCP connection and sign-in.
+live models, endpoints and providers, benchmarks and rankings, OpenRouter's documentation, account credit, generation,
+batch and preset lookups, test prompts, decisions and batches, transcription, and image, speech and video generation,
+through OpenCode's own MCP connection and sign-in.
 
 > **Not yet released.** This repository has no release tag yet, so nothing below can be installed from GitHub today.
 > The installation steps describe the first planned release, `v0.0.0`. Until it exists, run a local checkout (see
@@ -12,7 +13,7 @@ Unofficial; not affiliated with OpenRouter. OpenRouter and its logo are trademar
 
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
-every agent, so by default billable inference and feedback ask before they run, and a guard that refuses every
+every agent, so by default every billable tool and feedback asks before it runs, and a guard that refuses every
 OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills, a status
 command and dialog that never call OpenRouter, and script access to the reviewed tools through a tools RPC.
 
@@ -72,8 +73,8 @@ reviewed tool:
 
 | Tools | `read-only` | `ask-changes` (default) | `all` |
 | --- | --- | --- | --- |
-| Reads: models, endpoints, providers, benchmarks, rankings, docs, `get-credits`, `get-generation`, `ping`, the Ori recipes | allow | allow | allow |
-| Billable inference: `send-message`, `generate-image` | deny | ask | allow |
+| Reads: models, endpoints and their uptime, providers, benchmarks, rankings, harness session costs, docs, `ping`; your credit, key, generations, batches, video jobs and presets; the Ori recipes | allow | allow | allow |
+| Billable: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` | deny | ask | allow |
 | Feedback: `send-feedback` | deny | ask | allow |
 | A tool OpenRouter adds later | deny | ask | allow |
 
@@ -112,10 +113,10 @@ describes how to use the tools, and OpenCode's permissions still decide whether 
 
 | Skill | Use it for |
 | --- | --- |
-| `openrouter` | Finding and shortlisting models, comparing endpoints, explaining routing, usage trends, and integration questions answered from OpenRouter's current documentation. Read-only. |
-| `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Ori only when you ask for it. |
-| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you. |
-| `openrouter-troubleshoot` | Connection, sign-in, credit, generation, routing or tool failures, diagnosed with read operations. Feedback only when you ask for it. |
+| `openrouter` | Finding and shortlisting models, comparing endpoints and their uptime, explaining routing, usage trends, harness session costs, your saved presets, and integration questions answered from OpenRouter's current documentation. Read-only. |
+| `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Decision tests (`send-decision`), batches (`send-batch`) and Ori only when you ask for them. |
+| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you; also speech, video and transcription when you ask for them, each called once, a video job followed with `get-video`. |
+| `openrouter-troubleshoot` | Connection, sign-in, credit, key-limit, generation, batch, video-job, routing or tool failures, diagnosed with read operations (`get-current-key` after an out-of-credit error). Feedback only when you ask for it. |
 
 If you already have a skill with one of these names, yours is kept and the plugin's is not registered. A skill file that
 is missing or malformed is skipped with `SKILLS_INVALID`; the server and its tools keep working.
@@ -138,7 +139,7 @@ The report shows:
 - **Tools**: how many tools OpenCode lists for the server, how many the plugin has reviewed, the names of up to 20 it has
   not, reviewed tools that are missing, and when the plugin last saw the catalog. A server that connected moments ago and
   is still listing its tools is told apart from one that lists none.
-- **Scripts**: the number of script methods, the native-only `generate-image`, and how many methods have their output
+- **Scripts**: the number of script methods, the native-only tools, and how many methods have their output
   checked against OpenRouter's live server.
 - **Skills**: loaded, missing, invalid, or shadowed by a skill of yours with the same name.
 - **Agents without default rules**, with the exact block to paste, and agents whose own rule allows OpenRouter's
@@ -152,18 +153,20 @@ for `ping` through the ordinary tool path.
 
 ## Scripts
 
-Scripts and Jobs call 16 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
+Scripts and Jobs call 27 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
 the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs, an `ask` is
 refused because no one can answer it, a `deny` is refused, and while the plugin's rules are not in place every call fails
-with `POLICY_UNAVAILABLE` before anything is sent. Under the default `ask-changes`, `send-message` and `send-feedback`
-need an explicit allow rule for the script's session or agent.
+with `POLICY_UNAVAILABLE` before anything is sent. Under the default `ask-changes`, the billable `send-message`,
+`send-batch`, `send-decision` and `transcribe-audio`, and `send-feedback`, need an explicit allow rule for the script's
+session or agent.
 
-`generate-image` is not a script method: the RPC keeps text and structured results only, so a script would pay for an
-image it never receives. Its route does not exist and sends nothing; generate images in a conversation.
+Four tools are not script methods, and their routes do not exist: `generate-image`, `generate-speech` and
+`generate-video`, because the RPC keeps text and structured results only and a script would pay for media it never
+receives, and `get-current-key`, which describes the signed-in key itself. Use them in a conversation.
 
-The methods' output has been checked against a test server only, not yet against OpenRouter's live server. See
-[docs/scripting.md](docs/scripting.md) for the methods, the envelope, the errors and how to handle a paid call whose
-outcome is uncertain.
+Nine read methods have their output checked against OpenRouter's live server; the rest against their declared output
+schema or a test server. See [docs/scripting.md](docs/scripting.md) for the methods, the envelope, the errors and how to
+handle a paid call whose outcome is uncertain.
 
 ## Errors
 
@@ -186,13 +189,24 @@ Every error reads `CODE: What happened. Next step: What to do.`
 ## Known limits
 
 - Not released: there is no `v0.0.0` tag yet.
+- **Live evidence.** One signed-in, read-only capture of OpenRouter's server (2026-11-12) confirmed the 31 tool names,
+  their input and output schemas and annotations, and the text results of nine free reads: `list-models`,
+  `list-providers`, `list-benchmarks`, `list-daily-model-rankings`, `list-app-rankings`, `list-task-classifications`,
+  `search-docs`, `ping` and `get-credits`. Every other read was not called (its output is known only from its declared
+  schema or the local test server), and OpenRouter may change its tools and schemas at any time. Which tools bill is
+  documented by OpenRouter for all of them but `transcribe-audio` (treated as billable regardless) and the nine newer
+  reads (treated as free): those judgements rest on descriptions the capture did not store.
+- **Paid and feedback tools are never exercised by this project.** `send-message`, `send-batch`, `send-decision`,
+  `transcribe-audio`, `generate-image`, `generate-speech` and `generate-video` (all billable) and `send-feedback` have
+  never been run against OpenRouter by any check or capture; their behaviour here comes from their live descriptions
+  and schemas, OpenRouter's documentation and the local test server. Neither has `spawn-ori-eval`.
+- The plugin does not enforce a spending limit. The cap on the key OpenRouter mints at sign-in, which you set on its
+  consent page, is OpenRouter's control.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
-- The tool catalog comes from OpenRouter's public documentation. No signed-in tool list has been captured, so input
-  schemas are whatever the server reports at run time.
-- The plugin does not enforce a spending limit. The provider-side cap on the MCP key is OpenRouter's control.
-- Script methods return text and structured results only, and their output has not been checked against OpenRouter's
-  live server. `generate-image` runs only natively.
+- Script methods return text and structured results only. `generate-image`, `generate-speech`, `generate-video` and
+  `get-current-key` run only natively. Speech and video results reach the conversation as OpenCode delivers them: an
+  audio block is saved to a file whose path the model sees; how a finished video is shown has not been checked.
 
 ## License
 

@@ -22,6 +22,10 @@ const TOOLS = [...TOOL_NAMES, NEW_TOOL].map((name) => ({ name, description: `Syn
 export interface FakeMcpOptions {
   /** Start with every MCP request challenged, as before any sign-in. */
   readonly challenge?: boolean
+  /** Split `tools/list` into pages of this many tools, linked by `nextCursor`. */
+  readonly pageSize?: number
+  /** Stop challenging once a token has been issued, as a real server accepts the token it signed. */
+  readonly acceptAfterToken?: boolean
 }
 
 export interface FakeMcp {
@@ -72,8 +76,12 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     switch (message.method) {
       case "initialize":
         return reply({ protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fake-openrouter", version: "0.0.0" } })
-      case "tools/list":
-        return reply({ tools: TOOLS })
+      case "tools/list": {
+        if (!options.pageSize) return reply({ tools: TOOLS })
+        const start = Number((message.params as { cursor?: string } | undefined)?.cursor ?? 0)
+        const end = start + options.pageSize
+        return reply({ tools: TOOLS.slice(start, end), ...(end < TOOLS.length ? { nextCursor: String(end) } : {}) })
+      }
       case "tools/call": {
         const name = message.params?.name ?? ""
         calls.push(name)
@@ -123,6 +131,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     if (route === "/oauth/token" && request.method === "POST") {
       const form = Object.fromEntries(new URLSearchParams(await read(request)))
       tokens.push(form)
+      if (options.acceptAfterToken) fake.challenge = false
       return json(response, 200, { access_token: `fake-access-${tokens.length}`, token_type: "Bearer", expires_in: 3600 })
     }
     return json(response, 404, { error: "not_found" })

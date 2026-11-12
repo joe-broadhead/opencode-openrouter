@@ -12,14 +12,16 @@ site; the package carries no vendor marks.
 
 ## Tools and permissions
 
-17 tools are declared, every reviewed tool in `src/openrouter-tools.ts`, in catalog order. Each `name` is the Code Mode
+31 tools are declared, every reviewed tool in `src/openrouter-tools.ts`, in catalog order. Each `name` is the Code Mode
 path (`openrouter.send-message`) and each `permission` the host's action (`openrouter_send-message`); the hyphens stay.
 Each `effect` is what the plugin's default rules decide under the default `access`, `ask-changes`:
 
-- the 14 reads (models, endpoints, providers, benchmarks, rankings, documentation, `get-credits`, `get-generation`,
-  `ping` and the two Ori recipes) are `allow` and `readOnly`;
-- `send-message` and `generate-image`, billable inference, and `send-feedback`, which sends feedback to OpenRouter, are
-  `ask` and not `readOnly`.
+- the 23 reads (models, endpoints and their uptime, providers, benchmarks, rankings, harness session costs,
+  documentation, `ping`, the account's credit, key, generations, batches, video jobs and presets, and the two Ori
+  recipes) are `allow` and `readOnly`;
+- the seven billable tools (`send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,
+  `generate-speech`, `generate-video`) and `send-feedback`, which sends feedback to OpenRouter, are `ask` and not
+  `readOnly`.
 
 Jelly's agents have no base "allow everything" rule, so the plugin's own rules, which it puts after that rule, never
 reach them: Jelly writes each declared `ask` as that tool's default. A tool OpenRouter adds later is not declared until a

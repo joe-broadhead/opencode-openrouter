@@ -1,0 +1,3237 @@
+{
+  "evidence": "live-observed",
+  "note": "Captured from OpenRouter's MCP server with a signed-in account by scripts/capture-live.ts. Descriptions are recorded as digests; results as types only. No key, token, account id, balance or result text is recorded. No billable or feedback tool was called.",
+  "retrieved": "2026-11-12",
+  "endpoint": "https://mcp.openrouter.ai/mcp",
+  "host": {
+    "version": "2.2.3",
+    "via": "embedded @opencode/sdk"
+  },
+  "protocol": {
+    "version": "2025-11-25",
+    "server": {
+      "name": "OpenRouterMcp",
+      "version": "0.1.0"
+    }
+  },
+  "pages": 1,
+  "tools": [
+    {
+      "name": "generate-image",
+      "title": "Generate an image",
+      "description": {
+        "sha256": "1b7c93c9dad074a39b6c5619301d2e3ea0ebb3fd51ce7b6b9056d774f217b091",
+        "length": 247
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Image model slug, e.g. \"bytedance-seed/seedream-4.5\""
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Text description of the desired image"
+          },
+          "aspect_ratio": {
+            "description": "Normalized aspect ratio; providers clamp to what the model supports",
+            "type": "string",
+            "enum": [
+              "1:1",
+              "1:2",
+              "1:3",
+              "1:4",
+              "1:8",
+              "2:1",
+              "2:3",
+              "3:1",
+              "2.35:1",
+              "3:2",
+              "3:4",
+              "4:1",
+              "4:3",
+              "4:5",
+              "5:2",
+              "5:4",
+              "5:7",
+              "7:5",
+              "8:1",
+              "9:16",
+              "16:9",
+              "9:19.5",
+              "19.5:9",
+              "9:20",
+              "20:9",
+              "9:21",
+              "21:9",
+              "auto"
+            ]
+          },
+          "resolution": {
+            "description": "Resolution tier; exact pixels are chosen per provider. Omit for the model default",
+            "type": "string",
+            "enum": [
+              "512",
+              "768",
+              "1K",
+              "1.5K",
+              "2K",
+              "4K"
+            ]
+          },
+          "size": {
+            "description": "Removed: use aspect_ratio and resolution instead",
+            "not": {}
+          },
+          "reference_image_urls": {
+            "description": "Reference images (https or data URLs) for image-to-image: a template to edit, faces or products to keep, a style to match. Refer to them in the prompt as \"image 1\", \"image 2\", ... in this order. Only for models that accept reference images (the API rejects others).",
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "model",
+          "prompt"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Generate an image",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "generate-speech",
+      "title": "Generate speech audio",
+      "description": {
+        "sha256": "9b39a33bb2f9473cd7f96f5081f855d2809f0ea814a222b73e1b688714ee7452",
+        "length": 345
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "TTS model slug, e.g. \"mistralai/voxtral-mini-tts-2603\""
+          },
+          "input": {
+            "description": "Text to synthesize (single speaker). Pass either input or turns.",
+            "type": "string"
+          },
+          "turns": {
+            "description": "Multi-speaker dialogue as ordered turns, each with its own voice (e.g. Gemini TTS). Pass either input or turns.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Text for this turn"
+                },
+                "voice": {
+                  "description": "Voice for this turn; defaults to the top-level voice",
+                  "type": "string"
+                },
+                "instructions": {
+                  "description": "Delivery instructions for this turn",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "voice": {
+            "description": "Voice identifier (provider-specific). Omit for the model default. Always pick from get-model supported_voices: ElevenLabs premade voice names stop working on 2026-12-31 and must be replaced by voice IDs.",
+            "type": "string"
+          },
+          "instructions": {
+            "description": "Free-text delivery guidance (tone, pace, accent), e.g. \"whisper, slightly sad\". Honored by instructable models such as openai/gpt-4o-mini-tts and Gemini TTS; ignored elsewhere.",
+            "type": "string"
+          },
+          "response_format": {
+            "description": "Audio output format; defaults to mp3",
+            "type": "string",
+            "enum": [
+              "mp3",
+              "pcm"
+            ]
+          },
+          "speed": {
+            "description": "Playback speed multiplier; only honored by models that support it",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Generate speech audio",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "generate-video",
+      "title": "Generate video (start job)",
+      "description": {
+        "sha256": "ece7a42742ec7aa669782ab528f6a234360a3485c2897ea65c177f0506f56942",
+        "length": 516
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Video model slug; find them with list-models output_modalities=video"
+          },
+          "prompt": {
+            "description": "What the video should show; optional only for image-to-video models",
+            "type": "string"
+          },
+          "duration": {
+            "description": "Length in seconds (model-specific range)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "resolution": {
+            "description": "Output resolution; pair with aspect_ratio, or use size instead",
+            "type": "string",
+            "enum": [
+              "360p",
+              "480p",
+              "720p",
+              "768p",
+              "1080p",
+              "1K",
+              "2K",
+              "4K"
+            ]
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "9:16",
+              "1:1",
+              "4:3",
+              "3:4",
+              "3:2",
+              "2:3",
+              "21:9",
+              "9:21"
+            ]
+          },
+          "size": {
+            "description": "Exact \"WIDTHxHEIGHT\" (e.g. \"1280x720\") instead of resolution + aspect_ratio",
+            "type": "string"
+          },
+          "first_frame_image_url": {
+            "description": "Image the video starts from (https or data URL), for models whose provider integration accepts frame images; the API rejects it otherwise.",
+            "type": "string"
+          },
+          "last_frame_image_url": {
+            "description": "Image the video ends on, for models that accept last frames.",
+            "type": "string"
+          },
+          "reference_image_urls": {
+            "description": "Input images (https or data URLs), referred to in the prompt as \"image 1\", \"image 2\", ... in this order. How it is used depends on the model: a style or subject reference for models that accept reference images, and the start frame for image-to-video models that take their image this way (e.g. Sora, HeyGen, Seedance 1.5, Wan 2.6). The API rejects it for models that accept neither. Combining it with the frame fields is honored by few models (e.g. Gemini Omni); most integrations keep the frames and ignore the reference.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "generate_audio": {
+            "description": "Also generate audio, when the model can",
+            "type": "boolean"
+          },
+          "seed": {
+            "description": "Seed for repeatable output, when the model honors it",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "generation_id": {
+            "type": "string"
+          },
+          "polling_url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "unsigned_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": "integer"
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "cost": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "is_byok": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": {}
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "polling_url",
+          "status"
+        ],
+        "additionalProperties": {}
+      },
+      "annotations": {
+        "title": "Generate video (start job)",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "get-batch",
+      "title": "Get batch",
+      "description": {
+        "sha256": "f577de6554c075245f7aa66d5ffe926fd9991332f2540041d1e0137a9e3940e7",
+        "length": 447
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Batch id returned by send-batch, e.g. \"batch_abc123\""
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validating",
+              "in_progress",
+              "finalizing",
+              "completed",
+              "failed",
+              "expired",
+              "cancelling",
+              "cancelled"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "request_counts": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "completed": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "completed",
+              "failed"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "model",
+          "endpoint",
+          "request_counts",
+          "error",
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get batch",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-credits",
+      "title": "Get credit balance",
+      "description": {
+        "sha256": "a1569ab3c3cf6de83d3736217d986d70a5e5b50d1a64f09fcd2d71f9a9820dd0",
+        "length": 69
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "total_credits": {
+                "type": "number",
+                "description": "Total credits purchased, in USD"
+              },
+              "total_usage": {
+                "type": "number",
+                "description": "Total credits used, in USD"
+              }
+            },
+            "required": [
+              "total_credits",
+              "total_usage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get credit balance",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-current-key",
+      "title": "Get current API key",
+      "description": {
+        "sha256": "deea1459b58a7f3b1f791903d89a689f5985c54a9f9d9a800e00b5c01ffa2331",
+        "length": 411
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "limit": {
+                "description": "Spend limit in USD, null when unlimited",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "limit_remaining": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "usage": {
+                "type": "number",
+                "description": "Spend so far in USD"
+              },
+              "limit_reset": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "is_free_tier": {
+                "type": "boolean"
+              },
+              "is_management_key": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "label",
+              "limit",
+              "limit_remaining",
+              "usage",
+              "limit_reset",
+              "is_free_tier",
+              "is_management_key"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get current API key",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-endpoint-uptime-history",
+      "title": "Get endpoint uptime history",
+      "description": {
+        "sha256": "410889bd7d04fd531c787f85cc56786eba64e96da585bae01c3483b53836342a",
+        "length": 296
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string",
+            "description": "The model author/organization, e.g. \"deepseek\""
+          },
+          "slug": {
+            "type": "string",
+            "description": "The model slug, optionally with a variant suffix, e.g. \"deepseek-chat\" or \"deepseek-chat:free\""
+          },
+          "from": {
+            "description": "Optional ISO 8601 UTC start of the window, e.g. \"2026-07-23T05:00:00Z\". Only the last 72 hours are retained, so earlier starts return no data; omit both from and to for the full 72-hour window.",
+            "type": "string"
+          },
+          "to": {
+            "description": "Optional ISO 8601 UTC end of the window, e.g. \"2026-07-23T09:00:00Z\". Must be after from; defaults to now.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "author",
+          "slug"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Get endpoint uptime history",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-generation",
+      "title": "Get generation",
+      "description": {
+        "sha256": "a8627ab8f4bf651b58b496611019e57be5634bab19e965d5d89d4c398428b492",
+        "length": 173
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The generation ID"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "provider_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "total_cost": {
+                "type": "number"
+              },
+              "tokens_prompt": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "tokens_completion": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "latency": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "generation_time": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "finish_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "model",
+              "provider_name",
+              "total_cost",
+              "tokens_prompt",
+              "tokens_completion",
+              "latency",
+              "generation_time",
+              "finish_reason",
+              "created_at"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Get generation",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-model",
+      "title": "Get model",
+      "description": {
+        "sha256": "b69e8c7cfe0cfd123fd9480d7de608695e341537011fbe1fe00741a690bcb0b2",
+        "length": 192
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "string",
+                "description": "The author/organization of the model"
+              },
+              "slug": {
+                "type": "string",
+                "description": "The model slug, optionally including a variant suffix (e.g. gpt-4 or gpt-4:free)"
+              }
+            },
+            "required": [
+              "author",
+              "slug"
+            ]
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Get model",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-preset",
+      "title": "Get preset",
+      "description": {
+        "sha256": "3421c79627b3b70d4ef94135d9184091ef9b570847f47710b63614f548197ec0",
+        "length": 229
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string",
+                "description": "URL-safe slug identifying the preset."
+              },
+              "workspace_id": {
+                "type": "string",
+                "description": "Workspace to act in. Also accepted as a `workspace_id` field in a JSON request body. Defaults to the key's workspace for a key limited to one workspace, otherwise to the account's default workspace."
+              }
+            },
+            "required": [
+              "slug"
+            ]
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Get preset",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-session-cost",
+      "title": "Get harness session cost",
+      "description": {
+        "sha256": "5e36b77f264dae820b6ff6e787b89eea593e25bc7d1c837fa9c175f3fc691b0b",
+        "length": 449
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "app_slug": {
+                "type": "string",
+                "description": "Filter to one published harness slug."
+              },
+              "limit": {
+                "default": 100,
+                "description": "Maximum number of cells to return (1-500). Defaults to 100.",
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "model": {
+                "type": "string",
+                "description": "Exact model permaslug filter. Works across all harness apps."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "default": 0,
+                    "description": "Number of sorted cells to skip (0-5000). Defaults to 0.",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "turn_range": {
+                "description": "Filter by the inclusive number of turns in a session.",
+                "type": "string",
+                "enum": [
+                  "1-turn",
+                  "2-9-turns",
+                  "10-49-turns",
+                  "50-plus-turns"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Get harness session cost",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get-video",
+      "title": "Get video job status",
+      "description": {
+        "sha256": "baed3a09505f24b7b7377e9c14620172da3b008785a0a451ee2e82a94bafbd39",
+        "length": 548
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job id returned by generate-video, e.g. \"gen-vid-1789480874-Ab3dEf9hIjKlMnOpQrSt\""
+          }
+        },
+        "required": [
+          "job_id"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "generation_id": {
+            "type": "string"
+          },
+          "polling_url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "unsigned_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": "integer"
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "cost": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "is_byok": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": {}
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "polling_url",
+          "status"
+        ],
+        "additionalProperties": {}
+      },
+      "annotations": {
+        "title": "Get video job status",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "install-ori-harness",
+      "title": "Install Ori Harness",
+      "description": {
+        "sha256": "af0b0ee375c58dacedd45ddab5fb47d37c3c6030e296f621e016cbe46ffce9c1",
+        "length": 728
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Install Ori Harness",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-app-rankings",
+      "title": "List app rankings",
+      "description": {
+        "sha256": "dbbb5a4abf25f19921b4e5b547134e41f665d122ca6a493b8cbfc4f676fef3d6",
+        "length": 196
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "description": "Marketplace category group to filter by (e.g. `coding`). Only apps tagged with a subcategory inside this group are returned. Mutually combinable with `subcategory` — when both are supplied the `subcategory` must belong to the `category` group.",
+                "type": "string",
+                "enum": [
+                  "coding",
+                  "creative",
+                  "productivity",
+                  "entertainment"
+                ]
+              },
+              "end_date": {
+                "type": "string",
+                "description": "End of the date window in YYYY-MM-DD (UTC), inclusive. Defaults to the most recent completed UTC day. Must be on or after 2025-01-01; earlier values are rejected with a 400."
+              },
+              "limit": {
+                "default": 50,
+                "description": "Maximum number of apps to return (1-100). Defaults to 50.",
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "default": 0,
+                    "description": "Number of ranked apps to skip before the first returned row (0-100). Defaults to 0. `rank` stays absolute, so the first row of `offset=50` is `rank: 51`.",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sort": {
+                "default": "popular",
+                "description": "`popular` ranks apps by total token volume inside the date window. `trending` ranks apps by absolute excess token growth: window volume minus the average volume of the three equal-length periods immediately preceding the window. Apps with no excess growth are omitted from `trending` results.",
+                "type": "string",
+                "enum": [
+                  "popular",
+                  "trending"
+                ]
+              },
+              "start_date": {
+                "type": "string",
+                "description": "Start of the date window in YYYY-MM-DD (UTC), inclusive. Defaults to 30 days before `end_date`. The dataset begins at 2025-01-01; earlier values are clamped forward to that floor and the resolved value is echoed in `meta.start_date`."
+              },
+              "subcategory": {
+                "description": "Marketplace subcategory to filter by (e.g. `cli-agent`). Takes precedence over `category` for the actual filter; when `category` is also supplied the pair must be consistent.",
+                "type": "string",
+                "enum": [
+                  "cli-agent",
+                  "ide-extension",
+                  "cloud-agent",
+                  "programming-app",
+                  "native-app-builder",
+                  "creative-writing",
+                  "video-gen",
+                  "image-gen",
+                  "audio-gen",
+                  "roleplay",
+                  "game",
+                  "writing-assistant",
+                  "general-chat",
+                  "personal-agent",
+                  "legal"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List app rankings",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-batches",
+      "title": "List batches",
+      "description": {
+        "sha256": "8830b389578e26646bce1d27bb7db33183b1543cdfad33e0b30508a778ea8287",
+        "length": 338
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Page size, 1-100 (default 20)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "after": {
+            "description": "Cursor: the last_id from the previous page, to fetch the next page",
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "description": "Only include batches in these states, e.g. [\"validating\",\"in_progress\"] for in-flight batches. Omit to list every status.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "validating",
+                "in_progress",
+                "completed",
+                "failed",
+                "expired",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "validating",
+                    "in_progress",
+                    "finalizing",
+                    "completed",
+                    "failed",
+                    "expired",
+                    "cancelling",
+                    "cancelled"
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                },
+                "endpoint": {
+                  "type": "string"
+                },
+                "request_counts": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "completed": {
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "completed",
+                    "failed"
+                  ],
+                  "additionalProperties": false
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "results": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {}
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "model",
+                "endpoint",
+                "request_counts",
+                "error",
+                "results"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "first_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "object",
+          "data",
+          "first_id",
+          "last_id",
+          "has_more"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List batches",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-benchmarks",
+      "title": "List benchmarks",
+      "description": {
+        "sha256": "07b63ea623c33dd99aa1db7ea111b5a8c6e669666342d63daa1fd4a484415e6e",
+        "length": 466
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "arena": {
+                "description": "Design Arena only: arena to query. Defaults to `models` when source is `design-arena`.",
+                "type": "string",
+                "enum": [
+                  "models",
+                  "builders",
+                  "agents"
+                ]
+              },
+              "benchmark_type": {
+                "description": "Return results for one exact OpenRouter benchmark. A `search_*` value narrows the response to search results only; a classic value narrows the OpenRouter items and leaves other sources' items as they are.",
+                "type": "string",
+                "enum": [
+                  "gpqa_diamond",
+                  "tau_bench_verified_airline",
+                  "search_browsecomp",
+                  "search_hle",
+                  "search_dsqa",
+                  "search_widesearch"
+                ]
+              },
+              "category": {
+                "type": "string",
+                "description": "Design Arena only: category within the arena (e.g. `codecategories`, `uicomponent`, `gamedev`, `3d`, `dataviz`, `image`, `video`, `svg`). When omitted, returns all categories."
+              },
+              "include_run_config": {
+                "default": false,
+                "description": "Search benchmarks only: include the published lane configuration whitelist in each search item. Defaults to false. The whitelist is limited to agent turn count, reasoning effort, and temperature so future harness configuration changes do not change the public contract.",
+                "type": "boolean"
+              },
+              "max_results": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Maximum number of items to return. When omitted, all matching results are returned."
+              },
+              "search_engine": {
+                "type": "string",
+                "description": "OpenRouter search benchmarks only: filter by the search engine used."
+              },
+              "search_surface": {
+                "description": "OpenRouter search benchmarks only: filter by the request surface the lane ran on.",
+                "type": "string",
+                "enum": [
+                  "server-tool",
+                  "plugin"
+                ]
+              },
+              "source": {
+                "description": "Benchmark source to query. Determines the shape of the returned items. When omitted, returns results from all sources.",
+                "type": "string",
+                "enum": [
+                  "artificial-analysis",
+                  "design-arena",
+                  "openrouter"
+                ]
+              },
+              "task_type": {
+                "description": "Filter results by task type. For Artificial Analysis, maps to the corresponding index. For Design Arena, maps to the matching category. `search` returns OpenRouter search benchmark results only.",
+                "type": "string",
+                "enum": [
+                  "coding",
+                  "intelligence",
+                  "agentic",
+                  "search"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List benchmarks",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-daily-model-rankings",
+      "title": "List daily model rankings",
+      "description": {
+        "sha256": "c9801ae610f1beea25aa8443ff9f0097da05d362a97f4ae1fbe861aea46a45ed",
+        "length": 270
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "description": "Restrict to a use-case category (e.g. `programming`, `roleplay`). Sourced from a sampled, upsampled dataset, so `total_tokens` is an estimate and is aggregated weekly (the trailing weekly bucket may include traffic past `end_date`). Cannot be combined with `modality`, `context_bucket`, or `language_type`.",
+                "type": "string",
+                "enum": [
+                  "programming",
+                  "roleplay",
+                  "marketing",
+                  "marketing/seo",
+                  "technology",
+                  "science",
+                  "translation",
+                  "legal",
+                  "finance",
+                  "health",
+                  "trivia",
+                  "academia"
+                ]
+              },
+              "context_bucket": {
+                "description": "Restrict to requests whose context length falls in this bucket (`1K`, `10K`, `100K`, `1M`, or `10M`). Exact dataset — cannot be combined with `category` or `language_type`.",
+                "type": "string",
+                "enum": [
+                  "1K",
+                  "10K",
+                  "100K",
+                  "1M",
+                  "10M"
+                ]
+              },
+              "end_date": {
+                "type": "string",
+                "description": "End of the date window in YYYY-MM-DD (UTC), inclusive. Defaults to the most recent completed UTC day. Must be on or after 2025-01-01; earlier values are rejected with a 400."
+              },
+              "language_type": {
+                "description": "Restrict to natural-language or programming-language tagged activity. Sourced from a sampled, upsampled dataset, so `total_tokens` is an estimate and is aggregated weekly (the trailing weekly bucket may include traffic past `end_date`). Cannot be combined with `modality`, `context_bucket`, or `category`.",
+                "type": "string",
+                "enum": [
+                  "natural",
+                  "programming"
+                ]
+              },
+              "modality": {
+                "description": "Restrict to models for a modality surface: `text` / `image_output` match output modality, `image` / `audio` match input modality, and `tool_calling` keeps only rows that recorded at least one tool call. Exact dataset — cannot be combined with `category` or `language_type`.",
+                "type": "string",
+                "enum": [
+                  "text",
+                  "image",
+                  "image_output",
+                  "audio",
+                  "tool_calling"
+                ]
+              },
+              "period": {
+                "description": "Time grain of each row. `day` (default) returns the per-UTC-day series; `week` buckets by ISO week start; `month` buckets by month start. With `category` or `language_type` only `week` (default) and `month` are available — `day` is rejected with a 400 because those datasets are aggregated weekly. For those sampled datasets `period=month` buckets each week by its week-start month, so totals are approximate at month boundaries.",
+                "type": "string",
+                "enum": [
+                  "day",
+                  "week",
+                  "month"
+                ]
+              },
+              "start_date": {
+                "type": "string",
+                "description": "Start of the date window in YYYY-MM-DD (UTC), inclusive. Defaults to 30 days before `end_date`. The dataset begins at 2025-01-01; earlier values are clamped forward to that floor and the resolved value is echoed in `meta.start_date`."
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List daily model rankings",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-model-endpoints",
+      "title": "List model endpoints",
+      "description": {
+        "sha256": "a54790aa720ea36176afd76ff33e0b875ce7e1f5e9742d36b8fcd00676d71ff5",
+        "length": 147
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "string",
+                "description": "The author/organization of the model"
+              },
+              "slug": {
+                "type": "string",
+                "description": "The model slug"
+              }
+            },
+            "required": [
+              "author",
+              "slug"
+            ]
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List model endpoints",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-models",
+      "title": "List models",
+      "description": {
+        "sha256": "f69cd6dab7504665f2e0f0f05bc40e8c3a55f6e1298c0adb4713b446e38d4eb6",
+        "length": 1225
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "arch": {
+                "type": "string",
+                "description": "Filter models by architecture/model family (e.g. GPT, Claude, Gemini, Llama)."
+              },
+              "category": {
+                "description": "Filter models by use case category",
+                "type": "string",
+                "enum": [
+                  "programming",
+                  "roleplay",
+                  "marketing",
+                  "marketing/seo",
+                  "technology",
+                  "science",
+                  "translation",
+                  "legal",
+                  "finance",
+                  "health",
+                  "trivia",
+                  "academia"
+                ]
+              },
+              "context": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Minimum context length (tokens). Models with smaller context are excluded."
+              },
+              "distillable": {
+                "description": "Filter by distillation capability. \"true\" returns only distillable models, \"false\" excludes them.",
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ]
+              },
+              "endpoints": {
+                "type": "string",
+                "description": "Filter models by the request API paths they serve, as listed in each model's `endpoints` field. Comma-separated; a model must serve every listed path. Valid values: /api/v1/chat/completions, /api/v1/completions, /api/v1/messages, /api/v1/responses, /api/v1/embeddings, /api/v1/rerank, /api/alpha/decisions, /api/alpha/extractions, /api/v1/videos, /api/v1/audio/speech, /api/v1/audio/transcriptions, /api/v1/images, /api/v1/batches. When set without `output_modalities`, models of every output modality are considered (the companion `/api/alpha/extractions` route is served by text and decisions models alike)."
+              },
+              "input_modalities": {
+                "type": "string",
+                "description": "Filter models by input modality. Comma-separated list of: text, image, audio, file."
+              },
+              "limit": {
+                "default": 20,
+                "description": "Models to return (1-1000); narrow with q and the filters before raising it",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "max_age_days": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Maximum model age in days since its creation date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_agentic_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum Artificial Analysis agentic index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_coding_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum Artificial Analysis coding index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_intelligence_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum Artificial Analysis intelligence index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_output_price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum completion (output) price in $/M tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum prompt price in $/M tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_tool_success_rate": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum tool-calling success rate, as a fraction in [0, 1]."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_age_days": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Minimum model age in days since its creation date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_agentic_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum Artificial Analysis agentic index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_coding_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum Artificial Analysis coding index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_intelligence_index": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum Artificial Analysis intelligence index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_output_price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum completion (output) price in $/M tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum prompt price in $/M tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_tool_success_rate": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Minimum tool-calling success rate, as a fraction in [0, 1] (e.g. 0.9 = 90% of requests finishing with a tool_calls finish reason)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "model_authors": {
+                "type": "string",
+                "description": "Filter models by the organization that created the model. Comma-separated list of author slugs."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "default": 0,
+                    "description": "Number of records to skip for pagination. When both offset and limit are omitted, the full list is returned",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "output_modalities": {
+                "type": "string",
+                "description": "Filter models by output modality. Accepts a comma-separated list of modalities (text, image, embeddings, audio, video, rerank, decisions, speech, transcription) or \"all\" to include all models. Defaults to \"text\"."
+              },
+              "providers": {
+                "type": "string",
+                "description": "Filter models by hosting provider. Comma-separated list of provider names."
+              },
+              "q": {
+                "type": "string",
+                "description": "Free-text search by model name or slug."
+              },
+              "region": {
+                "description": "Filter to models with endpoints in the given data region (\"eu\" or \"us\").",
+                "type": "string",
+                "enum": [
+                  "eu",
+                  "us"
+                ]
+              },
+              "sort": {
+                "description": "Sort the returned models server-side. Prefer this over fetching the full list and sorting client-side. Options: pricing-low-to-high, pricing-high-to-low (average prompt/completion price), context-high-to-low (context length), throughput-high-to-low, latency-low-to-high (recent median performance), most-popular, top-weekly (tokens processed in the last week), newest (creation date), intelligence-high-to-low, coding-high-to-low, agentic-high-to-low (Artificial Analysis indices), design-arena-elo-high-to-low (best Design Arena ELO across arenas). Models without a score for the chosen benchmark are placed last. When omitted, the existing default ordering is preserved.",
+                "type": "string",
+                "enum": [
+                  "most-popular",
+                  "newest",
+                  "top-weekly",
+                  "pricing-low-to-high",
+                  "pricing-high-to-low",
+                  "context-high-to-low",
+                  "throughput-high-to-low",
+                  "latency-low-to-high",
+                  "intelligence-high-to-low",
+                  "coding-high-to-low",
+                  "agentic-high-to-low",
+                  "design-arena-elo-high-to-low"
+                ]
+              },
+              "supported_parameters": {
+                "type": "string",
+                "description": "Filter models by supported parameter (comma-separated)"
+              },
+              "zdr": {
+                "description": "When set to \"true\", return only models with zero data retention endpoints.",
+                "type": "string",
+                "enum": [
+                  "true"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List models",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-preset-versions",
+      "title": "List preset versions",
+      "description": {
+        "sha256": "213df61709cb465a72d4a5bb55b772e6a3fecce01186080fc4faa286fc7491e7",
+        "length": 317
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "default": 50,
+                "description": "Maximum number of records to return (max 100)",
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "default": 0,
+                    "description": "Number of records to skip for pagination",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "slug": {
+                "type": "string",
+                "description": "URL-safe slug identifying the preset."
+              },
+              "workspace_id": {
+                "type": "string",
+                "description": "Workspace to act in. Also accepted as a `workspace_id` field in a JSON request body. Defaults to the key's workspace for a key limited to one workspace, otherwise to the account's default workspace."
+              }
+            },
+            "required": [
+              "slug"
+            ]
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List preset versions",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-presets",
+      "title": "List presets",
+      "description": {
+        "sha256": "999f3ca4edcc73b8d23e873c75f1922b5087fd5a21d3da7bcc03e0cbfbb60c23",
+        "length": 272
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "default": 50,
+                "description": "Maximum number of records to return (max 100)",
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "default": 0,
+                    "description": "Number of records to skip for pagination",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "workspace_id": {
+                "type": "string",
+                "description": "Workspace to act in. Also accepted as a `workspace_id` field in a JSON request body. Defaults to the key's workspace for a key limited to one workspace, otherwise to the account's default workspace."
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List presets",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-providers",
+      "title": "List providers",
+      "description": {
+        "sha256": "efefeafc478ce3ca537f614e72a14d25128c2458c7a30605323e1feac0befde1",
+        "length": 69
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List providers",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list-task-classifications",
+      "title": "List task classifications",
+      "description": {
+        "sha256": "13aa6b7f555262f0b030c340cf6078d225bbe6e7e78e2b9f2dd0fbc8b843b027",
+        "length": 412
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "window": {
+                "default": "7d",
+                "description": "Trailing time window for the classification data. Currently only `7d` (trailing 7 days) is supported.",
+                "type": "string",
+                "enum": [
+                  "7d"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "List task classifications",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "ping",
+      "title": "Ping",
+      "description": {
+        "sha256": "d0db67d9c323a625e666dd0a875a8b85ee7fbd147fb92e1d1151607941179a74",
+        "length": 185
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Ping",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "search-docs",
+      "title": "Search OpenRouter docs",
+      "description": {
+        "sha256": "b146db2d726fdeecb606ba9b0ea231d34edcbd2cb317dcd3fcea973a33f56669",
+        "length": 271
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "What to look up in the OpenRouter docs, e.g. \"stream responses\""
+          },
+          "max_results": {
+            "default": 4,
+            "description": "How many doc sections to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Search OpenRouter docs",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "send-batch",
+      "title": "Send batch",
+      "description": {
+        "sha256": "4f2bc7675ad7cdca9eb793463cbe40f58847f69eda245964314e2d07cf401209",
+        "length": 488
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "/v1/chat/completions",
+              "/v1/responses",
+              "/v1/messages",
+              "/v1/embeddings",
+              "/v1/audio/speech"
+            ],
+            "description": "API shape every request body in this batch targets, e.g. \"/v1/chat/completions\""
+          },
+          "model": {
+            "type": "string",
+            "description": "Model slug every request runs on, e.g. \"openai/gpt-6-astra\""
+          },
+          "requests": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "custom_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Caller-chosen id echoed back on the matching result"
+                },
+                "body": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {},
+                  "description": "The request body exactly as you would POST it to the endpoint (omit \"model\")"
+                }
+              },
+              "required": [
+                "custom_id",
+                "body"
+              ]
+            },
+            "description": "Requests to run (at most 1000 per call, 8 MB serialized); all share the same endpoint and model. Larger batches go to POST /api/v1/batches directly."
+          },
+          "provider_only": {
+            "description": "Restrict routing to these provider slugs only, e.g. [\"google-vertex\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "endpoint",
+          "model",
+          "requests"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validating",
+              "in_progress",
+              "finalizing",
+              "completed",
+              "failed",
+              "expired",
+              "cancelling",
+              "cancelled"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "request_counts": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "completed": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "completed",
+              "failed"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "model",
+          "endpoint",
+          "request_counts",
+          "error",
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Send batch",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "send-decision",
+      "title": "Send decision request",
+      "description": {
+        "sha256": "434658b56a84b267610b9161b7dd3ebd7a2b29b24d81a9d6708c57c29f659d78",
+        "length": 385
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Decision model slug, e.g. \"typesafe/jev-1.13\"; search-docs \"decisions\" lists the current ones"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "array",
+                "items": {}
+              }
+            ],
+            "description": "The thing to decide about: a string, or a JSON object/array (which may contain {\"type\":\"image_url\",\"image_url\":{\"url\":...}} parts for box questions)"
+          },
+          "questions": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1
+            },
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "noul"
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Yes/no question to answer about the state"
+                    },
+                    "criteria": {
+                      "description": "What counts as true and what counts as false",
+                      "type": "object",
+                      "properties": {
+                        "true": {
+                          "type": "string"
+                        },
+                        "false": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "true",
+                        "false"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instructions"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "choice"
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "What to pick between"
+                    },
+                    "criteria": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "description": "Option key → description (null for none); the answer is one key"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instructions",
+                    "criteria"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "score"
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "What to rate"
+                    },
+                    "criteria": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Ordered rubric, lowest level first; the answer is an index into it"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instructions",
+                    "criteria"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "box"
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "What to locate in the image contained in state"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "instructions"
+                  ]
+                }
+              ]
+            },
+            "description": "Map of question id → question. Types: noul (yes/no with a probability), choice (pick one of criteria keys), score (index into an ordered rubric), box (bounding box in an image)"
+          },
+          "provider": {
+            "description": "Provider routing preferences, same shape as the chat completions provider object",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "model",
+          "state",
+          "questions"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "answers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "noul"
+                    },
+                    "noul": {
+                      "type": "number",
+                      "description": "Probability the answer is true"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "noul"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "choice"
+                    },
+                    "choice": {
+                      "type": "string"
+                    },
+                    "probabilities": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "confidence": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "choice"
+                  ],
+                  "additionalProperties": {}
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "score"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "probabilities": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "confidence": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "score"
+                  ],
+                  "additionalProperties": {}
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "box"
+                    },
+                    "box": {
+                      "type": "object",
+                      "properties": {
+                        "top": {
+                          "type": "number"
+                        },
+                        "bottom": {
+                          "type": "number"
+                        },
+                        "left": {
+                          "type": "number"
+                        },
+                        "right": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "confidence": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "box"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "refusal"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "input_tokens": {
+                "type": "integer"
+              },
+              "output_tokens": {
+                "type": "integer"
+              },
+              "cost": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "input_tokens",
+              "output_tokens"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "model",
+          "answers",
+          "usage"
+        ],
+        "additionalProperties": {}
+      },
+      "annotations": {
+        "title": "Send decision request",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "send-feedback",
+      "title": "Send generation feedback",
+      "description": {
+        "sha256": "7e598ac82e2be9a3b2c514c3f8020d47b78df5e62c284bc5ce30a0f93c8ecbfc",
+        "length": 689
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "latency",
+                  "incoherence",
+                  "incorrect_response",
+                  "formatting",
+                  "billing",
+                  "api_error",
+                  "other"
+                ],
+                "description": "The category of feedback being reported"
+              },
+              "comment": {
+                "description": "An optional free-text comment describing the feedback",
+                "type": "string"
+              },
+              "generation_id": {
+                "type": "string",
+                "description": "The generation to submit feedback on"
+              }
+            },
+            "required": [
+              "category",
+              "generation_id"
+            ],
+            "description": "Structured feedback about a specific generation"
+          }
+        },
+        "required": [
+          "request"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Send generation feedback",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "send-message",
+      "title": "Send a chat message",
+      "description": {
+        "sha256": "66ba391ce91bf57fdce2d687db3b7cab5a09be78cf5ea2d93168d9e4a96ffb60",
+        "length": 529
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model slug, e.g. \"openai/gpt-4o-mini\""
+          },
+          "message": {
+            "type": "string",
+            "description": "The user message to send"
+          },
+          "system": {
+            "description": "Optional system prompt sent as the first message with role \"system\"; sets persona, rules and output format. Leave unset for a plain user message.",
+            "type": "string"
+          },
+          "provider": {
+            "description": "Provider routing preferences. Leave this unset for normal chats so the router picks the best provider. Set it ONLY when the request needs zero provider variance — running evals, benchmarking, or reproducing a result — because providers differ in quantization, throughput, and sampling, so the same model can return different outputs depending on who serves it. To hard-pin one provider: { only: [\"fireworks\"], allow_fallbacks: false }.",
+            "type": "object",
+            "properties": {
+              "order": {
+                "description": "Ordered provider slugs to try first, e.g. [\"fireworks\", \"together\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "only": {
+                "description": "Restrict routing to these provider slugs only",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ignore": {
+                "description": "Provider slugs to exclude from routing",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allow_fallbacks": {
+                "description": "When false, use only the pinned provider(s) and fail instead of falling back. Set false to hard-pin for evals.",
+                "type": "boolean"
+              },
+              "sort": {
+                "description": "How to rank candidate providers when \"order\" is not set: \"price\" (cheapest first), \"throughput\" (fastest tokens/s), or \"latency\" (lowest time to first token). Default is OpenRouter load balancing weighted toward price.",
+                "type": "string",
+                "enum": [
+                  "price",
+                  "throughput",
+                  "latency",
+                  "exacto"
+                ]
+              }
+            }
+          },
+          "reasoning_effort": {
+            "description": "How hard a reasoning model should think: \"max\" | \"xhigh\" | \"high\" | \"medium\" | \"low\" | \"minimal\" | \"none\". Omit to use the model's own default. Use a lower value to cap cost/latency on reasoning models that over-think, or a higher value for hard prompts. Non-reasoning models ignore it. Discover a model's supported/default efforts via list-models or get-model.",
+            "type": "string",
+            "enum": [
+              "max",
+              "xhigh",
+              "high",
+              "medium",
+              "low",
+              "minimal",
+              "none"
+            ]
+          },
+          "max_tokens": {
+            "description": "Cap the total tokens generated (including reasoning). The single most effective lever to stop a reasoning model from running unbounded on a hard prompt. Omit for the model default.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "timeout_ms": {
+            "description": "Abort the call locally after this many milliseconds. Returns a typed client_timeout error with elapsed_ms. If the timeout fires before any response, no generation id is available; if it fires while reading the response body, the generation may have completed upstream and been billed. Omit to wait for the default gateway timeout.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "model",
+          "message"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Send a chat message",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "spawn-ori-eval",
+      "title": "Spawn an Ori eval",
+      "description": {
+        "sha256": "d7d2de7799a20b1c1b2cbc5ab83c978f9c72806459469239f059cbaee5b929fa",
+        "length": 1065
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": null,
+      "annotations": {
+        "title": "Spawn an Ori eval",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "transcribe-audio",
+      "title": "Transcribe audio to text",
+      "description": {
+        "sha256": "01284506ff08b8e0781cba2bb4ccc3c4c782637ef1d55dfd07f8e64b0d5a5c7c",
+        "length": 286
+      },
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "STT model slug, e.g. \"openai/whisper-large-v3\""
+          },
+          "audio_url": {
+            "description": "HTTPS URL of the audio file to transcribe. Passed to the model when it can fetch URLs itself (no size limit), otherwise fetched server-side (max 25 MB). URLs without an audio file extension are always fetched server-side unless format is set. Preferred over audio_base64.",
+            "type": "string"
+          },
+          "audio_base64": {
+            "description": "Base64-encoded audio bytes, for small clips only. Requires format.",
+            "type": "string"
+          },
+          "format": {
+            "description": "Audio container format. Required with audio_base64; inferred from the URL or Content-Type otherwise.",
+            "type": "string",
+            "enum": [
+              "wav",
+              "mp3",
+              "flac",
+              "m4a",
+              "ogg",
+              "webm",
+              "aac"
+            ]
+          },
+          "language": {
+            "description": "ISO-639-1 language hint (e.g. \"en\", \"ja\"). Auto-detected if omitted.",
+            "type": "string"
+          },
+          "timestamps": {
+            "description": "Return timestamped \"segment\"s or \"word\"s in structuredContent (verbose_json). Omit for plain text.",
+            "type": "string",
+            "enum": [
+              "segment",
+              "word"
+            ]
+          },
+          "diarize": {
+            "description": "Label speakers; the transcript is rendered one line per speaker turn. Only models that support diarization (e.g. ElevenLabs Scribe) honor it.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "number"
+                    },
+                    "end": {
+                      "type": "number"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "speaker": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "speaker_label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "words": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "word": {
+                      "type": "string"
+                    },
+                    "start": {
+                      "type": "number"
+                    },
+                    "end": {
+                      "type": "number"
+                    },
+                    "speaker": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "speaker_label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "word",
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "cost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "seconds": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "generation_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "truncated": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "words",
+                "segments"
+              ]
+            }
+          }
+        },
+        "required": [
+          "text",
+          "model"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Transcribe audio to text",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      }
+    }
+  ],
+  "calls": {
+    "list-models": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 31865,
+        "json": {
+          "data": [
+            {
+              "architecture": {
+                "input_modalities": [
+                  "string"
+                ],
+                "instruct_type": "null",
+                "modality": "string",
+                "output_modalities": [
+                  "string"
+                ],
+                "tokenizer": "string"
+              },
+              "canonical_slug": "string",
+              "context_length": "number",
+              "created": "number",
+              "default_parameters": {},
+              "description": "string",
+              "endpoints": [
+                "string"
+              ],
+              "expiration_date": "null",
+              "hugging_face_id": "string",
+              "id": "string",
+              "knowledge_cutoff": "null",
+              "links": {
+                "details": "string"
+              },
+              "name": "string",
+              "per_request_limits": "null",
+              "pricing": {
+                "completion": "string",
+                "prompt": "string"
+              },
+              "reasoning": {
+                "default_effort": "string",
+                "default_enabled": "boolean",
+                "mandatory": "boolean",
+                "supported_efforts": [
+                  "string"
+                ]
+              },
+              "supported_parameters": [
+                "string"
+              ],
+              "supported_voices": "null",
+              "top_provider": {
+                "context_length": "number",
+                "is_moderated": "boolean",
+                "max_completion_tokens": "number"
+              }
+            }
+          ],
+          "links": {
+            "next": "string"
+          },
+          "total_count": "number"
+        }
+      }
+    },
+    "get-model": {
+      "called": false,
+      "reason": "required parameter \"request\" is not one the capture fills"
+    },
+    "list-model-endpoints": {
+      "called": false,
+      "reason": "required parameter \"request\" is not one the capture fills"
+    },
+    "list-providers": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 28595,
+        "json": {
+          "data": [
+            {
+              "datacenters": [
+                "string"
+              ],
+              "headquarters": "string",
+              "name": "string",
+              "privacy_policy_url": "string",
+              "slug": "string",
+              "status_page_url": "null",
+              "terms_of_service_url": "string"
+            }
+          ]
+        }
+      }
+    },
+    "list-benchmarks": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 581836,
+        "json": {
+          "data": [
+            {
+              "agentic_index": "null",
+              "coding_index": "null",
+              "display_name": "string",
+              "intelligence_index": "number",
+              "model_permaslug": "string",
+              "pricing": {
+                "completion": "string",
+                "prompt": "string"
+              },
+              "source": "string"
+            }
+          ],
+          "meta": {
+            "as_of": "string",
+            "citation": "null",
+            "model_count": "number",
+            "source": "null",
+            "source_url": "null",
+            "task_type": "null",
+            "version": "string"
+          }
+        }
+      }
+    },
+    "list-daily-model-rankings": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 158700,
+        "json": {
+          "data": [
+            {
+              "date": "string",
+              "model_permaslug": "string",
+              "total_tokens": "string"
+            }
+          ],
+          "meta": {
+            "as_of": "string",
+            "end_date": "string",
+            "start_date": "string",
+            "version": "string"
+          }
+        }
+      }
+    },
+    "list-app-rankings": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 5577,
+        "json": {
+          "data": [
+            {
+              "app_id": "number",
+              "app_name": "string",
+              "rank": "number",
+              "total_requests": "number",
+              "total_tokens": "string"
+            }
+          ],
+          "meta": {
+            "as_of": "string",
+            "end_date": "string",
+            "start_date": "string",
+            "version": "string"
+          }
+        }
+      }
+    },
+    "list-task-classifications": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 31501,
+        "json": {
+          "data": {
+            "as_of": "string",
+            "classifications": [
+              {
+                "category_token_share": "number",
+                "category_usage_share": "number",
+                "display_name": "string",
+                "macro_category": "string",
+                "models": [
+                  {
+                    "id": "string",
+                    "tag_token_share": "number",
+                    "tag_usage_share": "number"
+                  }
+                ],
+                "tag": "string",
+                "token_share": "number",
+                "usage_share": "number"
+              }
+            ],
+            "macro_categories": [
+              {
+                "key": "string",
+                "label": "string",
+                "token_share": "number",
+                "usage_share": "number"
+              }
+            ],
+            "window_days": "number"
+          }
+        }
+      }
+    },
+    "search-docs": {
+      "called": true,
+      "arguments": {
+        "max_results": 3,
+        "query": "provider routing"
+      },
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 3845,
+        "json": null
+      }
+    },
+    "ping": {
+      "called": true,
+      "arguments": {},
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": null,
+      "text": {
+        "length": 4,
+        "json": null
+      }
+    },
+    "get-credits": {
+      "called": true,
+      "isError": false,
+      "contentTypes": [
+        "text"
+      ],
+      "structured": {
+        "data": "object"
+      },
+      "text": {
+        "length": 60,
+        "json": {
+          "data": "object"
+        }
+      }
+    }
+  }
+}

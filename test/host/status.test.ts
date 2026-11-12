@@ -4,7 +4,7 @@
 import "./isolate.js"
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { PLUGIN_ID, SERVER_NAME, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
-import { TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { LIVE_VERIFIED_SCRIPT_METHODS, NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { StatusRpc } from "../../src/status.js"
 import { NEW_TOOL } from "./fake-mcp.js"
@@ -51,8 +51,8 @@ describe(`status of a connected server on OpenCode ${HOST_VERSION}`, () => {
       state: "connected",
       access: "ask-changes",
       source: "plugin",
-      catalog: { state: "ready", observed: 18, reviewedPresent: 17, unknownCount: 1, unknown: [NEW_TOOL], missingReviewed: [] },
-      scripting: { reviewedMethodCount: 16, nativeOnly: ["generate-image"], liveVerifiedCount: 0 },
+      catalog: { state: "ready", observed: TOOL_NAMES.length + 1, reviewedPresent: TOOL_NAMES.length, unknownCount: 1, unknown: [NEW_TOOL], missingReviewed: [] },
+      scripting: { reviewedMethodCount: RPC_TOOLS.length, nativeOnly: [...NATIVE_ONLY], liveVerifiedCount: LIVE_VERIFIED_SCRIPT_METHODS.length },
       policy: { installation: "ready" },
       skills: SKILL_NAMES.map((name) => ({ name, state: "loaded" })),
       unguardedAgents: [],
@@ -70,8 +70,8 @@ describe(`status of a connected server on OpenCode ${HOST_VERSION}`, () => {
     const text = await command(host)
     expect(text.split("\n")[0]).toBe("OpenRouter status")
     expect(text).toContain("- Connection: connected (registered by this plugin)\n")
-    expect(text).toContain(`- Tools: 18 listed, 17 reviewed, 1 unknown: ${NEW_TOOL} (asked about, never a script method); last seen `)
-    expect(text).toContain("- Scripts: 16 methods through openrouter.models.tools, output checked against a test server only")
+    expect(text).toContain(`- Tools: ${TOOL_NAMES.length + 1} listed, ${TOOL_NAMES.length} reviewed, 1 unknown: ${NEW_TOOL} (asked about, never a script method); last seen `)
+    expect(text).toContain(`- Scripts: ${RPC_TOOLS.length} methods through openrouter.models.tools, ${LIVE_VERIFIED_SCRIPT_METHODS.length} of ${RPC_TOOLS.length} with output checked against OpenRouter's live server`)
     expect(text).toContain("- Skills: 4 of 4 loaded\n")
     expect(text).toContain("- Next step: Nothing to do.")
     expect(host.fake.calls.length).toBe(before)

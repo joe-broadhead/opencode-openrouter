@@ -17,9 +17,9 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
 const { jelly } = pkg
 
 describe("the jelly declaration", () => {
-  test("declares all 17 reviewed tools once, in catalog order, and no tool the catalog has not reviewed", () => {
+  test("declares all 31 reviewed tools once, in catalog order, and no tool the catalog has not reviewed", () => {
     expect(jelly.tools.map((tool) => tool.permission)).toEqual(REVIEWED_TOOLS.map((tool) => nativeToolId(tool.name)))
-    expect(jelly.tools).toHaveLength(17)
+    expect(jelly.tools).toHaveLength(31)
   })
 
   test("each tool's name is its Code Mode path with the hyphens intact, and its permission the host's action", () => {
@@ -63,8 +63,10 @@ describe("the jelly declaration", () => {
     })
   })
 
-  test("declares no billing, budget or media field", () => {
-    expect(JSON.stringify(jelly)).not.toMatch(/billing|budget|price|cost|media/i)
+  test("declares no billing, budget or media field: no key at any depth names one", () => {
+    const keys = (value: unknown): string[] =>
+      Array.isArray(value) ? value.flatMap(keys) : value !== null && typeof value === "object" ? Object.entries(value).flatMap(([key, item]) => [key, ...keys(item)]) : []
+    expect(keys(jelly).filter((key) => /billing|budget|price|cost|media|spend/i.test(key))).toEqual([])
   })
 
   test("the summary is one line of 1 to 120 characters", () => {

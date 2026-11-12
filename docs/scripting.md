@@ -13,40 +13,58 @@ path segment: `/api/rpc/openrouter.models.tools/list-models`. The methods come f
 
 | Method | Class | What it does | Output evidence |
 | --- | --- | --- | --- |
+| `get-endpoint-uptime-history` | `read` | Hourly uptime of a model's provider endpoints, last 72 hours | synthetic |
 | `get-model` | `read` | One model's details | synthetic |
-| `list-app-rankings` | `read` | App rankings | synthetic |
-| `list-benchmarks` | `read` | Benchmarks | synthetic |
-| `list-daily-model-rankings` | `read` | Usage rankings | synthetic |
+| `get-session-cost` | `read` | Median cost per session of published coding harnesses (public statistics) | synthetic |
+| `list-app-rankings` | `read` | App rankings | live-observed |
+| `list-benchmarks` | `read` | Benchmarks | live-observed |
+| `list-daily-model-rankings` | `read` | Usage rankings | live-observed |
 | `list-model-endpoints` | `read` | A model's endpoints | synthetic |
-| `list-models` | `read` | Model catalog | synthetic |
-| `list-providers` | `read` | Providers | synthetic |
-| `list-task-classifications` | `read` | Task usage | synthetic |
-| `ping` | `read` | Health | synthetic |
-| `search-docs` | `read` | OpenRouter's documentation | synthetic |
-| `get-credits` | `read` | The account's credit | synthetic |
-| `get-generation` | `read` | One generation's metadata | synthetic |
+| `list-models` | `read` | Model catalog | live-observed |
+| `list-providers` | `read` | Providers | live-observed |
+| `list-task-classifications` | `read` | Task usage | live-observed |
+| `ping` | `read` | Health | live-observed |
+| `search-docs` | `read` | OpenRouter's documentation | live-observed |
+| `get-batch` | `read` | One batch's status and, once finished, its results | documented |
+| `get-credits` | `read` | The account's credit | live-observed |
+| `get-generation` | `read` | One generation's metadata | documented |
+| `get-preset` | `read` | One saved preset | synthetic |
+| `get-video` | `read` | A video job's status, cost and output links; starts nothing | documented |
+| `list-batches` | `read` | The workspace's batches | documented |
+| `list-preset-versions` | `read` | A preset's versions | synthetic |
+| `list-presets` | `read` | The account's saved presets | synthetic |
 | `install-ori-harness` | `read` | Retrieves an installation recipe; runs nothing | synthetic |
 | `spawn-ori-eval` | `read` | Retrieves an evaluation recipe; runs nothing | synthetic |
+| `send-batch` | `write` | Billable: submits a batch of inference requests | documented |
+| `send-decision` | `write` | Billable: asks a decision model typed questions | documented |
 | `send-message` | `write` | Billable test inference | documented |
+| `transcribe-audio` | `write` | Billable: transcribes an audio file | documented |
 | `send-feedback` | `send` | Feedback on one of the account's own generations | synthetic |
 | `describe` | none | Lists the methods, their class and permission action, whether OpenCode lists each tool now, each tool's live input schema, and, given a session, whether that session may call it | |
 
 The **output evidence** column is the strongest evidence that the method's useful result fits the RPC's result, which
 keeps structured content and text and drops every other kind of content (see [contract.md](contract.md)):
 
-- **documented**: OpenRouter's documentation describes the result as text (for `send-message`, a reply that carries the
-  generation id). Not observed by running anything.
+- **live-observed**: a signed-in, read-only capture of OpenRouter's server called the method and got text or structured
+  content back (`test/fixtures/live-tools.json`, 2026-11-12). Only free reads were called.
+- **documented**: OpenRouter declares the result: an output schema on its live server (so the result carries structured
+  content), or, for `send-message`, its documentation (a text reply that carries the generation id). Not called.
 - **synthetic**: observed only against this repository's loopback test server, whose results are invented. It proves
   the RPC carries a text and structured result; it says nothing about what OpenRouter's server returns.
 
-No method has been checked against OpenRouter's live server: no signed-in tool list has been captured yet. `/openrouter-status`
-shows how many methods are checked live (`scripting.liveVerifiedCount`). If a live capture shows that a method's useful
-result is media or another kind of content the RPC drops, that method stops being a script method in the next release.
+`/openrouter-status` shows how many methods are checked live (`scripting.liveVerifiedCount`). If a later capture shows
+that a method's useful result is media or another kind of content the RPC drops, that method stops being a script method.
 
-`generate-image` is **not** a method. Its image comes back as an image block, which this RPC drops, so a script would pay
-for an image it never receives. Its route does not exist: OpenCode answers `rpc.method_not_found` before the plugin runs,
-and nothing is sent to OpenRouter. Generate images natively, in a conversation, where OpenCode delivers the image itself.
-Status reports it under `scripting.nativeOnly`.
+These reviewed tools are **not** methods, and status reports them under `scripting.nativeOnly`. Their routes do not
+exist: OpenCode answers `rpc.method_not_found` before the plugin runs, and nothing is sent to OpenRouter.
+
+- `generate-image` is **not** a method: its image comes back as an image block, which this RPC drops, so a script would
+  pay for an image it never receives. Generate images natively, in a conversation, where OpenCode delivers the image.
+- `generate-speech` is **not** a method: it bills for audio that comes back as an audio block.
+- `generate-video` is **not** a method: it bills for a video, which it may return inline once finished. Poll a job you
+  started natively with the `get-video` method.
+- `get-current-key` is **not** a method: it describes the signed-in key itself (its label, spend limit, remaining limit
+  and usage), which the plugin keeps out of scripts. Use `get-credits` for the account's balance.
 
 A tool OpenRouter adds later is never a method until the catalog reviews it.
 
@@ -58,8 +76,9 @@ are the same rules the native path uses, and the same operational guard:
 
 - **Only an `allow` runs.** The rules are resolved before anything is dispatched. An `ask` is refused with no prompt and
   nothing sent, because no one is there to answer it. A `deny` is refused with nothing sent.
-- **Under the default `access: "ask-changes"`, `send-message` and `send-feedback` ask**, so a script needs an explicit
-  `allow` for each in the session's or the agent's rules. Reads are allowed. Under `read-only` both are denied.
+- **Under the default `access: "ask-changes"`, every billable method and `send-feedback` ask**: `send-message`,
+  `send-batch`, `send-decision`, `transcribe-audio` and `send-feedback`. A script needs an explicit `allow` for each in
+  the session's or the agent's rules. Reads are allowed. Under `read-only` they are denied.
 - **An unguarded agent runs everything.** A custom agent with OpenCode's base allow (`* * allow`) but without the
   plugin's block is unguarded: a script on that agent runs `send-message`, `send-feedback` and every other method with
   no prompt and no refusal, exactly as the model would. `/openrouter-status` lists such agents under
@@ -112,7 +131,7 @@ opencode api post /api/rpc/openrouter.models.tools/describe -H "x-opencode-direc
 
 With a session, each method also carries `permission`: `allow`, `ask` or `deny`, resolved exactly as a call would be.
 The answer's `unclassified` lists every tool OpenCode lists for the server that is **not exposed as an RPC method**: the
-native-only `generate-image` as well as any tool the catalog has not reviewed. It is not a count of unknown tools; status
+four native-only tools above as well as any tool the catalog has not reviewed. It is not a count of unknown tools; status
 reports those separately.
 
 A result comes back as `{ output?, text }`: the tool's structured content when it has any, and its text parts joined by
@@ -121,12 +140,13 @@ install or another paid call.
 
 ## Paid calls and uncertain outcomes
 
-`send-message` is billable inference and `send-feedback` sends feedback to OpenRouter. Neither is idempotent, and the
-RPC never retries. When such a call is cancelled, times out, loses its connection or fails upstream, it may still have
-run and been billed. Before deliberately sending it again, look for a generation id in any output and check it with
+`send-message`, `send-batch`, `send-decision` and `transcribe-audio` bill the account, and `send-feedback` sends feedback
+to OpenRouter. None is idempotent, and the RPC never retries. When such a call is cancelled, times out, loses its
+connection or fails upstream, it may still have run and been billed. Before deliberately sending it again, look for a generation id in any output and check it with
 `get-generation`, or check your activity on openrouter.ai. The error's next step says the same.
 
-A Jobs script that calls `send-message` or `send-feedback` should run with retries off: a retry is a second paid call.
+A Jobs script that calls any of them should run with retries off: a retry is a second paid call. A batch bills each
+request that completes, over up to 24 hours: follow it with `get-batch`, never by sending it again.
 
 The plugin sets no spending limit. The cap on the key OpenRouter mints at sign-in is OpenRouter's control.
 
@@ -154,12 +174,13 @@ A refusal or failure is the RPC error `failed`, with a message `CODE: what happe
 | `UPSTREAM_ERROR` | OpenRouter answered with an error. The message holds the first line of its text, at most 300 characters, with tokens and URL query strings removed. |
 | `CANCELLED` | The request was cancelled. A paid or feedback call may still have run. |
 
-OpenCode itself answers `rpc.method_not_found` for a method that does not exist, such as `generate-image` or a tool
+OpenCode itself answers `rpc.method_not_found` for a method that does not exist, such as a native-only tool or a tool
 OpenRouter adds later, and `rpc.invalid_input` for a body that is not the envelope above.
 
 ## What scripts cannot do
 
-- Generate an image: use the native tool.
+- Generate an image, speech or a video: use the native tools.
+- Read the signed-in key's own metadata (`get-current-key`).
 - Run a method whose action resolves to `ask` or `deny`: no one can answer a prompt.
 - Rely on a saved "Always allow" from a conversation.
 - Call a tool the catalog has not reviewed, even with an allow rule.

@@ -40,11 +40,12 @@ export const PLUGIN_ID = OPENROUTER_PLUGIN_ID
 
 /**
  * The reviewed OpenRouter tools a script may call, by exact upstream name with its hyphens, from the plugin's one
- * catalog in `src/openrouter-tools.ts`: the reads, `send-message` (billable, class `write`) and `send-feedback` (class
- * `send`). `generate-image` is not a method: this module's result keeps structured content and text and drops an image
- * block, so a script would pay for an image it never receives. Its route is unknown to the contract, which refuses it
- * before anything runs. A tool OpenRouter adds later is never a method until it is reviewed in the catalog. The class
- * never decides whether a call runs: the rules do.
+ * catalog in `src/openrouter-tools.ts`: every tool whose `rpc` is true, with its effect as the class (`read`, `write` for
+ * a billable call, `send` for feedback). The native-only tools are not methods: the media generators, because this
+ * module's result keeps structured content and text and drops an image, audio or video block, so a script would pay
+ * for media it never receives; and `get-current-key`, which describes the signed-in key. Their routes are unknown to
+ * the contract, which refuses them before anything runs. A tool OpenRouter adds later is never a method until it is
+ * reviewed in the catalog. The class never decides whether a call runs: the rules do.
  */
 export const METHODS: readonly MethodSpec[] = REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool): MethodSpec => ({ kind: "mcp", name: tool.name, class: tool.effect }))
 
@@ -79,12 +80,15 @@ export const operationalShapers = (assertOperational: () => void): Shapers => ({
  * disconnected or failed upstream), repeating it may run and bill it twice. So these next steps never say "call again"
  * for them; a read can simply be repeated. Each is one sentence that ends with a full stop.
  */
-const BEFORE_REPEATING =
-  "for send-message or send-feedback the call may already have run and been billed, so look for its generation id in any output and check it with get-generation, or check your activity on openrouter.ai, before you deliberately send it again"
+/** The script methods that change something, from the catalog: the billable ones, then the rest (feedback). */
+const PAID_METHODS = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.billable).map((tool) => tool.name)
+const ASKING_METHODS = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.effect !== "read").map((tool) => tool.name)
+const OTHER_CHANGES = ASKING_METHODS.filter((name) => !PAID_METHODS.includes(name))
+const BEFORE_REPEATING = `for a billable method (${PAID_METHODS.join(", ")}) or ${OTHER_CHANGES.join(", ")} the call may already have run and been billed, so look for its generation or batch id in any output and check it with get-generation or get-batch, or check your activity on openrouter.ai, before you deliberately send it again`
 export const NEXT_STEPS: NextSteps = {
   SESSION_UNKNOWN: `Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id.`,
   SESSION_AGENT_REQUIRED: `Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id.`,
-  PERMISSION_DENIED: "Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it; send-message and send-feedback ask by default, and a script cannot answer a prompt.",
+  PERMISSION_DENIED: `Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it; ${ASKING_METHODS.join(", ")} ask by default, and a script cannot answer a prompt.`,
   SERVER_CONFLICT: `Run /openrouter-status, then set your own mcp.servers.${SERVER_NAME} in opencode.json to the URL it names or remove it, and restart OpenCode.`,
   AUTH_REQUIRED: `Run /connect and choose OpenRouter tools (in a terminal, opencode mcp auth ${SERVER_NAME} from the project folder where the plugin is installed); never put an OpenRouter key in a script.`,
   CONNECTING: `Wait a few seconds and run /openrouter-status; a read can be called again, but ${BEFORE_REPEATING}.`,
