@@ -116,6 +116,7 @@ Every error reads `CODE: What happened. Next step: What to do.`
 | `SERVER_CONFLICT` | `mcp.servers.openrouter` is a local command or points at another URL; it is left untouched. |
 | `SERVER_DUPLICATE` | Another server entry points at OpenRouter's MCP host under a different name. |
 | `NAMESPACE_COLLISION` | Another server's tool ids would start with `openrouter_`. |
+| `TOOL_NAMESPACE_MISSING` | OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's. |
 | `POLICY_UNAVAILABLE` | The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent. |
 
 ## Known limits

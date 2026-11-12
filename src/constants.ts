@@ -52,6 +52,7 @@ export const CODES = {
   SERVER_CONFLICT: { surface: "connection", when: "`mcp.servers.openrouter` is a local command or points at another URL; it is left untouched." },
   SERVER_DUPLICATE: { surface: "connection", when: "Another server entry points at OpenRouter's MCP host under a different name." },
   NAMESPACE_COLLISION: { surface: "connection", when: "Another server's tool ids would start with `openrouter_`." },
+  TOOL_NAMESPACE_MISSING: { surface: "connection", when: "OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's." },
   POLICY_UNAVAILABLE: { surface: "dispatch", when: "The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent." },
 } as const
 

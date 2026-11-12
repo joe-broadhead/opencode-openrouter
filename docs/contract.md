@@ -103,6 +103,7 @@ inlines (`src/tool/mcp.ts` and so on) so a reader can find the same code in anot
 | --- | --- |
 | Effect, billing, visibility and script eligibility of each tool (`src/openrouter-tools.ts`). | assumed (reviewed policy, DESIGN §3 and §9) |
 | `ask-changes` is the default access. | assumed (DESIGN §1) |
+| The guard decorates an `openrouter_` tool in the server's namespace, and one with no namespace at all, reported as `TOOL_NAMESPACE_MISSING`: every tested host sets the namespace (synthetic row above), and a host that stopped would fail closed. | assumed (DESIGN §10) |
 | The block goes into the agents while the entry is the plugin's own, adopted, or not checked yet (`pending`, the fail-safe), and never for a conflicting or disabled entry. When the source changes the plugin asks the host to rebuild the tools and agents (`ctx.tool.reload`, `ctx.agent.reload`), and the replay that finds a conflict leaves the block out. That a conflicting entry ends with no rule in any agent is synthetic (`test/host/guard.test.ts`). | assumed (DESIGN §8, §17) |
 | The access matrix: reads allowed; billable inference, image generation, feedback and unreviewed tools deny / ask / allow under `read-only` / `ask-changes` / `all`. That the host then denies, asks and allows as the block says, and sends nothing on a deny or a declined prompt, is synthetic (`test/host/guard.test.ts`). | assumed (DESIGN §10) |
 | Exact-string URL ownership: anything but the canonical URL is a fixable conflict. | assumed (DESIGN §8; trailing slash pending live evidence) |

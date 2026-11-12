@@ -10,7 +10,7 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, pluginError, SERVER_NAME } from "./constants.js"
 import { namespaceOf, nativeToolId, type ServerSource } from "./mcp.js"
-import { reasonOf } from "./redact.js"
+import { reasonOf, shortReason } from "./redact.js"
 
 /** Where the default rules stand: not applied yet, applied in every agent with a base allow, or failed. */
 export type PolicyInstallation = "pending" | "ready" | "failed"
@@ -49,6 +49,7 @@ const text = (block: Block) => errorText("POLICY_UNAVAILABLE", block.message, bl
 export function createGuard(source: () => ServerSource, observe?: () => void) {
   let policy: { installation: PolicyInstallation; reason?: string } = { installation: "pending" }
   let transformFailure: string | undefined
+  let unnamespaced: readonly string[] = []
   let closed = false
 
   /** Why a call may not run now; undefined when the plugin is operational. */
@@ -81,13 +82,23 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
       policy = failure === undefined ? { installation: "ready" } : { installation: "failed", reason: failure }
     },
     /** Records the tool transform's latest pass. */
-    transformReport(failure: string | undefined) {
-      transformFailure = failure
+    transformReport(pass: GuardPass) {
+      transformFailure = pass.failure
+      unnamespaced = pass.unnamespaced
     },
     health(): PolicyHealth {
       const problems: string[] = []
       if (policy.installation === "failed") problems.push(text(policyFailed(policy.reason ?? "no reason given")))
       if (transformFailure) problems.push(text(guardFailed(transformFailure)))
+      if (unnamespaced.length) {
+        problems.push(
+          errorText(
+            "TOOL_NAMESPACE_MISSING",
+            `OpenCode listed ${unnamespaced.join(", ")} with no tool namespace, so the plugin treats ${unnamespaced.length === 1 ? "it" : "them"} as OpenRouter's and guards ${unnamespaced.length === 1 ? "it" : "them"}.`,
+            "If a tool here is not OpenRouter's, rename the plugin or server that adds it; otherwise update OpenCode.",
+          ),
+        )
+      }
       return { installation: policy.installation, problems }
     },
     /** Blocks every call for good: the plugin is unloading. */
@@ -104,12 +115,26 @@ type Tools = Pick<ToolEditor, "list" | "update" | "remove">
 type Listed = ReturnType<ToolEditor["list"]>[number]
 
 /**
- * Whether a registered tool is one of the `openrouter` server's native tools that the plugin may decorate: in its
- * namespace and while the entry is not another server the user configured. A pending entry is decorated too, so a tool
- * can never appear unguarded; the guard holds it until the entry is checked.
+ * Whether a registered tool is one of the `openrouter` server's native tools that the plugin may decorate: an
+ * `openrouter_` id in the server's namespace, or with no namespace at all, while the entry is not another server the
+ * user configured. A pending entry is decorated too, so a tool can never appear unguarded; the guard holds it until the
+ * entry is checked. A tool with no namespace is decorated rather than skipped, so a host that stopped setting it fails
+ * closed; another server whose name starts with `openrouter_` has its own namespace and is left alone.
  */
 export const isOwnedOpenRouterTool = (tool: Pick<Listed, "id" | "options">, source: ServerSource) =>
-  tool.id.startsWith(`${NAMESPACE}_`) && tool.options?.namespace === NAMESPACE && (source.type === "plugin" || source.type === "adopted" || source.type === "pending")
+  tool.id.startsWith(`${NAMESPACE}_`) &&
+  (tool.options?.namespace === NAMESPACE || tool.options?.namespace === undefined) &&
+  (source.type === "plugin" || source.type === "adopted" || source.type === "pending")
+
+/** What one tool transform pass did. */
+export interface GuardPass {
+  /** Why some tools could not be decorated (and were removed), or undefined. */
+  readonly failure: string | undefined
+  /** `openrouter_` tools listed with no namespace, which the pass decorated anyway, at most 20, one line each. */
+  readonly unnamespaced: readonly string[]
+}
+
+const NAME_LIMIT = 20
 
 /**
  * One tool transform pass: decorates every owned OpenRouter tool's executor in place, and makes the image tool direct.
@@ -118,16 +143,18 @@ export const isOwnedOpenRouterTool = (tool: Pick<Listed, "id" | "options">, sour
  * output schema, options, permission) is left as the host made it. A tool that cannot be decorated is removed, so it
  * can never run unguarded. Synchronous and never throws.
  */
-export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void): string | undefined {
+export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void): GuardPass {
   const failures: string[] = []
+  const unnamespaced: string[] = []
   let tools: readonly Listed[]
   try {
     tools = editor.list()
   } catch (error) {
-    return reasonOf(error)
+    return { failure: reasonOf(error), unnamespaced }
   }
   for (const tool of tools) {
     if (!isOwnedOpenRouterTool(tool, source)) continue
+    if (tool.options?.namespace === undefined && unnamespaced.length < NAME_LIMIT) unnamespaced.push(shortReason(tool.id) ?? "an unnamed tool")
     try {
       editor.update(tool.id, (draft) => {
         const original = draft.execute
@@ -150,7 +177,7 @@ export function guardTools(editor: Tools, source: ServerSource, assertOperationa
       }
     }
   }
-  return failures.length ? `${failures.length} tool${failures.length === 1 ? "" : "s"} failed: ${failures[0]}` : undefined
+  return { failure: failures.length ? `${failures.length} tool${failures.length === 1 ? "" : "s"} failed: ${failures[0]}` : undefined, unnamespaced }
 }
 
 /** Registers the guard as a tool transform. Each pass reads the latest server observation and reports its outcome. */
