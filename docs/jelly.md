@@ -46,4 +46,8 @@ provider, whose key OpenCode manages separately.
 `jelly.rpc` and `jelly.views` are empty, and the plugin contributes no Home feed or widget: a feed would call OpenRouter
 unasked. An empty `jelly.rpc` does not mean the plugin has no RPC: its status RPC `openrouter.models` and its tools RPC
 `openrouter.models.tools` are OpenCode RPCs, a different surface. The one setting is `access`, with `ask-changes` the
-default.
+default. It declares its three values as `choices` with Jelly's own labels: **Allowed** (`all`), **Ask before changes**
+(`ask-changes`) and **Read only** (`read-only`), so Jelly draws a choice, never free text. Choices need a Jelly that
+includes app#1301: an older Jelly refuses a setting that declares them. `test/unit/jelly.test.ts` checks the settings
+against Jelly's setting contract, restated in `test/support/jelly-settings.ts`, and checks that the options parser takes
+every declared value and refuses one outside the set.
