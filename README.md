@@ -21,7 +21,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.1
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -32,7 +32,7 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.0",
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.1",
       "options": { "access": "ask-changes", "allowUntestedHost": false }
     }
   ]
@@ -42,7 +42,9 @@ Or add it to `opencode.json`:
 You can also sign in from `/connect` → **OpenRouter tools**, or from `/mcps` → `openrouter`.
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
-release is a new tag: install it with its own `#v<version>` spec.
+release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
+with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.0`, then add the new tag with
+`opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
 
 ## Two OpenRouter connections
 
@@ -207,6 +209,8 @@ Every error reads `CODE: What happened. Next step: What to do.`
   removes the prompt for that tool.
 - Script methods return text and structured results only. `generate-image`, `generate-speech`, `generate-video` and
   `get-current-key` run only natively.
+- **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly
+  refuses the plugin's declaration.
 
 ## License
 

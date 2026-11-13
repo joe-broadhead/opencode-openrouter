@@ -44,7 +44,7 @@ npm run check
 | `host` | `bun test ./test/host`: the plugin and the host contract facts inside an embedded OpenCode host, once on each tested release |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, sets up the installed TUI bundle's status dialog against a fake TUI context, checks that each stock TUI closes a plugin's alert on every path, and loads the package in stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6, where status and the tools RPC run against the loopback fake |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
-| `copies` | `node scripts/check-copies.mjs`: the shared part of `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, still has the family's hash |
+| `copies` | `node scripts/check-copies.mjs`: the shared part of `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, and Jelly's setting rules in `test/support/jelly-settings.ts` still have the family's hashes |
 | `release-kit` | `node --test scripts/release-kit.test.mjs`: the family's release kit, copied unchanged |
 | `lint:actions` | `actionlint` over the workflows, when it is on PATH; CI runs it as its own job |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |

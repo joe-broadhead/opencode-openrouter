@@ -12,7 +12,7 @@ export interface Options {
   readonly access: Access
 }
 
-const EXAMPLE = `"plugins": [{ "package": "github:joe-broadhead/opencode-openrouter#v0.0.0", "options": { "access": "ask-changes" } }]`
+const EXAMPLE = `"plugins": [{ "package": "github:joe-broadhead/opencode-openrouter#v0.0.1", "options": { "access": "ask-changes" } }]`
 const ACCEPTED = {
   access: `${ACCESS.map((value) => `"${value}"`).join(", ")}, with "${DEFAULT_ACCESS}" the default`,
   allowUntestedHost: "true or false (the default)",

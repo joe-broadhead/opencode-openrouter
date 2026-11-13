@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [0.0.1] - 2026-11-13
+
+### Added
+
+- The `jelly` settings declare their choices: `access` offers Jelly's three choices, **Allowed**, **Ask before changes**
+  and **Read only**, with `ask-changes` still the default (needs a jelly that includes app#1301).
+
 ## [0.0.0] - 2026-11-12
 
 ### Added

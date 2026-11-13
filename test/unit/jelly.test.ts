@@ -6,9 +6,10 @@ import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
 import { nativeToolId } from "../../src/mcp.js"
 import { BILLABLE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
-import { DEFAULT_ACCESS } from "../../src/options.js"
+import { ACCESS, DEFAULT_ACCESS, parseOptions } from "../../src/options.js"
 import { BASE_ALLOW, defaultRules, lastMatch } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
+import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean }
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
@@ -59,8 +60,40 @@ describe("the jelly declaration", () => {
       homeFeeds: [],
       homeWidgets: [],
       workKinds: [],
-      settings: [{ key: "access", label: "Access", type: "string", default: "ask-changes", description: "all, ask-changes or read-only. Generates default rules for agents with a base allow rule." }],
+      settings: [
+        {
+          key: "access",
+          label: "Access",
+          type: "string",
+          choices: ACCESS_CHOICES,
+          default: "ask-changes",
+          description: "all, ask-changes or read-only. Generates default rules for agents with a base allow rule.",
+        },
+      ],
     })
+  })
+
+  test("the settings pass Jelly's setting contract, and access offers Jelly's three choices with the plugin's default", () => {
+    const { settings } = jelly.contributes as { settings: PluginSetting[] }
+    expect(settingsProblems(settings)).toEqual([])
+    const access = settings.find((setting) => setting.key === "access")!
+    expect(access.choices).toEqual([...ACCESS_CHOICES])
+    expect(access.default).toBe(DEFAULT_ACCESS)
+  })
+
+  test("every declared choice is a value the options parser takes, and the parser refuses a value outside the set", () => {
+    const { settings } = jelly.contributes as { settings: PluginSetting[] }
+    const access = settings.find((setting) => setting.key === "access")!
+    const values = settingChoices(access)!.map((choice) => choice.value)
+    expect(values).toEqual([...ACCESS])
+    for (const value of values) {
+      expect(settingValueIssue(access, value)).toBeNull()
+      expect(parseOptions({ access: value }).access as string).toBe(value)
+    }
+    for (const outside of ["write", "read", "none", ""]) {
+      expect(settingValueIssue(access, outside)).not.toBeNull()
+      expect(() => parseOptions({ access: outside })).toThrow("OPTIONS_INVALID")
+    }
   })
 
   test("declares no billing, budget or media field: no key at any depth names one", () => {
