@@ -1,15 +1,19 @@
-// Fails when this plugin's copy of the tools RPC differs from the one every plugin carries.
-//   node scripts/check-copies.mjs          check the copy this plugin has
-//   node scripts/check-copies.mjs --print  print the copy's hash, after a change made in every plugin at once
-// The copy keeps its own file, because each bundle stands alone. Only the part outside the PLUGIN-SPECIFIC markers is
-// shared, and the hash below names that part's one version.
+// Fails when a shared module's copy in this plugin differs from the one every plugin carries.
+//   node scripts/check-copies.mjs          check the copies this plugin has
+//   node scripts/check-copies.mjs --print  print each copy's hash, after a change made in every plugin at once
+// Each plugin keeps its own copy, because each bundle and each test suite stands alone. The hashes below name the one
+// version all plugins carry: the tools RPC outside its PLUGIN-SPECIFIC block, and Jelly's setting rules whole.
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 
 const BEGIN = "// >>> PLUGIN-SPECIFIC >>>"
 const END = "// <<< PLUGIN-SPECIFIC <<<"
 
-const COPY = { path: "src/host/tools-rpc.ts", sha256: "15d82caa53aaae7ad9efb88dddb97056d3895c4dbf49b8efbb85b743871b2a6d" }
+const COPIES = [
+  { path: "src/host/tools-rpc.ts", optional: false, sha256: "15d82caa53aaae7ad9efb88dddb97056d3895c4dbf49b8efbb85b743871b2a6d", part: sharedPart },
+  // Jelly's setting rules, restated without zod (the file's header says what it restates and how to update it).
+  { path: "test/support/jelly-settings.ts", optional: false, sha256: "966aeac7eddce490da51e8e46780f1fbcfaf9b3e892bd62f2c3952c2a6111383", part: (text) => text },
+]
 
 function sharedPart(text, path) {
   const begin = text.indexOf(BEGIN)
@@ -18,16 +22,21 @@ function sharedPart(text, path) {
   return text.slice(0, begin) + text.slice(end + END.length)
 }
 
-if (!existsSync(COPY.path)) {
-  console.error(`MISSING: ${COPY.path}`)
-  process.exit(1)
+const print = process.argv.includes("--print")
+let failed = 0
+for (const copy of COPIES) {
+  if (!existsSync(copy.path)) {
+    if (copy.optional) continue
+    console.error(`MISSING: ${copy.path}`)
+    failed++
+    continue
+  }
+  const hash = createHash("sha256").update(copy.part(readFileSync(copy.path, "utf8").replaceAll("\r\n", "\n"), copy.path)).digest("hex")
+  if (print) console.log(`${copy.path}: ${hash}`)
+  else if (hash === copy.sha256) console.log(`same: ${copy.path}`)
+  else {
+    console.error(`DRIFT: ${copy.path} differs from the copy every plugin carries. Change it in every plugin at once, then update its hash here.`)
+    failed++
+  }
 }
-const hash = createHash("sha256").update(sharedPart(readFileSync(COPY.path, "utf8").replaceAll("\r\n", "\n"), COPY.path)).digest("hex")
-if (process.argv.includes("--print")) {
-  console.log(`${COPY.path}: ${hash}`)
-} else if (hash === COPY.sha256) {
-  console.log(`same: ${COPY.path}`)
-} else {
-  console.error(`DRIFT: ${COPY.path} differs from the copy every plugin carries. Change it in every plugin at once, then update its hash here.`)
-  process.exit(1)
-}
+process.exit(failed === 0 ? 0 : 1)

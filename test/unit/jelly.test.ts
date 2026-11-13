@@ -9,7 +9,7 @@ import { BILLABLE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter
 import { ACCESS, DEFAULT_ACCESS, parseOptions } from "../../src/options.js"
 import { BASE_ALLOW, defaultRules, lastMatch } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
-import { ACCESS_CHOICES, type DeclaredSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
+import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean }
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
@@ -74,7 +74,7 @@ describe("the jelly declaration", () => {
   })
 
   test("the settings pass Jelly's setting contract, and access offers Jelly's three choices with the plugin's default", () => {
-    const { settings } = jelly.contributes as { settings: DeclaredSetting[] }
+    const { settings } = jelly.contributes as { settings: PluginSetting[] }
     expect(settingsProblems(settings)).toEqual([])
     const access = settings.find((setting) => setting.key === "access")!
     expect(access.choices).toEqual([...ACCESS_CHOICES])
@@ -82,7 +82,7 @@ describe("the jelly declaration", () => {
   })
 
   test("every declared choice is a value the options parser takes, and the parser refuses a value outside the set", () => {
-    const { settings } = jelly.contributes as { settings: DeclaredSetting[] }
+    const { settings } = jelly.contributes as { settings: PluginSetting[] }
     const access = settings.find((setting) => setting.key === "access")!
     const values = settingChoices(access)!.map((choice) => choice.value)
     expect(values).toEqual([...ACCESS])
