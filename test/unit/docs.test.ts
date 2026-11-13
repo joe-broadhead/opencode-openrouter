@@ -29,11 +29,18 @@ describe("the README", () => {
   test("installs from the release tag of package.json's version, with every install spec pinned to it", () => {
     const { version } = JSON.parse(read("package.json")) as { version: string }
     for (const path of ["README.md", "CONTRIBUTING.md", "AGENTS.md", "docs/scripting.md", "docs/jelly.md", "docs/contract.md", "src/options.ts"]) {
-      const specs = read(path).match(/github:joe-broadhead\/opencode-openrouter(?:#[^\s"'`)]*)?/g) ?? []
+      // The upgrade example removes the previous release's entry, so its spec names an older tag (checked below).
+      const text = read(path).replace(/opencode plugin remove github:joe-broadhead\/opencode-openrouter#v[0-9.]+/g, "")
+      const specs = text.match(/github:joe-broadhead\/opencode-openrouter(?:#[^\s"'`)]*)?/g) ?? []
       // A spec whose tag is a placeholder, such as `#v<x>`, describes the form, not a release.
       for (const spec of specs.filter((item) => !item.includes("#v<"))) expect({ path, spec }).toEqual({ path, spec: `github:joe-broadhead/opencode-openrouter#v${version}` })
     }
     expect(readme.match(/github:joe-broadhead\/opencode-openrouter#/g)?.length).toBeGreaterThanOrEqual(2)
+    const removed = [...readme.matchAll(/opencode plugin remove github:joe-broadhead\/opencode-openrouter#v([0-9]+)\.([0-9]+)\.([0-9]+)/g)]
+    expect(removed).toHaveLength(1)
+    const [major, minor, patch] = version.split(".").map(Number) as [number, number, number]
+    const older = removed[0]!.slice(1).map(Number) as [number, number, number]
+    expect(older[0] * 1e6 + older[1] * 1e3 + older[2]).toBeLessThan(major * 1e6 + minor * 1e3 + patch)
     expect(readme).not.toContain("Not yet released")
     expect(readme).toContain("## Install\n")
     expect(readme).toContain("The install takes the GitHub release tag.")
