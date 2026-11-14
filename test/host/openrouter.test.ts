@@ -51,7 +51,7 @@ describe(`the plugin on OpenCode ${HOST_VERSION}`, () => {
     expect((await serverRow(host))?.status).toEqual({ status: "connected" })
     expect(host.state().server()).toEqual({ source: { type: "plugin" }, duplicates: [], collisions: [], problems: [] })
     expect(host.state().owned()).toBe(true)
-    expect(host.state().options).toEqual({ access: "ask-changes", allowUntestedHost: false })
+    expect(host.state().options).toEqual({ access: "all", allowUntestedHost: false })
     expect(host.state().host).toMatchObject({ version: HOST_VERSION, tested: true })
   })
 

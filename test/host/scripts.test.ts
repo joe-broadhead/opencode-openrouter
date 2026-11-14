@@ -31,7 +31,7 @@ const pending = async (host: Host, sessionID: string) => (await host.client.perm
 describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-changes`, () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost()
+    host = await startHost({ options: { access: "ask-changes" } })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -119,7 +119,7 @@ describe("a failed policy installation on the script path, under ask-changes", (
   let fault: "register" | "apply" | undefined = "register"
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
     await listed(host)
   })
   afterAll(() => host?.close())
@@ -141,7 +141,7 @@ describe("a policy failure on a replay, on the script path, under ask-changes", 
   let fault: "apply" | undefined
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })

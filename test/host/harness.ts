@@ -38,17 +38,14 @@ globalThis.fetch = Object.assign(
 /** Removes the temp root; call once after every host in the file has closed. */
 export const cleanup = () => rmSync(root, { recursive: true, force: true })
 
-/** The plugin as a test loads it again, with `options`: by default `ask-changes`, as `startHost` uses. */
-export function pluginWith(seam: OpenRouterSeam, options: Record<string, unknown> = { access: "ask-changes" }) {
+/** The plugin as a test loads it again, with `options` (by default none: the shipped default, `all`). */
+export function pluginWith(seam: OpenRouterSeam, options: Record<string, unknown> = {}) {
   const openrouter = createOpenRouterPlugin(seam)
   return Plugin.define({ id: openrouter.id, setup: (ctx) => openrouter.setup({ ...ctx, options }) })
 }
 
 export interface HostInput {
-  /**
-   * Plugin options, as a user writes them in opencode.json. Without them a host runs under `access: "ask-changes"`, where
-   * the plugin's rules and guard decide something; a suite of the default, `all`, passes `{}`.
-   */
+  /** Plugin options, as a user writes them in opencode.json. Without them a host runs at the shipped default, `all`. */
   readonly options?: Record<string, unknown>
   /** Extra user config: mcp servers and the like. `(url) => config` receives the fake server's URL. */
   readonly config?: (url: string) => Record<string, unknown>
@@ -89,7 +86,7 @@ export async function startHost(input: HostInput = {}) {
   const withOptions = Plugin.define({
     id: openrouter.id,
     setup: async (ctx) => {
-      const stop = await openrouter.setup({ ...ctx, options: input.options ?? { access: "ask-changes" } })
+      const stop = await openrouter.setup({ ...ctx, options: input.options ?? {} })
       return async () => {
         cleanups.started++
         await stop?.()
