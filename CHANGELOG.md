@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [Unreleased]
+
+### Changed
+
+- The default `access` is now `all`, the family's default: every tool runs without asking, the seven billable tools
+  (`send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`,
+  `generate-video`) and `send-feedback` included, from the model and from scripts alike. `ask-changes` (they ask) and
+  `read-only` (they are denied) work exactly as before, and are now the opt-in limits. The skills still call a billable
+  tool only on the user's explicit request; that is guidance to the model, not a permission.
+- The guard holds nothing back under `all`: the rules allow every tool there, so a call is no longer refused with
+  `POLICY_UNAVAILABLE` while the rules are pending or failed. Under `ask-changes` and `read-only` it blocks exactly as
+  before, and an unloading plugin stops a call under every value.
+- Jelly: the declaration's 31 tools are all `allow`, each `readOnly` unchanged (the server's own `readOnlyHint`), and
+  the `access` setting's default is `all`. `install-ori-harness` and `spawn-ori-eval` stay read-only: each returns a
+  recipe as text and runs nothing.
+- Jelly: `docs/jelly.md` now says the icon is OpenRouter's own glyph (it said a neutral drawing), and that the sign-in
+  key lasts at most seven days with no refresh, so a person signs in again at least once a week.
+- `package.json` is `"private": true`: the plugin installs from its GitHub release tag only.
+
+### Added
+
+- `test/unit/declaration-drift.test.ts` checks the Jelly declaration against the committed live capture
+  (`test/fixtures/live-tools.json`, 2026-11-12): every served tool declared, every declared tool served, each
+  `readOnly` the server's hint, every effect `allow`. No fresh capture was taken for this release.
+- `SECURITY.md`: reporting, data handling, and what the default access allows.
+
 ## [0.0.1] - 2026-11-13
 
 ### Added
