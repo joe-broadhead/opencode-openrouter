@@ -7,11 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The default `access` is now `all`, the family's default: every tool runs without asking, the seven billable tools
+- **Breaking:** the default `access` is now `all`, the family's default: every tool runs without asking, the seven billable tools
   (`send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`,
   `generate-video`) and `send-feedback` included, from the model and from scripts alike. `ask-changes` (they ask) and
   `read-only` (they are denied) work exactly as before, and are now the opt-in limits. The skills still call a billable
   tool only on the user's explicit request; that is guidance to the model, not a permission.
+  If you relied on the old default, set `access: "ask-changes"`: billable calls now run without asking at the default.
 - The guard holds nothing back under `all`: the rules allow every tool there, so a call is no longer refused with
   `POLICY_UNAVAILABLE` while the rules are pending or failed. Under `ask-changes` and `read-only` it blocks exactly as
   before, and an unloading plugin stops a call under every value.
