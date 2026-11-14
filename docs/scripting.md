@@ -76,18 +76,22 @@ are the same rules the native path uses, and the same operational guard:
 
 - **Only an `allow` runs.** The rules are resolved before anything is dispatched. An `ask` is refused with no prompt and
   nothing sent, because no one is there to answer it. A `deny` is refused with nothing sent.
-- **Under the default `access: "ask-changes"`, every billable method and `send-feedback` ask**: `send-message`,
-  `send-batch`, `send-decision`, `transcribe-audio` and `send-feedback`. A script needs an explicit `allow` for each in
-  the session's or the agent's rules. Reads are allowed. Under `read-only` they are denied.
-- **An unguarded agent runs everything.** A custom agent with OpenCode's base allow (`* * allow`) but without the
+- **A script gets the same default as the model: every method is allowed.** At the default `access: "all"`, the
+  plugin's block allows every reviewed tool and the `openrouter_*` namespace, so a script can run `send-message`,
+  `send-batch`, `send-decision`, `transcribe-audio` and `send-feedback`, which bill the account or send feedback, with
+  no prompt. To restrict a script, set `"access": "ask-changes"` (each of those five asks, and an ask is refused, so a
+  script then needs an explicit `allow` for each in the session's or the agent's rules) or `"read-only"` (they are
+  denied), or give the script's agent or session a later rule. Reads are allowed under every value.
+- **Under `ask-changes` or `read-only`, an unguarded agent runs everything.** A custom agent with OpenCode's base allow (`* * allow`) but without the
   plugin's block is unguarded: a script on that agent runs `send-message`, `send-feedback` and every other method with
   no prompt and no refusal, exactly as the model would. `/openrouter-status` lists such agents under
   `unguardedAgents`, with the exact block; add it to that agent's own rules to restore the default.
 - **A saved approval does not authorise a script.** An earlier "Always allow" in a conversation is not part of the
   agent's and the session's rules.
-- **The guard applies.** While the plugin's default rules are not in place, the `openrouter` entry is not the plugin's or
-  your exact one, or the plugin is unloading, every method fails with `POLICY_UNAVAILABLE` before anything is sent, as a
-  native call does.
+- **The guard applies under `ask-changes` and `read-only`.** While the plugin's default rules are not in place or the
+  `openrouter` entry is not the plugin's or your exact one, every method fails with `POLICY_UNAVAILABLE` before anything
+  is sent, as a native call does. Under the default `all` the guard holds nothing back. Under every value, a call
+  through a plugin that is unloading fails the same way.
 
 Create a dedicated session for the script, in the project it runs in, naming the agent it runs as. Never borrow a
 session found through history or a list: the script would run under that session's rules.
@@ -96,8 +100,8 @@ session found through history or a list: the script would run under that session
 opencode api post /api/session -d '{"title":"model survey","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
-Session rules come after the agent's, so a session can narrow a script, or grant it one paid action. This session can
-read and send test messages, and nothing else from OpenRouter:
+Session rules come after the agent's, so a session can narrow a script, or, under `ask-changes`, grant it one paid
+action. This session can read and send test messages, and nothing else from OpenRouter, whatever `access` is:
 
 ```sh
 opencode api post /api/session -d '{"title":"prompt test","agent":"build","location":{"directory":"/path/to/project"},"permissions":[
@@ -148,7 +152,8 @@ connection or fails upstream, it may still have run and been billed. Before deli
 A Jobs script that calls any of them should run with retries off: a retry is a second paid call. A batch bills each
 request that completes, over up to 24 hours: follow it with `get-batch`, never by sending it again.
 
-The plugin sets no spending limit. The cap on the key OpenRouter mints at sign-in is OpenRouter's control.
+The plugin sets no spending limit, and at the default `access: "all"` nothing asks before a paid call. The cap on the
+key OpenRouter mints at sign-in is OpenRouter's control.
 
 ## The location
 
@@ -167,7 +172,7 @@ A refusal or failure is the RPC error `failed`, with a message `CODE: what happe
 | `SESSION_UNKNOWN` | OpenCode says the session does not exist in this location. |
 | `SESSION_AGENT_REQUIRED` | The session names no agent, or an agent that does not exist. |
 | `PERMISSION_DENIED` | The last matching rule is an `ask` or a `deny`, so the call was refused before dispatch. |
-| `POLICY_UNAVAILABLE` | The plugin's rules or guard are not in place, the entry is not the plugin's, or the plugin is unloading; nothing was sent. The next step is the guard's. |
+| `POLICY_UNAVAILABLE` | Under `ask-changes` or `read-only`, the plugin's rules or guard are not in place or the entry is not the plugin's; or the plugin is unloading. Nothing was sent. The next step is the guard's. |
 | `SERVER_CONFLICT` | Your `opencode.json` defines its own `openrouter` server at another URL. |
 | `AUTH_REQUIRED`, `CONNECTING`, `CONNECTION_FAILED`, `DISABLED`, `NOT_REGISTERED` | The `openrouter` server needs a sign-in, is still connecting, could not connect, is disabled, or is missing. `/openrouter-status` gives the details. |
 | `TOOL_UNAVAILABLE` | The server is connected, but OpenCode does not list the tool. |

@@ -1,7 +1,8 @@
-// The operational guard: health starts blocked and opens only with an owned server and applied rules; the decorator
-// captures the original inside each pass, checks first, delegates exactly once and returns its result unchanged; replays
-// never stack; only owned OpenRouter tools are decorated; the image tool becomes direct only for an owned server; and a
-// tool that cannot be decorated is removed rather than left unguarded.
+// The operational guard: under ask-changes and read-only, health starts blocked and opens only with an owned server and
+// applied rules, and a tool that cannot be decorated is removed rather than left unguarded; under the default all it
+// holds nothing back. The decorator captures the original inside each pass, checks first, delegates exactly once and
+// returns its result unchanged; replays never stack; only owned OpenRouter tools are decorated; and the image tool
+// becomes direct only for an owned server.
 import { describe, expect, test } from "bun:test"
 import { createGuard, guardTools, IMAGE_TOOL, isOwnedOpenRouterTool, registerGuard } from "../../src/guard.js"
 import type { ServerSource } from "../../src/mcp.js"
@@ -49,7 +50,7 @@ function registry(extra: Tool[] = []) {
 }
 
 const healthy = () => {
-  const guard = createGuard(() => PLUGIN)
+  const guard = createGuard(() => PLUGIN, "ask-changes")
   guard.policyReport(undefined)
   return guard
 }
@@ -57,7 +58,7 @@ const healthy = () => {
 describe("health", () => {
   test("starts blocked, opens only with an owned server and applied rules, and closes for good", () => {
     let source: ServerSource = { type: "pending" }
-    const guard = createGuard(() => source)
+    const guard = createGuard(() => source, "ask-changes")
     expect(guard.operational()).toBe(false)
     expect(guard.health()).toEqual({ installation: "pending", problems: [] })
     source = PLUGIN
@@ -85,8 +86,27 @@ describe("health", () => {
     expect(() => guard.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
   })
 
+  test("under the default access, all, it holds nothing back: pending, conflicting or failed, only unloading stops a call", () => {
+    let source: ServerSource = { type: "pending" }
+    const guard = createGuard(() => source, "all")
+    expect(guard.enforced).toBe(false)
+    expect(guard.operational()).toBe(true)
+    for (const next of [PLUGIN, CONFLICT, { type: "disabled" } as ServerSource]) {
+      source = next
+      expect(() => guard.assertOperational()).not.toThrow()
+    }
+    source = PLUGIN
+    guard.policyReport("agent store closed")
+    guard.transformReport({ failure: "1 tool failed: frozen", unnamespaced: [], observed: 1 })
+    expect(guard.operational()).toBe(true)
+    // The failures are recorded, but neither is a POLICY_UNAVAILABLE problem, because neither holds a call back.
+    expect(guard.health()).toEqual({ installation: "failed", problems: [] })
+    guard.close()
+    expect(() => guard.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
+  })
+
   test("the thrown error carries its code and next step", () => {
-    const guard = createGuard(() => PLUGIN)
+    const guard = createGuard(() => PLUGIN, "ask-changes")
     try {
       guard.assertOperational()
       throw new Error("not thrown")
@@ -120,7 +140,7 @@ describe("the decorator", () => {
 
   test("refuses before the original runs while blocked, and the check stays live in an older wrapper", async () => {
     let source: ServerSource = PLUGIN
-    const guard = createGuard(() => source)
+    const guard = createGuard(() => source, "ask-changes")
     guard.policyReport(undefined)
     const { tools, editor, calls } = registry()
     guardTools(editor as never, PLUGIN, guard.assertOperational)
@@ -162,7 +182,7 @@ describe("the decorator", () => {
   })
 
   test("decorates only the openrouter server's own tools, and none of a conflicting entry", async () => {
-    const guard = createGuard(() => PLUGIN)
+    const guard = createGuard(() => PLUGIN, "ask-changes")
     const { tools, editor } = registry()
     const originals = new Map([...tools].map(([id, tool]) => [id, tool.execute]))
     guardTools(editor as never, PLUGIN, guard.assertOperational)
@@ -177,7 +197,7 @@ describe("the decorator", () => {
   })
 
   test("a pending entry's tools are decorated, so none is ever exposed unguarded, but the image tool stays as it is", () => {
-    const guard = createGuard(() => ({ type: "pending" }))
+    const guard = createGuard(() => ({ type: "pending" }), "ask-changes")
     const { tools, editor } = registry()
     const original = tools.get("openrouter_ping")!.execute
     guardTools(editor as never, { type: "pending" }, guard.assertOperational)
@@ -189,7 +209,7 @@ describe("the decorator", () => {
 
   test("fails closed on a tool with no namespace: decorates it, guards it, and names it as a problem", async () => {
     let source: ServerSource = PLUGIN
-    const guard = createGuard(() => source)
+    const guard = createGuard(() => source, "ask-changes")
     guard.policyReport(undefined)
     const bare = (id: string): Tool => ({ id, name: id, description: id, input: {}, execute: async () => "ran" })
     const { tools, editor, calls } = registry([bare("openrouter_bare-tool"), bare("openrouter_\u202eevil")])
@@ -252,6 +272,14 @@ describe("the decorator", () => {
     expect(tools.has("openrouter_ping")).toBe(false)
     expect(tools.has("openrouter_send-message")).toBe(true)
     expect(guardTools({ list: () => { throw new Error("registry closed") } } as never, PLUGIN, guard.assertOperational)).toEqual({ failure: "registry closed", unnamespaced: [], observed: 0 })
+  })
+
+  test("under access all, a tool that cannot be decorated is left in place rather than removed", () => {
+    const guard = createGuard(() => PLUGIN, "all")
+    const { tools, editor } = registry()
+    const failing = { ...editor, update: (id: string, update: (draft: Tool) => void) => (id === "openrouter_ping" ? (() => { throw new Error("frozen draft") })() : editor.update(id, update)) }
+    expect(guardTools(failing as never, PLUGIN, guard.assertOperational, guard.enforced)).toEqual({ failure: "1 tool failed: frozen draft", unnamespaced: [], observed: TOOL_COUNT })
+    expect(tools.has("openrouter_ping")).toBe(true)
   })
 
   test("the registered transform reads the latest source and reports each pass to the guard", async () => {

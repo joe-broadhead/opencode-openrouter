@@ -54,7 +54,9 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   never deletes a credential, and leaves no timer or subscription behind. The one exception is the default rules: their
   failure keeps setup going with the guard registered and blocked, because a rollback would leave an adopted server's
   tools on the base allow.
-- **The guard fails closed.** Health starts blocked and opens only when the rules applied and the server is owned. Every
+- **The guard fails closed under `ask-changes` and `read-only`.** Health starts blocked and opens only when the rules
+  applied and the server is owned. Under the default `all` the rules allow every tool, so the guard holds nothing back;
+  only an unloading plugin stops a call. Every
   OpenRouter tool's executor is decorated in place, the original captured inside each pass and called once; the check is
   live. Never add a permission hook, a second prompt or a retry to it.
 - **Transforms are cheap, synchronous and never throw.** No file reads, network calls, awaited work or new timers in a
@@ -69,7 +71,8 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms it.
 - **The `jelly` section** of `package.json` declares every reviewed tool, the skills, the sign-in, the `access` setting,
   a one-line `summary` and the `icon`, with only the keys Jelly reads. Each tool's effect is the default rules' decision
-  under `ask-changes`; `test/unit/jelly.test.ts` keeps it in step with the catalog. See [docs/jelly.md](docs/jelly.md).
+  under the default `access`, `all` (so every tool is `allow`); `test/unit/jelly.test.ts` keeps it in step with the
+  catalog, and `test/unit/declaration-drift.test.ts` with the committed live capture. See [docs/jelly.md](docs/jelly.md).
 - **Errors** read `CODE: What happened. Next step: What to do.`, built by `pluginError`, `errorText` or `codeText`.
   `CODES` in `src/constants.ts` is the one table, and the README's `Errors` table is checked equal to it.
 - **Redaction.** Host or network text is shown only through `src/redact.ts`: one line, at most 160 characters, no

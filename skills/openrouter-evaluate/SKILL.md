@@ -5,7 +5,7 @@ description: Run a bounded, authorized comparison or prompt test using OpenRoute
 
 # OpenRouter evaluation
 
-Turn a model-testing request into a small, inspectable experiment. `send-message` performs billable inference, and so do `send-decision` and `send-batch`; use those two only when the user explicitly asks for a decision-model test or an offline batch. Follow the host's default `ask-changes` policy and existing user authorization without adding redundant conversational approval steps.
+Turn a model-testing request into a small, inspectable experiment. `send-message` performs billable inference, and so do `send-decision` and `send-batch`; use those two only when the user explicitly asks for a decision-model test or an offline batch. By default (`access: "all"`) nothing asks before a paid call, so spend only on the user's explicit request; follow the host's permissions and existing user authorization without adding redundant conversational approval steps.
 
 ## Execution contract
 

@@ -3,11 +3,12 @@
 // Order (each step runs only after the one before it succeeded):
 //   1. parse the options and check the host, before anything is registered;
 //   2. load and validate the packaged skill files, outside every transform;
-//   3. create the cleanup stack, the diagnostics, the server observation and the guard, which starts blocked;
+//   3. create the cleanup stack, the diagnostics, the server observation and the guard, which starts blocked under
+//      `ask-changes` and `read-only` and holds nothing back under the default `all`;
 //   4. register the `openrouter` server entry, then the in-place native dispatch guard, before any tool exists;
 //   5. the default rules, only while the server is the plugin's own, adopted or still pending, which mark the policy
-//      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and
-//      blocked, so an adopted server's tools refuse every call;
+//      installation ready only when they apply. A failure here does not abort setup: the guard stays registered and,
+//      under `ask-changes` or `read-only`, blocked, so an adopted server's tools refuse every call;
 //   6. the Code Mode namespace text, only for the plugin's own or the user's adopted server;
 //   7. the skills, the `/openrouter-status` command, the status RPC and the tools RPC for scripts;
 //   8. the `/connect` watcher, last, because it reads what the steps before it registered;
@@ -117,7 +118,7 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
       let server: ServerObservation = PENDING
       let serverChangedAt = Date.now()
       const owned = () => isOwned(server.source)
-      const guard = createGuard(() => server.source, seam.guardCheck)
+      const guard = createGuard(() => server.source, options.access, seam.guardCheck)
       const state: PluginState = {
         options,
         host,
@@ -149,7 +150,7 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         )
         // The guard, registered before the host has discovered any tool, so every pass that adds one decorates it.
         cleanup.defer(await registerGuard(ctx.tool, guard, () => server.source))
-        // 5. The default rules. Only their success makes the guard healthy; a failure leaves it blocked, not setup.
+        // 5. The default rules. Only their success makes an enforcing guard healthy; a failure leaves it blocked, not setup.
         try {
           if (seam.policyFault?.() === "register") throw new Error("injected registration failure")
           cleanup.defer(await registerDefaultRules(ctx.agent, options.access, () => server.source, guard.policyReport, () => seam.policyFault?.() === "apply"))

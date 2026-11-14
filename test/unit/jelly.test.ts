@@ -1,6 +1,6 @@
-// The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly's agents have no base allow
-// rule, so this plugin's own rules never reach them: Jelly writes each declared "ask" or "deny" as that tool's default.
-// Every entry derives from the one catalog and the default rules, so these tests keep them in step.
+// The `jelly` section of package.json, which Jelly reads without loading the plugin. Every entry derives from the one
+// catalog and the default rules under the default access, all, so these tests keep them in step: every tool is `allow`,
+// and `readOnly` is the catalog's read class, which the live capture's readOnlyHint confirms (declaration-drift.test.ts).
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
@@ -36,8 +36,11 @@ describe("the jelly declaration", () => {
     const rules = [BASE_ALLOW, ...defaultRules(DEFAULT_ACCESS)]
     for (const tool of jelly.tools) expect([tool.permission, tool.effect]).toEqual([tool.permission, lastMatch(rules, tool.permission)!.effect])
     for (const name of READ_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "allow", readOnly: true })
-    for (const name of BILLABLE_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "ask", readOnly: false })
-    expect(jelly.tools.find((tool) => tool.permission === nativeToolId("send-feedback"))).toMatchObject({ effect: "ask", readOnly: false })
+    for (const name of BILLABLE_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "allow", readOnly: false })
+    expect(jelly.tools.find((tool) => tool.permission === nativeToolId("send-feedback"))).toMatchObject({ effect: "allow", readOnly: false })
+    // The family default: every tool is allowed at access all, paid calls included.
+    expect(DEFAULT_ACCESS).toBe("all")
+    expect(jelly.tools.every((tool) => tool.effect === "allow")).toBe(true)
   })
 
   test("uses only the keys Jelly reads: its contracts strip any other, and refuse an unknown key inside an entry", () => {
@@ -66,7 +69,7 @@ describe("the jelly declaration", () => {
           label: "Access",
           type: "string",
           choices: ACCESS_CHOICES,
-          default: "ask-changes",
+          default: "all",
           description: "all, ask-changes or read-only. Generates default rules for agents with a base allow rule.",
         },
       ],

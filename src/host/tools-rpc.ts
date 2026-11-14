@@ -88,7 +88,7 @@ const BEFORE_REPEATING = `for a billable method (${PAID_METHODS.join(", ")}) or 
 export const NEXT_STEPS: NextSteps = {
   SESSION_UNKNOWN: `Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id.`,
   SESSION_AGENT_REQUIRED: `Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id.`,
-  PERMISSION_DENIED: `Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it; ${ASKING_METHODS.join(", ")} ask by default, and a script cannot answer a prompt.`,
+  PERMISSION_DENIED: `Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it; under access "ask-changes" ${ASKING_METHODS.join(", ")} ask, and a script cannot answer a prompt.`,
   SERVER_CONFLICT: `Run /openrouter-status, then set your own mcp.servers.${SERVER_NAME} in opencode.json to the URL it names or remove it, and restart OpenCode.`,
   AUTH_REQUIRED: `Run /connect and choose OpenRouter tools (in a terminal, opencode mcp auth ${SERVER_NAME} from the project folder where the plugin is installed); never put an OpenRouter key in a script.`,
   CONNECTING: `Wait a few seconds and run /openrouter-status; a read can be called again, but ${BEFORE_REPEATING}.`,

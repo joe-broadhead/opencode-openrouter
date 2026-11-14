@@ -233,49 +233,49 @@
       {
         "name": "openrouter.generate-image",
         "permission": "openrouter_generate-image",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.generate-speech",
         "permission": "openrouter_generate-speech",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.generate-video",
         "permission": "openrouter_generate-video",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.send-batch",
         "permission": "openrouter_send-batch",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.send-decision",
         "permission": "openrouter_send-decision",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.send-message",
         "permission": "openrouter_send-message",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.transcribe-audio",
         "permission": "openrouter_transcribe-audio",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "openrouter.send-feedback",
         "permission": "openrouter_send-feedback",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       }
     ],
@@ -320,7 +320,7 @@
               "description": "Reads run. Changes never run."
             }
           ],
-          "default": "ask-changes",
+          "default": "all",
           "description": "all, ask-changes or read-only. Generates default rules for agents with a base allow rule."
         }
       ]
