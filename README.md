@@ -22,7 +22,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.2
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -33,7 +33,7 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.1",
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.2",
       "options": { "access": "all", "allowUntestedHost": false }
     }
   ]
@@ -44,7 +44,7 @@ You can also sign in from `/connect` â†’ **OpenRouter tools**, or from `/mcps` â
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
 release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
-with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.0`, then add the new tag with
+with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.1`, then add the new tag with
 `opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
 
 ## Two OpenRouter connections
