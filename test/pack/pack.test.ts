@@ -354,7 +354,7 @@ describe.each(TESTED_HOSTS)("status and the tools RPC on stock OpenCode %s", (ve
     return (created.id ?? created.data?.id) as string
   }
 
-  test("status sees the catalog, and a script gets the native decision: read runs, ask and deny refused, no image route", async () => {
+  test("status sees the catalog, and a script gets the native decision: at the default access a read and a paid call run, ask and deny refused, no image route", async () => {
     fake = await startFakeMcp()
     host = await serve(version, pointedAt(fake.url, `rpc-${version}`), { name: `rpc-${version}` })
     try {
@@ -372,20 +372,20 @@ describe.each(TESTED_HOSTS)("status and the tools RPC on stock OpenCode %s", (ve
       const build = await create({ agent: "build" })
       expect((await script("ping", { sessionID: build, input: {} })).value).toMatchObject({ text: "synthetic ping" })
       expect(fake.calls).toEqual(["ping"])
-      // Under the default ask-changes, a paid call would ask: refused at once, with no prompt left waiting.
-      const asked = await script("send-message", { sessionID: build, input: { query: "q" } })
+      // Under the default access, all, a paid call runs once with no extra rule.
+      expect((await script("send-message", { sessionID: build, input: { query: "q" } })).value).toMatchObject({ text: "synthetic send-message" })
+      // A session rule that asks is refused at once, with no prompt left waiting and nothing sent.
+      const asking = await create({ agent: "build", permissions: [rule("openrouter_send-message", "ask")] })
+      const asked = await script("send-message", { sessionID: asking, input: { query: "q" } })
       expect(asked).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
       expect(asked.message).toContain("would ask")
       const { data: pending } = await host.api<{ data: unknown[] }>("GET", "/api/permission/request")
-      expect(pending.filter((request) => JSON.stringify(request).includes(build))).toEqual([])
+      expect(pending.filter((request) => JSON.stringify(request).includes(asking))).toEqual([])
       // A session's own deny refuses a read.
       const denied = await create({ agent: "build", permissions: [rule("openrouter_ping", "deny")] })
       expect(await script("ping", { sessionID: denied, input: {} })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-      // An explicit allow is the grant a script needs for a paid call: it runs once.
-      const granted = await create({ agent: "build", permissions: [rule("openrouter_send-message", "allow")] })
-      expect((await script("send-message", { sessionID: granted, input: { query: "q" } })).value).toMatchObject({ text: "synthetic send-message" })
       // The image route does not exist.
-      expect(await script("generate-image", { sessionID: granted, input: { query: "q" } })).toMatchObject({ type: "rpc.method_not_found" })
+      expect(await script("generate-image", { sessionID: build, input: { query: "q" } })).toMatchObject({ type: "rpc.method_not_found" })
       expect(fake.calls).toEqual(["ping", "send-message"])
     } catch (error) {
       throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host?.log().slice(-3000)}`)

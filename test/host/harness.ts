@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import type { OpenCodeClient } from "@opencode/client"
 import { Plugin } from "@opencode/plugin"
 import { PLUGIN_ID } from "../../src/constants.js"
-import { createOpenRouterPlugin, type PluginState } from "../../src/plugin.js"
+import { createOpenRouterPlugin, type OpenRouterSeam, type PluginState } from "../../src/plugin.js"
 import { startFakeMcp, type FakeMcp, type FakeMcpOptions } from "./fake-mcp.js"
 
 /** The SDK's `Interface`, which its own declarations resolve to `any`. */
@@ -38,8 +38,14 @@ globalThis.fetch = Object.assign(
 /** Removes the temp root; call once after every host in the file has closed. */
 export const cleanup = () => rmSync(root, { recursive: true, force: true })
 
+/** The plugin as a test loads it again, with `options` (by default none: the shipped default, `all`). */
+export function pluginWith(seam: OpenRouterSeam, options: Record<string, unknown> = {}) {
+  const openrouter = createOpenRouterPlugin(seam)
+  return Plugin.define({ id: openrouter.id, setup: (ctx) => openrouter.setup({ ...ctx, options }) })
+}
+
 export interface HostInput {
-  /** Plugin options, as a user writes them in opencode.json. */
+  /** Plugin options, as a user writes them in opencode.json. Without them a host runs at the shipped default, `all`. */
   readonly options?: Record<string, unknown>
   /** Extra user config: mcp servers and the like. `(url) => config` receives the fake server's URL. */
   readonly config?: (url: string) => Record<string, unknown>

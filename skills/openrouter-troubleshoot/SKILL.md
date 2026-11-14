@@ -11,7 +11,7 @@ Find the narrowest verified explanation for the problem and give a concrete next
 
 - Read current host-exposed tool schemas before supplying arguments. Do not infer undocumented input fields, status meanings, or response structures.
 - Native actions use names such as `openrouter_ping` and `openrouter_get-generation`; a compatible Code Mode bridge uses `tools.openrouter["ping"]` and `tools.openrouter["get-generation"]`. Raw upstream names retain hyphens. Use whichever surface the host exposes.
-- Respect the default `ask-changes` policy. Existing troubleshooting authorization covers appropriate read operations; it does not automatically authorize paid inference, feedback submission, installers, credential replacement, or administrative changes.
+- Respect the host's permissions; by default (`access: "all"`) nothing asks before a paid call, so the restraint here is yours. Existing troubleshooting authorization covers appropriate read operations; it does not automatically authorize paid inference, feedback submission, installers, credential replacement, or administrative changes.
 - Never print tokens, authorization headers, OAuth codes, secrets, raw credential files, or sensitive prompt bodies into diagnostics. Use redacted status information.
 
 ## Diagnostic workflow

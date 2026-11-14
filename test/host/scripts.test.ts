@@ -31,7 +31,7 @@ const pending = async (host: Host, sessionID: string) => (await host.client.perm
 describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-changes`, () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost()
+    host = await startHost({ options: { access: "ask-changes" } })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -113,11 +113,13 @@ describe("script permission parity, access read-only", () => {
   })
 })
 
-describe("a failed policy installation on the script path", () => {
+// Under ask-changes the guard holds calls while the rules are not in place. The build agent's own allow makes every
+// method allowed, so only the guard refuses them.
+describe("a failed policy installation on the script path, under ask-changes", () => {
   let fault: "register" | "apply" | undefined = "register"
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ options: { access: "all" }, policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
     await listed(host)
   })
   afterAll(() => host?.close())
@@ -135,11 +137,11 @@ describe("a failed policy installation on the script path", () => {
   })
 })
 
-describe("a policy failure on a replay, on the script path", () => {
+describe("a policy failure on a replay, on the script path, under ask-changes", () => {
   let fault: "apply" | undefined
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ options: { access: "all" }, policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, config: () => ({ agents: { build: { permissions: [{ action: "openrouter_*", resource: "*", effect: "allow" }] } } }), policyFault: () => fault })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -159,5 +161,22 @@ describe("a policy failure on a replay, on the script path", () => {
     await until("the replay succeeded", async () => host.state().policy().installation === "ready")
     expect(await script(host, "ping", { sessionID, input: {} })).toMatchObject({ output: { text: "synthetic ping" } })
     expect(host.fake.calls.slice(before)).toEqual(["ping"])
+  })
+})
+
+describe("a failed policy installation on the script path, under the default access, all", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost({ options: {}, policyFault: () => "register" })
+    await listed(host)
+  })
+  afterAll(() => host?.close())
+
+  test("holds nothing back: every method runs once, paid calls included, with no rule of the plugin's", async () => {
+    expect(host.state().options.access).toBe("all")
+    expect(host.state().policy()).toEqual({ installation: "failed", problems: [] })
+    const sessionID = await session(host)
+    for (const method of RPC_TOOLS) expect({ method, result: await script(host, method, { sessionID, input: {} }) }).toMatchObject({ method, result: { output: { text: `synthetic ${method}` } } })
+    expect(host.fake.calls).toEqual([...RPC_TOOLS])
   })
 })

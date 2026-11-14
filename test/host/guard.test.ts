@@ -12,9 +12,8 @@ import { IMAGE_TOOL } from "../../src/guard.js"
 import { nativeToolId } from "../../src/mcp.js"
 import { BILLABLE_TOOLS, CHANGE_TOOLS, READ_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { defaultRules } from "../../src/permissions.js"
-import { createOpenRouterPlugin } from "../../src/plugin.js"
 import { IMAGE_PNG, NEW_TOOL } from "./fake-mcp.js"
-import { agentRules, attempt, cleanup, describeError, effect, HOST_VERSION, integration, serverRow, session, startHost, until, type Host, type Rule } from "./harness.js"
+import { agentRules, attempt, cleanup, describeError, effect, HOST_VERSION, integration, pluginWith, serverRow, session, startHost, until, type Host, type Rule } from "./harness.js"
 
 setDefaultTimeout(300_000)
 afterAll(cleanup)
@@ -71,10 +70,10 @@ async function call(host: Host, executor: Executor, agent = "build") {
 
 const mcp = (host: Host) => host.client.mcp as unknown as Record<"connect" | "disconnect", (input: object) => Promise<unknown>>
 
-describe(`the default access, ask-changes, on OpenCode ${HOST_VERSION}`, () => {
+describe(`access ask-changes on OpenCode ${HOST_VERSION}`, () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost()
+    host = await startHost({ options: { access: "ask-changes" } })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -178,6 +177,28 @@ describe("access read-only", () => {
   })
 })
 
+describe("the default access, all", () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost()
+    await listed(host)
+    await until("the policy is ready", async () => host.state().policy().installation === "ready")
+  })
+  afterAll(() => host?.close())
+
+  test("allows every tool, billable inference, feedback and a tool OpenRouter added later included, with no prompt", async () => {
+    expect(host.state().options.access).toBe("all")
+    expect((await agentRules(host)).get("build")!.slice(1, 1 + defaultRules("all").length)).toEqual(defaultRules("all"))
+    const build = await session(host)
+    const before = host.fake.calls.length
+    for (const tool of [NEW_TOOL, ...CHANGE_TOOLS]) {
+      expect({ tool, effect: await effect(host, "build", nativeToolId(tool)) }).toEqual({ tool, effect: "allow" })
+      expect({ tool, result: await attempt(host, build, "build", tool) }).toMatchObject({ tool, result: { asked: undefined, ok: true } })
+    }
+    expect(host.fake.calls.slice(before)).toEqual([NEW_TOOL, ...CHANGE_TOOLS])
+  })
+})
+
 // The agent transform sees only each agent's built-in rules; the host appends the user's `permissions` and the
 // agent's configured `permissions` after every transform. These tests depend on that order: the block holds an exact
 // allow for list-models and an exact ask for send-message, so the configured rules win only if they come after it.
@@ -188,6 +209,7 @@ describe("the user's and the agent's configured rules", () => {
   let host: Host
   beforeAll(async () => {
     host = await startHost({
+      options: { access: "ask-changes" },
       config: () => ({ permissions: [userDeny], agents: { build: { permissions: [agentAllow] } } }),
       // A probe agent transform, run after the plugin's, records what a transform sees of build's rules.
       probeSetup: async (ctx) => {
@@ -239,7 +261,7 @@ describe("the user's and the agent's configured rules", () => {
 describe("a later broad allow in the user's permissions", () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: () => ({ permissions: [{ action: "*", resource: "*", effect: "allow" }] }) })
+    host = await startHost({ options: { access: "ask-changes" }, config: () => ({ permissions: [{ action: "*", resource: "*", effect: "allow" }] }) })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -282,7 +304,7 @@ describe("a conflicting user openrouter entry", () => {
 describe("the user's exact openrouter entry", () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ config: (url) => ({ mcp: { servers: { openrouter: { type: "remote", url, oauth: false } } } }) })
+    host = await startHost({ options: { access: "ask-changes" }, config: (url) => ({ mcp: { servers: { openrouter: { type: "remote", url, oauth: false } } } }) })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -304,6 +326,7 @@ describe("a permission-registration failure at setup", () => {
   let first: Promise<{ emptyListings: number; outcomes: Record<string, string> }> | undefined
   beforeAll(async () => {
     host = await startHost({
+      options: { access: "ask-changes" },
       policyFault: () => "register",
       early: true,
       probeSetup: async (ctx) => {
@@ -372,7 +395,7 @@ describe("a permission failure on a replay and after the plugin is loaded again"
   let fault: "register" | "apply" | undefined
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, policyFault: () => fault })
     await listed(host)
     await until("the policy is ready", async () => host.state().policy().installation === "ready")
   })
@@ -401,7 +424,7 @@ describe("a permission failure on a replay and after the plugin is loaded again"
   test("the plugin loaded again with a failing registration blocks with zero dispatch, then recovers on a good replay", async () => {
     fault = "register"
     const generations = host.cleanups.finished
-    await host.client.plugin(createOpenRouterPlugin(host.seam))
+    await host.client.plugin(pluginWith(host.seam, { access: "ask-changes" }))
     await until("the plugin is loaded again", async () => host.state().policy().installation === "failed")
     expect(host.cleanups.finished).toBe(generations + 1)
     await listed(host)
@@ -415,7 +438,7 @@ describe("a permission failure on a replay and after the plugin is loaded again"
     expect(host.fake.calls.length).toBe(before)
     // The registration itself failed, so a replay has no rules to apply: only loading the plugin again recovers.
     fault = undefined
-    await host.client.plugin(createOpenRouterPlugin(host.seam))
+    await host.client.plugin(pluginWith(host.seam, { access: "ask-changes" }))
     await until("the policy is ready again", async () => host.state().policy().installation === "ready")
     expect(await attempt(host, build, "build", "ping")).toMatchObject({ asked: undefined, ok: true })
     expect(host.fake.calls.slice(before)).toEqual(["ping"])
@@ -427,7 +450,7 @@ describe("a late sign-in and a catalog rebuild", () => {
   let fault: "apply" | undefined
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ oauth: true, fake: { challenge: true }, probeSetup: recorder.setup, policyFault: () => fault })
+    host = await startHost({ options: { access: "ask-changes" }, oauth: true, fake: { challenge: true }, probeSetup: recorder.setup, policyFault: () => fault })
     await until("the server needs a sign-in", async () => (await serverRow(host))?.status.status === "needs_auth")
   })
   afterAll(() => host?.close())

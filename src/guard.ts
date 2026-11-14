@@ -1,15 +1,18 @@
-// The operational guard: OpenRouter's native tools run only while the plugin's policy is in place. It is a small
-// in-place decorator around each tool's own executor, registered with `ctx.tool.transform`, that checks the plugin's
-// health and then delegates to the host's executor exactly once. It adds no prompt and decides no permission: the
-// host's executor still asserts `openrouter_<name>` against the agent's rules before it calls the server.
+// The operational guard: under `access: "ask-changes"` or `"read-only"`, OpenRouter's native tools run only while the
+// plugin's policy is in place. It is a small in-place decorator around each tool's own executor, registered with
+// `ctx.tool.transform`, that checks the plugin's health and then delegates to the host's executor exactly once. It adds
+// no prompt and decides no permission: the host's executor still asserts `openrouter_<name>` against the agent's rules
+// before it calls the server.
 //
-// Health starts blocked. It becomes healthy only when the default permission rules applied in every agent with a base
-// allow, the server is the plugin's own or the user's exact entry, and the last tool transform pass succeeded. Losing
-// any of these, or unloading the plugin, blocks it again. The check is live, so a wrapper captured from an earlier
-// pass stops too.
+// Under those two values health starts blocked. It becomes healthy only when the default permission rules applied in
+// every agent with a base allow, the server is the plugin's own or the user's exact entry, and the last tool transform
+// pass succeeded. Losing any of these blocks it again. The check is live, so a wrapper captured from an earlier pass
+// stops too. Under the default `access: "all"` the rules hold nothing back (they allow every tool, and the base allow
+// they follow already does), so the guard holds nothing back either: only an unloaded plugin stops a call.
 import type { Plugin } from "@opencode/plugin"
 import { errorText, pluginError, SERVER_NAME } from "./constants.js"
 import { namespaceOf, nativeToolId, type ServerSource } from "./mcp.js"
+import type { Access } from "./options.js"
 import { reasonOf, shortReason } from "./redact.js"
 
 /** Where the default rules stand: not applied yet, applied in every agent with a base allow, or failed. */
@@ -45,8 +48,15 @@ const guardFailed = (reason: string): Block => ({
 })
 const text = (block: Block) => errorText("POLICY_UNAVAILABLE", block.message, block.nextStep)
 
+/**
+ * Whether the guard holds calls back while the policy is not in place: under `ask-changes` and `read-only`, never under
+ * `all`, where the rules allow every tool.
+ */
+export const enforces = (access: Access) => access !== "all"
+
 /** `observe` runs on every check; only the tests' seam passes it, to count checks per call. */
-export function createGuard(source: () => ServerSource, observe?: () => void) {
+export function createGuard(source: () => ServerSource, access: Access, observe?: () => void) {
+  const enforced = enforces(access)
   let policy: { installation: PolicyInstallation; reason?: string } = { installation: "pending" }
   let transformFailure: string | undefined
   let unnamespaced: readonly string[] = []
@@ -56,6 +66,7 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
   /** Why a call may not run now; undefined when the plugin is operational. */
   const blocked = (): Block | undefined => {
     if (closed) return { message: "The OpenRouter plugin is unloaded, so its tools no longer run.", nextStep: "Restart OpenCode, or add the plugin again." }
+    if (!enforced) return undefined
     const server = source()
     if (server.type === "pending") return { message: `The plugin has not checked the ${SERVER_NAME} server entry yet, so its tools are held.`, nextStep: WAIT }
     if (server.type !== "plugin" && server.type !== "adopted") {
@@ -71,6 +82,8 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
   }
 
   return {
+    /** Whether the guard holds calls back while the policy is not in place (not under `access: "all"`). */
+    enforced,
     /** Throws `POLICY_UNAVAILABLE` unless the plugin is operational. Called before every native and scripted dispatch. */
     assertOperational() {
       observe?.()
@@ -92,8 +105,9 @@ export function createGuard(source: () => ServerSource, observe?: () => void) {
     lastObservedAt: () => observedAt,
     health(): PolicyHealth {
       const problems: string[] = []
-      if (policy.installation === "failed") problems.push(text(policyFailed(policy.reason ?? "no reason given")))
-      if (transformFailure) problems.push(text(guardFailed(transformFailure)))
+      // Under `all` neither failure holds a call back, so neither is a POLICY_UNAVAILABLE problem.
+      if (enforced && policy.installation === "failed") problems.push(text(policyFailed(policy.reason ?? "no reason given")))
+      if (enforced && transformFailure) problems.push(text(guardFailed(transformFailure)))
       if (unnamespaced.length) {
         problems.push(
           errorText(
@@ -146,10 +160,11 @@ const NAME_LIMIT = 20
  * One tool transform pass: decorates every owned OpenRouter tool's executor in place, and makes the image tool direct.
  * The original executor is captured inside this pass, before the assignment, and called exactly once; the wrapper never
  * calls the field it replaced, so replays never stack. Everything else about the tool (id, name, description, input and
- * output schema, options, permission) is left as the host made it. A tool that cannot be decorated is removed, so it
- * can never run unguarded. Synchronous and never throws.
+ * output schema, options, permission) is left as the host made it. While the guard is `enforced`, a tool that cannot be
+ * decorated is removed, so it can never run unguarded; under `access: "all"` it is left as it is. Synchronous and never
+ * throws.
  */
-export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void): GuardPass {
+export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void, enforced = true): GuardPass {
   const failures: string[] = []
   const unnamespaced: string[] = []
   let observed = 0
@@ -178,6 +193,7 @@ export function guardTools(editor: Tools, source: ServerSource, assertOperationa
       })
     } catch (error) {
       failures.push(reasonOf(error))
+      if (!enforced) continue
       try {
         editor.remove(tool.id)
       } catch {
@@ -190,5 +206,5 @@ export function guardTools(editor: Tools, source: ServerSource, assertOperationa
 
 /** Registers the guard as a tool transform. Each pass reads the latest server observation and reports its outcome. */
 export function registerGuard(tool: Pick<Plugin.Context["tool"], "transform">, guard: Guard, source: () => ServerSource) {
-  return tool.transform((editor) => guard.transformReport(guardTools(editor, source(), guard.assertOperational)))
+  return tool.transform((editor) => guard.transformReport(guardTools(editor, source(), guard.assertOperational, guard.enforced)))
 }

@@ -114,7 +114,8 @@ const stepOf = (problem: Problem | undefined) => problem?.message.split(" Next s
 export function buildStatus(facts: StatusFacts): Status {
   const { source } = facts
   const policyProblems = facts.policy.problems.map(problemOf)
-  const blocked = facts.policy.installation === "failed" || policyProblems.some((problem) => problem.code === "POLICY_UNAVAILABLE")
+  // Under `all` the guard holds nothing back, so a failed rule pass blocks nothing.
+  const blocked = (facts.access !== "all" && facts.policy.installation === "failed") || policyProblems.some((problem) => problem.code === "POLICY_UNAVAILABLE")
   const owned = source.type === "plugin" || source.type === "adopted"
   const state: State =
     source.type === "conflict"

@@ -159,9 +159,9 @@ describe("the plugin", () => {
     }
   })
 
-  test("the guard starts blocked, opens only once the server is owned and the rules applied, and closes on unload", async () => {
+  test("under ask-changes, the guard starts blocked, opens only once the server is owned and the rules applied, and closes on unload", async () => {
     let state: PluginState | undefined
-    const { ctx, mcp, agent } = context()
+    const { ctx, mcp, agent } = context({ options: { access: "ask-changes" } })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
     expect(state!.policy()).toEqual({ installation: "pending", problems: [] })
     expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The plugin has not checked the openrouter server entry yet/)
@@ -192,9 +192,9 @@ describe("the plugin", () => {
     expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
   })
 
-  test("a failed rules registration keeps setup and the guard, blocked, with the problem for status", async () => {
+  test("under ask-changes, a failed rules registration keeps setup and the guard, blocked, with the problem for status", async () => {
     let state: PluginState | undefined
-    const { ctx, mcp, tool, log } = context({ fail: "agent" })
+    const { ctx, mcp, tool, log } = context({ fail: "agent", options: { access: "ask-changes" } })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
     expect(log).toEqual(["mcp", "tool", "agent", "tool", "skill", "command", "rpc:openrouter.models", "rpc:openrouter.models.tools", "permission.evaluate"])
     expect(tool.callbacks).toHaveLength(2)
@@ -207,7 +207,19 @@ describe("the plugin", () => {
     await (stop as () => Promise<void>)()
   })
 
-  test("the seam's faults fail the registration, or one pass, and a later good pass recovers", async () => {
+  test("under the default access, all, the guard holds nothing back: before the first check and after a failed rules registration", async () => {
+    let state: PluginState | undefined
+    const { ctx, mcp } = context({ fail: "agent" })
+    const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
+    expect(() => state!.assertOperational()).not.toThrow()
+    mcp.run(mcpEditor().editor)
+    expect(state!.policy()).toEqual({ installation: "failed", problems: [] })
+    expect(() => state!.assertOperational()).not.toThrow()
+    await (stop as () => Promise<void>)()
+    expect(() => state!.assertOperational()).toThrow(/^POLICY_UNAVAILABLE: The OpenRouter plugin is unloaded/)
+  })
+
+  test("under ask-changes, the seam's faults fail the registration, or one pass, and a later good pass recovers", async () => {
     // Each setup starts the /connect watcher, whose startup polling holds a timer for seconds: both are stopped here,
     // and the probe checks nothing is left for a later test file to count.
     const timers = timerProbe()
@@ -215,12 +227,12 @@ describe("the plugin", () => {
     try {
       let state: PluginState | undefined
       let fault: "register" | "apply" | undefined = "register"
-      const first = context()
+      const first = context({ options: { access: "ask-changes" } })
       stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(first.ctx)) as () => Promise<void>)
       expect(first.log).toEqual(["mcp", "tool", "tool", "skill", "command", "rpc:openrouter.models", "rpc:openrouter.models.tools", "permission.evaluate"])
       expect(state!.policy().installation).toBe("failed")
       fault = undefined
-      const second = context()
+      const second = context({ options: { access: "ask-changes" } })
       stops.push((await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value), policyFault: () => fault }).setup(second.ctx)) as () => Promise<void>)
       second.mcp.run(mcpEditor().editor)
       agentPass(second.agent)
@@ -238,11 +250,11 @@ describe("the plugin", () => {
     }
   })
 
-  test("defaults the options to ask-changes and reports the host as tested", async () => {
+  test("defaults the options to the family's access, all, and reports the host as tested", async () => {
     let state: PluginState | undefined
     const { ctx } = context({ options: {} })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
-    expect(state!.options).toEqual({ access: "ask-changes", allowUntestedHost: false })
+    expect(state!.options).toEqual({ access: "all", allowUntestedHost: false })
     expect(state!.host).toEqual({ version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true })
     await (stop as () => Promise<void>)()
   })

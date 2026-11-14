@@ -9,8 +9,9 @@ Unofficial; not affiliated with OpenRouter. OpenRouter and its logo are trademar
 
 The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
 a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
-every agent, so by default every billable tool and feedback asks before it runs, and a guard that refuses every
-OpenRouter tool call before anything is sent while those rules are not in place. It also ships four skills, a status
+every agent: by default every tool runs without asking, billable inference and feedback included, and the `access`
+option makes billable tools and feedback ask first or never run. Under those stricter values a guard refuses every
+OpenRouter tool call before anything is sent while the rules are not in place. It also ships four skills, a status
 command and dialog that never call OpenRouter, and script access to the reviewed tools through a tools RPC.
 
 ## Requirements
@@ -21,7 +22,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.2
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -32,8 +33,8 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.1",
-      "options": { "access": "ask-changes", "allowUntestedHost": false }
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.2",
+      "options": { "access": "all", "allowUntestedHost": false }
     }
   ]
 }
@@ -43,7 +44,7 @@ You can also sign in from `/connect` â†’ **OpenRouter tools**, or from `/mcps` â
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
 release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
-with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.0`, then add the new tag with
+with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.1`, then add the new tag with
 `opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
 
 ## Two OpenRouter connections
@@ -51,8 +52,9 @@ with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.0`, t
 OpenCode can hold two separate OpenRouter credentials, and this plugin uses only one of them:
 
 - **OpenRouter tools** is the MCP server's sign-in. OpenRouter's consent page mints a dedicated key for this connection,
-  with a spend cap you can edit there (USD 10 by default) and a lifetime of at most seven days. It enables this plugin's
-  tools.
+  with a spend cap you can edit there (USD 10 by default) and a lifetime of at most seven days, with no refresh: sign in
+  again at least once a week. When the key lapses, the server needs a sign-in again (`/openrouter-status` says so). It
+  enables this plugin's tools.
 - **OpenRouter** is OpenCode's built-in model provider, for chatting with OpenRouter's models. OpenCode manages its key
   separately; this plugin never reads or changes it.
 
@@ -60,7 +62,7 @@ OpenCode can hold two separate OpenRouter credentials, and this plugin uses only
 
 | Option | Values | Default | What it does |
 | --- | --- | --- | --- |
-| `access` | `all`, `ask-changes`, `read-only` | `ask-changes` | How much the default rules restrict billable inference, image generation, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
+| `access` | `all`, `ask-changes`, `read-only` | `all` | How much the default rules restrict billable inference, image generation, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
 | `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.3.0`. |
 
 An unknown option, or a wrong value, stops the plugin with `OPTIONS_INVALID` and the list of accepted options.
@@ -72,7 +74,7 @@ rule, so everything after it still wins: the agent's own stricter rules, your `p
 approvals. The block is a broad `openrouter_*` rule first, which covers a tool OpenRouter adds later, then one rule per
 reviewed tool:
 
-| Tools | `read-only` | `ask-changes` (default) | `all` |
+| Tools | `read-only` | `ask-changes` | `all` (default) |
 | --- | --- | --- | --- |
 | Reads: models, endpoints and their uptime, providers, benchmarks, rankings, harness session costs, docs, `ping`; your credit, key, generations, batches, video jobs and presets; the Ori recipes | allow | allow | allow |
 | Billable: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` | deny | ask | allow |
@@ -90,11 +92,12 @@ agent can miss the block; give it the block yourself, the same rules in the same
 
 ### The guard
 
-Every OpenRouter tool runs behind a small check that the plugin's policy is in place: the rules applied, and the
-`openrouter` entry is the plugin's own or your exact one. While it is not (the plugin is still starting, the rules could
-not be applied, the entry changed, or the plugin is unloading) every OpenRouter tool call fails with
-`POLICY_UNAVAILABLE` before anything is sent to OpenRouter. The check adds no prompt of its own; OpenCode's permission
-decision still follows it, and the tool's result passes through unchanged.
+Under `ask-changes` and `read-only`, every OpenRouter tool runs behind a small check that the plugin's policy is in
+place: the rules applied, and the `openrouter` entry is the plugin's own or your exact one. While it is not (the plugin
+is still starting, the rules could not be applied, or the entry changed) every OpenRouter tool call fails with
+`POLICY_UNAVAILABLE` before anything is sent to OpenRouter. Under the default `all` the rules allow every tool, so the
+guard holds nothing back. Under any value, a call through a plugin that is unloading fails the same way. The check adds
+no prompt of its own; OpenCode's permission decision still follows it, and the tool's result passes through unchanged.
 
 ## Your own `openrouter` server entry
 
@@ -156,10 +159,10 @@ for `ping` through the ordinary tool path.
 
 Scripts and Jobs call 27 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
 the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs, an `ask` is
-refused because no one can answer it, a `deny` is refused, and while the plugin's rules are not in place every call fails
-with `POLICY_UNAVAILABLE` before anything is sent. Under the default `ask-changes`, the billable `send-message`,
-`send-batch`, `send-decision` and `transcribe-audio`, and `send-feedback`, need an explicit allow rule for the script's
-session or agent.
+refused because no one can answer it, and a `deny` is refused. Under the default `all` every method runs, the billable
+`send-message`, `send-batch`, `send-decision` and `transcribe-audio`, and `send-feedback`, included. Under
+`ask-changes` those five need an explicit allow rule for the script's session or agent, and under `ask-changes` and
+`read-only` every call fails with `POLICY_UNAVAILABLE` before anything is sent while the plugin's rules are not in place.
 
 Four tools are not script methods, and their routes do not exist: `generate-image`, `generate-speech` and
 `generate-video`, because the RPC keeps text and structured results only and a script would pay for media it never
@@ -183,7 +186,7 @@ Every error reads `CODE: What happened. Next step: What to do.`
 | `SERVER_DUPLICATE` | Another server entry points at OpenRouter's MCP host under a different name. |
 | `NAMESPACE_COLLISION` | Another server's tool ids would start with `openrouter_`. |
 | `TOOL_NAMESPACE_MISSING` | OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's. |
-| `POLICY_UNAVAILABLE` | The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent. |
+| `POLICY_UNAVAILABLE` | Under `ask-changes` or `read-only`, the default permission rules or the tool guard are not in place or the server entry is not the plugin's; or the plugin is unloading. OpenRouter's tools are refused before anything is sent. |
 | `SKILLS_INVALID` | A packaged skill file is missing, unreadable or malformed; that skill is not registered. |
 | `STATUS_UNAVAILABLE` | `/openrouter-status`, the `/openrouter` dialog or the status RPC could not read the plugin's status. |
 
@@ -205,6 +208,11 @@ Every error reads `CODE: What happened. Next step: What to do.`
   against OpenRouter, so how their media reaches you (a video above all) has not been checked live.
 - **Your key, your cap.** You sign in with your own OpenRouter account; the key it mints is yours, with the spend limit
   you set on OpenRouter's consent page. The plugin enforces no spending limit of its own.
+- **Spending is allowed by default.** At the default `access: "all"` a model or a script may run billable tools with no
+  prompt; the skills call one only when you ask for it, but that is guidance to the model, not a permission. Set
+  `access` to `ask-changes` to be asked first, or `read-only` to stop them.
+- **The sign-in lasts at most seven days.** OpenRouter mints the key with no refresh, so sign in again from `/connect`
+  when status says a sign-in is required.
 - An `ask` prompt in a conversation is a per-call decision. Approving it always, or a later allow in your config,
   removes the prompt for that tool.
 - Script methods return text and structured results only. `generate-image`, `generate-speech`, `generate-video` and

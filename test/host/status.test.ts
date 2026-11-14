@@ -49,7 +49,7 @@ describe(`status of a connected server on OpenCode ${HOST_VERSION}`, () => {
     expect(status).toMatchObject({
       host: { version: HOST_VERSION, range: SUPPORTED_HOST, tested: TESTED_HOSTS.includes(HOST_VERSION) },
       state: "connected",
-      access: "ask-changes",
+      access: "all",
       source: "plugin",
       catalog: { state: "ready", observed: TOOL_NAMES.length + 1, reviewedPresent: TOOL_NAMES.length, unknownCount: 1, unknown: [NEW_TOOL], missingReviewed: [] },
       scripting: { reviewedMethodCount: RPC_TOOLS.length, nativeOnly: [...NATIVE_ONLY], liveVerifiedCount: LIVE_VERIFIED_SCRIPT_METHODS.length },
@@ -70,7 +70,7 @@ describe(`status of a connected server on OpenCode ${HOST_VERSION}`, () => {
     const text = await command(host)
     expect(text.split("\n")[0]).toBe("OpenRouter status")
     expect(text).toContain("- Connection: connected (registered by this plugin)\n")
-    expect(text).toContain(`- Tools: ${TOOL_NAMES.length + 1} listed, ${TOOL_NAMES.length} reviewed, 1 unknown: ${NEW_TOOL} (asked about, never a script method); last seen `)
+    expect(text).toContain(`- Tools: ${TOOL_NAMES.length + 1} listed, ${TOOL_NAMES.length} reviewed, 1 unknown: ${NEW_TOOL} (allowed, never a script method); last seen `)
     expect(text).toContain(`- Scripts: ${RPC_TOOLS.length} methods through openrouter.models.tools, ${LIVE_VERIFIED_SCRIPT_METHODS.length} of ${RPC_TOOLS.length} with output checked against OpenRouter's live server`)
     expect(text).toContain("- Skills: 4 of 4 loaded\n")
     expect(text).toContain("- Next step: Nothing to do.")
@@ -102,7 +102,7 @@ describe("status of a server that needs a sign-in", () => {
 describe("status of a failed policy installation", () => {
   let host: Host
   beforeAll(async () => {
-    host = await startHost({ policyFault: () => "register" })
+    host = await startHost({ options: { access: "ask-changes" }, policyFault: () => "register" })
   })
   afterAll(() => host?.close())
 

@@ -37,7 +37,7 @@ describe("the generated block", () => {
       // Another server's tools are not matched.
       expect(decide(rules, "github_create_issue")).toBe("allow")
     }
-    // The live server's spenders: speech, video, batches, decisions and transcription ask by default, like send-message.
+    // The live server's spenders: speech, video, batches, decisions and transcription ask under ask-changes, like send-message.
     expect([...BILLABLE_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-message", "transcribe-audio"])
     expect(FEEDBACK).toEqual(["send-feedback"])
     const askChanges = [BASE_ALLOW, ...defaultRules("ask-changes")]

@@ -27,7 +27,7 @@ type Evaluation = { action: string; effect: "allow" | "ask" | "deny"; source?: {
 async function setup(options: { access?: "all" | "ask-changes" | "read-only"; sessionRules?: Rule[]; source?: () => ServerSource; policy?: () => string | undefined } = {}) {
   const dispatched: string[] = []
   const evaluations: Evaluation[] = []
-  const guard = createGuard(options.source ?? (() => ({ type: "plugin" })))
+  const guard = createGuard(options.source ?? (() => ({ type: "plugin" })), options.access ?? "ask-changes")
   guard.policyReport(options.policy?.())
   let contract: { id: string; methods: Record<string, unknown> } | undefined
   let handlers: Record<string, Handler> = {}
@@ -137,8 +137,8 @@ describe("OpenRouter's block", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("never put an OpenRouter key in a script")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.openrouter")
     expect(NEXT_STEPS.PERMISSION_DENIED).toContain("a script cannot answer a prompt")
-    // The methods that ask by default come from the catalog, every billable one and feedback, never a hand-written pair.
-    expect(NEXT_STEPS.PERMISSION_DENIED).toContain("send-batch, send-decision, send-message, transcribe-audio, send-feedback ask by default")
+    // The methods that ask under ask-changes come from the catalog, every billable one and feedback, never a hand-written pair.
+    expect(NEXT_STEPS.PERMISSION_DENIED).toContain(`under access "ask-changes" send-batch, send-decision, send-message, transcribe-audio, send-feedback ask`)
     for (const name of RPC_TOOLS.filter((method) => REVIEWED_TOOLS.find((tool) => tool.name === method)!.effect !== "read")) expect(NEXT_STEPS.CANCELLED).toContain(name)
     expect(NEXT_STEPS.ACCOUNT_UNKNOWN).toBeUndefined()
     for (const step of Object.values(NEXT_STEPS)) expect(step).toMatch(/[^.]\.$/)
@@ -189,7 +189,7 @@ describe("the registered RPC", () => {
     expect(h.dispatched).toEqual(["list-models"])
   })
 
-  test("permission parity, all: an explicit allow runs a paid call exactly once; a session deny still refuses it", async () => {
+  test("permission parity, all (the default): a paid call runs exactly once with no extra rule; a session deny still refuses it", async () => {
     const h = await setup({ access: "all" })
     expect(await h.call("send-message", { query: "q" })).toMatchObject({ text: "synthetic openrouter_send-message" })
     expect(h.dispatched).toEqual(["send-message"])
@@ -209,8 +209,8 @@ describe("the registered RPC", () => {
   test.each([
     ["a failed policy installation", { policy: () => "injected" }],
     ["a pending server entry", { source: () => ({ type: "pending" }) as ServerSource }],
-  ])("%s refuses every allowed method with POLICY_UNAVAILABLE in the declared failure envelope, with zero dispatch", async (_name, options) => {
-    const h = await setup({ access: "all", ...options })
+  ])("under ask-changes, %s refuses every allowed method with POLICY_UNAVAILABLE in the declared failure envelope, with zero dispatch", async (_name, options) => {
+    const h = await setup({ access: "ask-changes", sessionRules: [{ action: "openrouter_*", resource: "*", effect: "allow" }], ...options })
     for (const method of RPC_TOOLS) {
       const result = await h.call(method)
       expect({ method, type: result.type, code: result.data?.code }).toEqual({ method, type: "failed", code: "POLICY_UNAVAILABLE" })
@@ -218,6 +218,15 @@ describe("the registered RPC", () => {
       expect(typeof result.data.next).toBe("string")
     }
     expect(h.dispatched).toEqual([])
+  })
+
+  test.each([
+    ["a failed policy installation", { policy: () => "injected" }],
+    ["a pending server entry", { source: () => ({ type: "pending" }) as ServerSource }],
+  ])("under the default access, all, %s holds nothing back: every method dispatches", async (_name, options) => {
+    const h = await setup({ access: "all", ...options })
+    for (const method of RPC_TOOLS) expect(await h.call(method)).toMatchObject({ text: `synthetic openrouter_${method}` })
+    expect(h.dispatched).toEqual([...RPC_TOOLS])
   })
 
   test("the guard closing after registration, as on unload, stops the next script call before dispatch", async () => {

@@ -55,7 +55,7 @@ export const CODES = {
   SERVER_DUPLICATE: { surface: "connection", when: "Another server entry points at OpenRouter's MCP host under a different name." },
   NAMESPACE_COLLISION: { surface: "connection", when: "Another server's tool ids would start with `openrouter_`." },
   TOOL_NAMESPACE_MISSING: { surface: "connection", when: "OpenCode listed an `openrouter_` tool with no tool namespace; the plugin guards it as one of OpenRouter's." },
-  POLICY_UNAVAILABLE: { surface: "dispatch", when: "The default permission rules or the tool guard are not in place, the server entry is not the plugin's, or the plugin is unloading; OpenRouter's tools are refused before anything is sent." },
+  POLICY_UNAVAILABLE: { surface: "dispatch", when: "Under `ask-changes` or `read-only`, the default permission rules or the tool guard are not in place or the server entry is not the plugin's; or the plugin is unloading. OpenRouter's tools are refused before anything is sent." },
   SKILLS_INVALID: { surface: "skills", when: "A packaged skill file is missing, unreadable or malformed; that skill is not registered." },
   STATUS_UNAVAILABLE: { surface: "status", when: "`/openrouter-status`, the `/openrouter` dialog or the status RPC could not read the plugin's status." },
 } as const
