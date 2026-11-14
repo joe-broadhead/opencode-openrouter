@@ -22,7 +22,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.3
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -33,7 +33,7 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.2",
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.3",
       "options": { "access": "all", "allowUntestedHost": false }
     }
   ]
