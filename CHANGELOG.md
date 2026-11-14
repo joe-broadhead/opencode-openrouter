@@ -20,7 +20,6 @@ All notable changes to this project are documented here. The format follows
   recipe as text and runs nothing.
 - Jelly: `docs/jelly.md` now says the icon is OpenRouter's own glyph (it said a neutral drawing), and that the sign-in
   key lasts at most seven days with no refresh, so a person signs in again at least once a week.
-- `package.json` is `"private": true`: the plugin installs from its GitHub release tag only.
 
 ### Added
 
