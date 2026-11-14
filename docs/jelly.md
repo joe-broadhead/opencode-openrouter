@@ -6,9 +6,10 @@ they don't know, and refuse an unknown key inside a tool, sign-in or `contribute
 keys Jelly reads: `title`, `summary`, `icon`, `tools`, `skills`, `rpc`, `views`, `signIns` and `contributes`.
 
 Jelly names the plugin **OpenRouter** (`jelly.title`) with the one line in `jelly.summary` and the mark in `jelly.icon`
-(`assets/icon.svg`, shipped in the package). The mark is this family's own neutral drawing, not OpenRouter's logo.
-`opencode.vendor` names OpenRouter's domain, so a display app may show OpenRouter's official logo from OpenRouter's own
-site; the package carries no vendor marks.
+(`assets/icon.svg`, shipped in the package). The mark is OpenRouter's own published Volt-on-Ink square glyph, only
+scaled, from https://openrouter.ai/brand, and `opencode.vendor.mark` is `true`. Unofficial; not affiliated with
+OpenRouter. OpenRouter and its logo are trademarks of OpenRouter, Inc., used only to identify the service this plugin
+connects to.
 
 ## Tools and permissions
 
@@ -47,6 +48,10 @@ ships.
 `jelly.signIns` declares one sign-in, `openrouter`, labelled "OpenRouter tools", for the MCP server `openrouter`. It names
 the `server`, so it resolves the integration OpenCode makes for that MCP server, never the built-in OpenRouter model
 provider, whose key OpenCode manages separately.
+
+The sign-in mints an OpenRouter key that lasts **at most seven days** (less under an account's key-lifetime policy), with
+a USD 10 default spend cap the person can edit on OpenRouter's consent page, and OpenRouter grants no refresh. Sign in
+again at least once a week: when the key lapses, the server needs a sign-in again and the card shows it.
 
 ## RPC, views and settings
 
