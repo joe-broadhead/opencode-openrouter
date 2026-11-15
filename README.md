@@ -16,7 +16,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 
 ## Requirements
 
-- OpenCode 2.2.3 to 2.2.x (`>=2.2.3 <2.3.0`). The checks run on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
+- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
 - An OpenRouter account, to sign in to the MCP server.
 
 ## Install
@@ -63,7 +63,7 @@ OpenCode can hold two separate OpenRouter credentials, and this plugin uses only
 | Option | Values | Default | What it does |
 | --- | --- | --- | --- |
 | `access` | `all`, `ask-changes`, `read-only` | `all` | How much the default rules restrict billable inference, image generation, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
-| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.3.0`. |
+| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.4.0`. |
 
 An unknown option, or a wrong value, stops the plugin with `OPTIONS_INVALID` and the list of accepted options.
 

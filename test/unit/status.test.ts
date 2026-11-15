@@ -173,7 +173,7 @@ describe("the report", () => {
   test("says read-only denies and all allows, and an untested host the user allowed", () => {
     expect(formatStatus(buildStatus(facts({ access: "read-only" })))).toContain("- Access: read-only: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later are denied")
     expect(formatStatus(buildStatus(facts({ access: "all" })))).toContain("- Access: all: every OpenRouter tool is allowed, billable inference and feedback included")
-    expect(formatStatus(buildStatus(facts({ host: checkHost("2.3.0", true) })))).toContain("- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range;")
+    expect(formatStatus(buildStatus(facts({ host: checkHost("2.4.0", true) })))).toContain("- OpenCode: 2.4.0 (untested; supported range >=2.2.3 <2.4.0). It is outside the supported range;")
   })
 
   test("never holds a key, an auth URL, a balance or an expiry", () => {
