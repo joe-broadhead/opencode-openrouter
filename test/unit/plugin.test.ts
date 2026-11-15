@@ -255,12 +255,12 @@ describe("the plugin", () => {
     const { ctx } = context({ options: {} })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
     expect(state!.options).toEqual({ access: "all", allowUntestedHost: false })
-    expect(state!.host).toEqual({ version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true })
+    expect(state!.host).toEqual({ version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true })
     await (stop as () => Promise<void>)()
   })
 
   test("refuses bad options or an out-of-range host before registering anything", async () => {
-    for (const input of [{ options: { access: "everything" } }, { version: "2.3.0" }]) {
+    for (const input of [{ options: { access: "everything" } }, { version: "2.4.0" }]) {
       const { ctx, log } = context(input)
       await expect(createOpenRouterPlugin({ endpoint: ENDPOINT }).setup(ctx)).rejects.toThrow(/^(OPTIONS_INVALID|HOST_UNTESTED): /)
       expect(log).toEqual([])

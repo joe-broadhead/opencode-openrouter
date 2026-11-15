@@ -19,7 +19,7 @@ type Client = Omit<OpenCodeClient, "plugin"> & {
   readonly close: () => Promise<void>
 }
 
-/** The locked @opencode/sdk, or another 2.2.x installed outside the lockfile in HOST_SDK_DIR's node_modules. */
+/** The locked @opencode/sdk, or another tested release installed outside the lockfile in HOST_SDK_DIR's node_modules. */
 const SDK = HOST_SDK_DIR ? join(HOST_SDK_DIR, "node_modules", "@opencode", "sdk") : fileURLToPath(new URL("../../node_modules/@opencode/sdk", import.meta.url))
 export const HOST_VERSION = (JSON.parse(readFileSync(join(SDK, "package.json"), "utf8")) as { version: string }).version
 

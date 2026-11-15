@@ -4,7 +4,7 @@ Unofficial; not affiliated with OpenRouter.
 
 ## Supported versions
 
-OpenCode `>=2.2.3 <2.3.0`. Tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. macOS and Linux.
+OpenCode `>=2.2.3 <2.4.0`. Tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. macOS and Linux.
 
 ## Reporting a vulnerability
 

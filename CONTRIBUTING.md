@@ -6,7 +6,7 @@ Read [AGENTS.md](AGENTS.md) first: it lists the rules for this repository and th
 ## Set up
 
 You need Node.js 22.18 or later, npm, and [Bun](https://bun.sh). CI uses Node.js 24 and Bun 1.4.4, the Bun inside stock
-OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
+OpenCode 2.2.3 to 2.2.7 and 2.3.0.
 
 ```sh
 npm ci --ignore-scripts
@@ -42,7 +42,7 @@ npm run check
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
 | `icons` | `node scripts/check-icons.mjs`, the family's icon check, copied verbatim |
 | `host` | `bun test ./test/host`: the plugin and the host contract facts inside an embedded OpenCode host, once on each tested release |
-| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, sets up the installed TUI bundle's status dialog against a fake TUI context, checks that each stock TUI closes a plugin's alert on every path, and loads the package in stock OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6, where status and the tools RPC run against the loopback fake |
+| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, sets up the installed TUI bundle's status dialog against a fake TUI context, checks that each stock TUI closes a plugin's alert on every path, and loads the package in stock OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, where status and the tools RPC run against the loopback fake |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
 | `copies` | `node scripts/check-copies.mjs`: the shared part of `src/host/tools-rpc.ts`, outside its `PLUGIN-SPECIFIC` block, and Jelly's setting rules in `test/support/jelly-settings.ts` still have the family's hashes |
 | `release-kit` | `node --test scripts/release-kit.test.mjs`: the family's release kit, copied unchanged |
@@ -61,7 +61,7 @@ and `npm run lint` (the `forbidden` stage).
 The host stage starts an embedded OpenCode host in a temporary home folder, with a loopback fake of OpenRouter's MCP and
 sign-in server, once for each tested release. A request to any address other than the local machine fails the test. 2.2.3
 is the locked `@opencode/sdk`; the stage installs the others from npm, outside the lockfile, into a temporary folder that
-it deletes afterwards. To run it on one other 2.2.x only, install that SDK in a separate folder and point `HOST_SDK_DIR`
+it deletes afterwards. To run it on one other tested release only, install that SDK in a separate folder and point `HOST_SDK_DIR`
 at it:
 
 ```sh
@@ -179,7 +179,7 @@ Before the approval, the workflow:
 - **verifies** on a fresh runner: the commit's identity, one parent on `master`, `package.json` exactly the parent's
   without the lifecycle scripts, only regular files in the allowed paths, no `package.json` under `dist/`, and a second,
   independent build of the parent (its own job) equal to the committed `dist/` byte for byte;
-- **installs** the release commit with `plugin add` on each stock OpenCode host (2.2.3 to 2.2.6);
+- **installs** the release commit with `plugin add` on each stock OpenCode host (2.2.3 to 2.2.7 and 2.3.0);
 - **packs** the commit before installing anything and keeps that tarball, then runs the pack stage against a copy;
 - **stages** the Release: verifies the attested native files, writes `SHA256SUMS` and the notes (the version's CHANGELOG
   section), and shows them all in the run summary with the sha256 of `SHA256SUMS`.

@@ -16,13 +16,13 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 
 ## Requirements
 
-- OpenCode 2.2.3 to 2.2.x (`>=2.2.3 <2.3.0`). The checks run on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
+- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
 - An OpenRouter account, to sign in to the MCP server.
 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.3
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.4
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -33,7 +33,7 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.3",
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.4",
       "options": { "access": "all", "allowUntestedHost": false }
     }
   ]
@@ -44,7 +44,7 @@ You can also sign in from `/connect` â†’ **OpenRouter tools**, or from `/mcps` â
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
 release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
-with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.1`, then add the new tag with
+with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.3`, then add the new tag with
 `opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
 
 ## Two OpenRouter connections
@@ -63,7 +63,7 @@ OpenCode can hold two separate OpenRouter credentials, and this plugin uses only
 | Option | Values | Default | What it does |
 | --- | --- | --- | --- |
 | `access` | `all`, `ask-changes`, `read-only` | `all` | How much the default rules restrict billable inference, image generation, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
-| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.3.0`. |
+| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.4.0`. |
 
 An unknown option, or a wrong value, stops the plugin with `OPTIONS_INVALID` and the list of accepted options.
 

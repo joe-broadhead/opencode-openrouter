@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-openrouter",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Unofficial OpenCode plugin for OpenRouter's hosted MCP server: live models, endpoints, routing, documentation, test prompts and images, with ask-first defaults for billable tools",
   "keywords": [
@@ -36,7 +36,7 @@
     "CHANGELOG.md"
   ],
   "opencode": {
-    "host": ">=2.2.3 <2.3.0",
+    "host": ">=2.2.3 <2.4.0",
     "icons": [
       {
         "src": "assets/icon.svg",
