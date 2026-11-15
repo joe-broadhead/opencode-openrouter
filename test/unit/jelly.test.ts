@@ -13,7 +13,7 @@ import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, s
 
 type Tool = { name: string; permission: string; effect: "allow" | "ask" | "deny"; readOnly: boolean }
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
-  jelly: { title: string; summary: string; icon: string; tools: Tool[]; skills: string[]; rpc: unknown[]; views: unknown[]; signIns: Record<string, string>[]; contributes: unknown }
+  jelly: { title: string; summary: string; icon: string; cost: string; tools: Tool[]; skills: string[]; rpc: unknown[]; views: unknown[]; signIns: Record<string, string>[]; contributes: unknown }
 }
 const { jelly } = pkg
 
@@ -44,7 +44,13 @@ describe("the jelly declaration", () => {
   })
 
   test("uses only the keys Jelly reads: its contracts strip any other, and refuse an unknown key inside an entry", () => {
-    expect(Object.keys(jelly).sort()).toEqual(["contributes", "icon", "rpc", "signIns", "skills", "summary", "title", "tools", "views"])
+    expect(Object.keys(jelly).sort()).toEqual(["contributes", "cost", "icon", "rpc", "signIns", "skills", "summary", "title", "tools", "views"])
+  })
+
+  test("states what it costs with OpenRouter, one line of at most 300 characters", () => {
+    expect(jelly.cost.length).toBeLessThanOrEqual(300)
+    expect(jelly.cost).toBe(jelly.cost.trim())
+    expect(jelly.cost).not.toContain("\n")
   })
 
   test("names the four skills, the one sign-in by server, and no views, Jelly RPC, feeds or widgets", () => {
@@ -99,10 +105,12 @@ describe("the jelly declaration", () => {
     }
   })
 
-  test("declares no billing, budget or media field: no key at any depth names one", () => {
+  test("declares no billing, budget or media field but jelly's own top-level cost line: no other key at any depth names one", () => {
     const keys = (value: unknown): string[] =>
       Array.isArray(value) ? value.flatMap(keys) : value !== null && typeof value === "object" ? Object.entries(value).flatMap(([key, item]) => [key, ...keys(item)]) : []
-    expect(keys(jelly).filter((key) => /billing|budget|price|cost|media|spend/i.test(key))).toEqual([])
+    const { cost: _cost, ...rest } = jelly
+    expect(keys(rest).filter((key) => /billing|budget|price|cost|media|spend/i.test(key))).toEqual([])
+    expect(typeof jelly.cost).toBe("string")
   })
 
   test("the summary is one line of 1 to 120 characters", () => {

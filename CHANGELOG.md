@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- **For jelly:** `jelly.cost`, the line jelly shows on the plugin's review before it installs: "Seven tools spend credit
+  on the OpenRouter key you sign in with: send-message, send-batch, send-decision, transcribe-audio, and image, speech
+  and video generation. You set the key's spend cap on OpenRouter's consent page (USD 10 by default); the plugin sets
+  none."
+
 ## [0.0.4] - 2026-11-15
 
 ### Changed

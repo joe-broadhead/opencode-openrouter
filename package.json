@@ -93,6 +93,7 @@
     "title": "OpenRouter",
     "summary": "Live models, routing, test prompts and images through OpenRouter.",
     "icon": "assets/icon.svg",
+    "cost": "Seven tools spend credit on the OpenRouter key you sign in with: send-message, send-batch, send-decision, transcribe-audio, and image, speech and video generation. You set the key's spend cap on OpenRouter's consent page (USD 10 by default); the plugin sets none.",
     "tools": [
       {
         "name": "openrouter.get-endpoint-uptime-history",
