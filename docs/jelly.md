@@ -3,13 +3,18 @@
 [Jelly](https://heyjelly.ai) runs OpenCode agents. It reads the `jelly` section of this package's `package.json` as JSON,
 without loading the plugin, when a person reviews the exact version. Jelly's declaration contracts drop a top-level key
 they don't know, and refuse an unknown key inside a tool, sign-in or `contributes` entry, so the section uses only the
-keys Jelly reads: `title`, `summary`, `icon`, `tools`, `skills`, `rpc`, `views`, `signIns` and `contributes`.
+keys Jelly reads: `title`, `summary`, `icon`, `cost`, `tools`, `skills`, `rpc`, `views`, `signIns` and `contributes`.
 
 Jelly names the plugin **OpenRouter** (`jelly.title`) with the one line in `jelly.summary` and the mark in `jelly.icon`
 (`assets/icon.svg`, shipped in the package). The mark is OpenRouter's own published Volt-on-Ink square glyph, only
 scaled, from https://openrouter.ai/brand, and `opencode.vendor.mark` is `true`. Unofficial; not affiliated with
 OpenRouter. OpenRouter and its logo are trademarks of OpenRouter, Inc., used only to identify the service this plugin
 connects to.
+
+`jelly.cost` is the line Jelly shows on the plugin's review before it installs, in the plugin's own words, saying what
+it costs with OpenRouter: "Seven tools spend credit on the OpenRouter key you sign in with: send-message, send-batch,
+send-decision, transcribe-audio, and image, speech and video generation. You set the key's spend cap on OpenRouter's
+consent page (USD 10 by default); the plugin sets none." It changes nothing Jelly allows.
 
 ## Tools and permissions
 
