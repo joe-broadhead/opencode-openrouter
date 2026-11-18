@@ -1,7 +1,7 @@
 // Pack, install and load the published shape. The tarball holds exactly the files whitelist and installs with
 // lifecycle scripts disabled. Installed alone, it loads in each stock OpenCode release it is tested on, which provides
 // @opencode/plugin, OpenTUI and Solid itself; next to those packages, both entry points also import under Bun.
-// OPENCODE_BIN_2_2_3 to OPENCODE_BIN_2_2_6 name stock binaries; otherwise each release in TESTED_HOSTS is installed
+// OPENCODE_BIN_2_2_3 to OPENCODE_BIN_2_3_2 name stock binaries; otherwise each release in TESTED_HOSTS is installed
 // with npm, once per run. Every temp folder is a git repository under the system's temp folder, so OpenCode's upward
 // search for `.opencode` folders stops there. PACK_TARBALL names a tarball that was already packed to test it instead.
 // On each release a copy of the installed plugin is also pointed at a loopback fake of OpenRouter's MCP and sign-in

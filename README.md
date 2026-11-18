@@ -16,7 +16,7 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 
 ## Requirements
 
-- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
+- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2.
 - An OpenRouter account, to sign in to the MCP server.
 
 ## Install

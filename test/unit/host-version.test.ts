@@ -6,10 +6,10 @@ import { checkHost, isSupportedHost, isTestedHost } from "../../src/host-version
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { opencode: { host: string }; devDependencies: Record<string, string> }
 
 describe("the host range", () => {
-  test("is the package's opencode.host, and the tested list is 2.2.3 to 2.2.7 and 2.3.0", () => {
+  test("is the package's opencode.host, and the tested list is 2.2.3 to 2.2.7, 2.3.0, 2.3.1 and 2.3.2", () => {
     expect(SUPPORTED_HOST).toBe(">=2.2.3 <2.4.0")
     expect(pkg.opencode.host).toBe(SUPPORTED_HOST)
-    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0"])
+    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0", "2.3.1", "2.3.2"])
     expect(pkg.devDependencies["@opencode/plugin"]).toBe(TESTED_HOSTS[0])
   })
 

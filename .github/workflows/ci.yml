@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: 24
           # Caches ~/.npm per OS and architecture. The host and pack stages install @opencode/sdk and the stock
-          # @opencode/cli for each release in TESTED_HOSTS (src/constants.ts: 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0) through npm,
+          # @opencode/cli for each release in TESTED_HOSTS (src/constants.ts: 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2) through npm,
           # so that file is part of the key.
           cache: npm
           cache-dependency-path: |
@@ -61,6 +61,6 @@ jobs:
             src/constants.ts
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4 # the Bun inside stock OpenCode 2.2.3 to 2.2.7 and 2.3.0
+          bun-version: 1.4.4 # the Bun inside stock OpenCode 2.2.3 to 2.2.7, 2.3.0, 2.3.1 and 2.3.2
       - run: npm ci --ignore-scripts
       - run: npm run check
