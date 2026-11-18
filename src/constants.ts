@@ -23,7 +23,7 @@ export const NAMESPACE_DESCRIPTION =
 /** The OpenCode versions the plugin starts on. Equals `opencode.host` in package.json. */
 export const SUPPORTED_HOST = ">=2.2.3 <2.4.0"
 /** The OpenCode releases every check runs on: the one list. Status calls only these "tested". */
-export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0"]
+export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0", "2.3.1", "2.3.2"]
 /** A release outside the tested list but inside the range, used in examples. */
 export const UNTESTED_EXAMPLE = "2.2.99"
 

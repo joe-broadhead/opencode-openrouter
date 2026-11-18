@@ -16,13 +16,13 @@ command and dialog that never call OpenRouter, and script access to the reviewed
 
 ## Requirements
 
-- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
+- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2.
 - An OpenRouter account, to sign in to the MCP server.
 
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.5
+opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.6
 opencode reload
 opencode mcp auth openrouter
 ```
@@ -33,7 +33,7 @@ Or add it to `opencode.json`:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.5",
+      "package": "github:joe-broadhead/opencode-openrouter#v0.0.6",
       "options": { "access": "all", "allowUntestedHost": false }
     }
   ]
@@ -44,7 +44,7 @@ You can also sign in from `/connect` â†’ **OpenRouter tools**, or from `/mcps` â
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
 release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
-with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.4`, then add the new tag with
+with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.5`, then add the new tag with
 `opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
 
 ## Two OpenRouter connections
