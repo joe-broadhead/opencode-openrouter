@@ -18,7 +18,7 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `src/tui.ts` and the status RPC `openrouter.models` / `status`. It reads `PluginState` and OpenCode's own lists
   (`ctx.mcp.list()`, `ctx.tool.list()`, agents, skills), never OpenRouter. The TUI reads the status RPC only; it holds
   event listeners only while the dialog is open, and never reopens a dialog the user closed.
-- **Scripts**: `src/host/tools-rpc.ts` is the family's shared adapter. Its methods are `RPC_TOOLS`; `NATIVE_ONLY`
+- **Scripts**: `src/host/tools-rpc.ts` is OpenRouter's part of the tools RPC. The transport is source-contract's `tools-rpc` module. Its methods are `RPC_TOOLS`; `NATIVE_ONLY`
   (`generate-image`) is never a method and is reported separately in status. The plugin registers it with
   `operationalShapers(guard.assertOperational)`, so the guard runs before every script dispatch.
 - **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`: read at step 2 outside every transform, registered at step 7.
@@ -79,10 +79,9 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   credentials, URL queries or userinfo, controls or bidi characters.
 - **Native-only tools.** A tool whose useful result is media the tools RPC drops (`rpcExclusion: "native-media-required"`)
   or that describes the signed-in key (`"key-metadata"`) is never a script method. A new media generator joins them.
-- **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module several plugins share. Change only its block between
-  the `PLUGIN-SPECIFIC` markers; `scripts/check-copies.mjs` (the `copies` stage) fails when the rest differs from the
-  family's hash, and a change there is made in every plugin at once. `test/unit/tools-rpc.test.ts` is the family's suite,
-  copied unchanged. Keep the RPC id `openrouter.models.tools` and the hyphenated method names: scripts call them by name.
+- **The tools RPC.** `src/host/tools-rpc.ts` is OpenRouter's part of it. The transport is source-contract's `tools-rpc`
+  module, pinned in `package.json` and bundled into `dist/index.js`; change the transport there, never here.
+  `test/unit/tools-rpc.test.ts` is the family's suite. Keep the RPC id `openrouter.models.tools` and the hyphenated method names: scripts call them by name.
   A method's output evidence is the `scriptOutput` column of the catalog; only a signed-in capture may make it
   `live-observed`, and a method whose live result is media leaves `RPC_TOOLS`. The next steps never tell a script to
   repeat `send-message` or `send-feedback` after an uncertain outcome.
@@ -117,9 +116,9 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - `Plugin.image` and profile images; imported OAuth grants;
 - the V1 plugin API: `@opencode-ai/*` packages and hooks such as `tool.execute.before`, `chat.message` or
   `permission.ask`; the deprecated `ctx.generate.text` and `experimental.policies`; importing `@opencode/ai`;
-- a permission hook, except the one `permission.hook("evaluate")` in `src/host/tools-rpc.ts` (and the bundle that inlines
-  it), exactly once each: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny, because no
-  one can answer it, and touches nothing else;
+- a permission hook, except the one `permission.hook("evaluate")` inlined into `dist/index.js` from source-contract's
+  `tools-rpc` module, exactly once: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
+  because no one can answer it, and touches nothing else;
 - computing the host's MCP integration hash in `src/` or `dist/`;
 - references to private host source or host checkouts; machine-local home and temp paths;
 - `.tsx` or `.jsx` files in `dist/`.
