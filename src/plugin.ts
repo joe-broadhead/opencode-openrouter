@@ -16,10 +16,11 @@
 // A failure part-way runs every cleanup accumulated so far, then rethrows one sanitised, actionable error. Unloading
 // blocks the guard first, then undoes the rest.
 import { Plugin } from "@opencode/plugin"
+import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { createGuard, registerGuard, type PolicyHealth } from "./guard.js"
 import { checkHost, type HostCheck } from "./host-version.js"
-import { METHODS, operationalShapers, registerToolsRpc } from "./host/tools-rpc.js"
+import { METHODS, operationalShapers, PLUGIN } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { isOwned, PENDING, registerServer, serverConfig, type EndpointSeam, type ServerObservation } from "./mcp.js"
 import { parseOptions, type Options } from "./options.js"
@@ -173,7 +174,8 @@ export function createOpenRouterPlugin(seam: OpenRouterSeam) {
         // tool hooks, so its input shaper runs the guard itself before every dispatch. A conflicting entry is the user's
         // own server: the RPC refuses it as SERVER_CONFLICT.
         cleanup.defer(
-          await registerToolsRpc(ctx, {
+          await registerToolsRpc(ctx as never, {
+            plugin: PLUGIN,
             methods: METHODS,
             shapers: operationalShapers(guard.assertOperational),
             mcp: { server: SERVER_NAME, managed: () => server.source.type !== "conflict" },

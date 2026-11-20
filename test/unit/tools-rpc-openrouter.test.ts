@@ -1,11 +1,12 @@
-// OpenRouter's part of the tools RPC: the PLUGIN-SPECIFIC block of src/host/tools-rpc.ts, and the module registered the
-// way the plugin registers it. The shared part is tested in tools-rpc.test.ts, a copy of the family's suite. These
-// tests use a narrow fake of the public context whose executor counts dispatches, so "refused before dispatch" is a
-// count of zero, and whose permission check follows the host's last-match rule.
+// OpenRouter's part of the tools RPC: the plugin value in src/host/tools-rpc.ts, registered the way the plugin
+// registers it. The shared transport, the source contract's, is tested in tools-rpc.test.ts. These tests use a narrow
+// fake of the public context whose executor counts dispatches, so "refused before dispatch" is a count of zero, and
+// whose permission check follows the host's last-match rule.
 import { describe, expect, test } from "bun:test"
+import { registerToolsRpc, type ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { PLUGIN_ID as OPENROUTER_PLUGIN_ID, pluginError as guardError, SERVER_NAME } from "../../src/constants.js"
 import { createGuard } from "../../src/guard.js"
-import { METHODS, NEXT_STEPS, operationalShapers, PLUGIN_ID, pluginError, registerToolsRpc, shapeInput, shapeResult, TOOLS_RPC_ID, type ToolCall } from "../../src/host/tools-rpc.js"
+import { METHODS, NEXT_STEPS, operationalShapers, PLUGIN, PLUGIN_ID, pluginError, shapeInput, shapeResult, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import type { ServerSource } from "../../src/mcp.js"
 import { NATIVE_ONLY, REVIEWED_TOOLS, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
@@ -75,7 +76,7 @@ async function setup(options: { access?: "all" | "ask-changes" | "read-only"; se
     location: { directory: "project" },
   }
   const source = options.source ?? (() => ({ type: "plugin" }) as ServerSource)
-  const stop = await registerToolsRpc(ctx as never, { methods: METHODS, shapers: operationalShapers(guard.assertOperational), mcp: { server: SERVER_NAME, managed: () => source().type !== "conflict" } })
+  const stop = await registerToolsRpc(ctx as never, { plugin: PLUGIN, methods: METHODS, shapers: operationalShapers(guard.assertOperational), mcp: { server: SERVER_NAME, managed: () => source().type !== "conflict" } })
   const error = (type: string, message: string, data: unknown) => ({ type, message, data })
   const call = (method: string, input: unknown = {}) => handlers[method]!({ sessionID: "ses_1", input }, { signal: new AbortController().signal, error })
   return { contract: contract!, handlers, call, dispatched, evaluations, guard, stop, describe: (input: unknown = {}) => handlers.describe!(input, { signal: new AbortController().signal, error }) }
