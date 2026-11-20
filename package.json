@@ -83,7 +83,7 @@
     "@opencode/sdk": "2.2.3",
     "@opentui/core": "0.8.0",
     "@opentui/solid": "0.8.0",
-    "@we-the-rebel-alliance/source-contract": "github:we-the-rebel-alliance/source-contract#v0.2.0",
+    "@we-the-rebel-alliance/source-contract": "github:we-the-rebel-alliance/source-contract#v0.3.0",
     "@types/bun": "1.4.4",
     "@types/node": "24.19.2",
     "esbuild": "0.28.2",

@@ -7,7 +7,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The tools RPC transport is source-contract's `tools-rpc` module, pinned to `v0.2.0` and bundled into `dist/index.js`. `src/host/tools-rpc.ts` is OpenRouter's part of it. The vendored copy and its `check-copies` pin are gone. Spend rules are unchanged.
+- The tools RPC transport is source-contract's `tools-rpc` module, pinned at `v0.3.0` and bundled into `dist/index.js`. `src/host/tools-rpc.ts` is OpenRouter's part of it. The vendored copy and its `check-copies` pin are gone. Spend rules are unchanged.
 
 ## [0.0.6] - 2026-11-18
 
