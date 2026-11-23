@@ -1,8 +1,8 @@
 {
   "name": "@joe-broadhead/opencode-openrouter",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
-  "description": "Unofficial OpenCode plugin for OpenRouter's hosted MCP server: live models, endpoints, routing, documentation, test prompts and images, with ask-first defaults for billable tools",
+  "description": "Unofficial OpenCode plugin for OpenRouter's hosted MCP server: model and routing lookups, test prompts and media generation, with optional approval for billable calls",
   "keywords": [
     "opencode",
     "opencode-plugin",
