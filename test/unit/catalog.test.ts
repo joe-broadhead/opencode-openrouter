@@ -105,7 +105,7 @@ describe("the reviewed catalog", () => {
   })
 
   test("the Code Mode namespace text names the spend class without listing every spending tool", () => {
-    expect(NAMESPACE_DESCRIPTION).toContain("send-*, transcribe-audio and generate-* bill the account")
+    expect(NAMESPACE_DESCRIPTION).toContain("send-message, send-batch, send-decision, transcribe-audio and generate-* bill the account; send-feedback does not")
     expect(NAMESPACE_DESCRIPTION.length).toBeLessThanOrEqual(400)
     expect(NAMESPACE_DESCRIPTION).not.toContain("direct tool")
   })
