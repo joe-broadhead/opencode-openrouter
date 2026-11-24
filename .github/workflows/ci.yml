@@ -35,6 +35,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.5 # the Bun the suite and the bundle are developed on
+          no-cache: true # the cached 1.4.5 toolchain restores without its binary on this runner
       # actionlint is not on the runner; install the pinned release, checked against its published checksums, so the
       # check's `lint:actions` stage runs the workflow lint here as well.
       - name: Install actionlint
