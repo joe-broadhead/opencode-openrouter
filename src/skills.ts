@@ -11,7 +11,7 @@ import { reasonOf } from "./redact.js"
 /** `skills/` at the package root, next to `dist/` (and next to `src/` in the repository). */
 export const SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url))
 
-/** The skills the plugin ships, in the order the Jelly declaration lists them. */
+/** The skills the plugin ships, in the order the legacy declaration lists them. */
 export const SKILL_NAMES: readonly string[] = ["openrouter", "openrouter-evaluate", "openrouter-images", "openrouter-troubleshoot"]
 
 /** What became of one packaged skill. `shadowed` means a skill with the same name, at `shadowedBy`, is the one in use. */

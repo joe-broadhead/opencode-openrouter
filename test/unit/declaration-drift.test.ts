@@ -1,8 +1,8 @@
-// The Jelly declaration against the committed live capture, with no catalog in between: every tool OpenRouter's server
-// listed is declared, every declared tool was listed, and each declared `readOnly` is the server's own `readOnlyHint`.
-// Jelly enforces the declaration without loading the plugin, so a served tool that is not declared, or a write declared
-// read-only, would escape its read-only-helper fence. The family's shared drift check (a kit script) will replace this
-// test; until then it reads the same two files the same way.
+// The legacy declaration against the committed live capture, with no catalog in between: every tool OpenRouter's
+// server listed is declared, every declared tool was listed, and each declared `readOnly` is the server's own
+// `readOnlyHint`. The legacy host enforces the declaration without loading the plugin, so a served tool that is not
+// declared, or a write declared read-only, would escape its read-only-helper fence. The family's shared drift check (a
+// kit script) will replace this test; until then it reads the same two files the same way.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { SERVER_NAME } from "../../src/constants.js"

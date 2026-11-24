@@ -21,31 +21,8 @@ reviewed tools through a tools RPC.
 
 ## Install
 
-There is no release yet. Until `v0.0.0` is published, install a checkout of `master`:
-
-```sh
-git clone https://github.com/we-the-rebel-alliance/openrouter-plugin
-opencode plugin add /path/to/openrouter-plugin
-opencode reload
-opencode mcp auth openrouter
-```
-
-A published release installs from its tag, `github:we-the-rebel-alliance/openrouter-plugin#v<version>`.
-
-Or add the checkout to `opencode.json`:
-
-```json
-{
-  "plugins": [
-    {
-      "package": "/path/to/openrouter-plugin",
-      "options": { "access": "all", "allowUntestedHost": false }
-    }
-  ]
-}
-```
-
-You can also sign in from `/connect` → **OpenRouter tools**, or from `/mcps` → `openrouter`.
+Install from a release: `opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v<version>`. The first
+release on plugin-contract is v0.0.0 (phase 4b).
 
 ## Two OpenRouter connections
 
@@ -58,8 +35,8 @@ OpenCode can hold two separate OpenRouter credentials, and this plugin uses only
 - **OpenRouter** is OpenCode's built-in model provider, for chatting with OpenRouter's models. OpenCode manages its key
   separately; this plugin never reads or changes it.
 
-OpenCode 2.4.1 passes the server's instructions to the model verbatim and offers no override. OpenRouter's server text
-makes no claim on another owner's job, so the plugin adds no counter text of its own.
+OpenCode 2.4.1 passes the server's instructions to the model verbatim and offers no override: the plugin cannot drop or
+replace them. Its namespace line only marks results as untrusted data, never instructions.
 
 ## Options
 
@@ -75,8 +52,8 @@ An unknown option, or a wrong value, stops the plugin with `OPTIONS_INVALID` and
 Every reviewed tool has exactly one spend class in `src/openrouter-tools.ts`: `spend` (one call bills the OpenRouter
 account) or not. The seven spending tools are `send-message`, `send-batch`, `send-decision`, `transcribe-audio`,
 `generate-image`, `generate-speech` and `generate-video`; `send-feedback` sends feedback and spends nothing; every other
-tool is a free read. The default rules, status, the skills, these docs and the Jelly cost line derive the same
-classification from that one table, so no surface keeps its own copy.
+tool is a free read. The default rules, status and the skills derive the same classification from that one table;
+these docs and the legacy cost line are checked against it, so no surface keeps its own copy.
 
 The plugin adds one block of rules to every agent that starts from OpenCode's base allow (`* * allow`), right after that
 rule, so everything after it still wins: the agent's own stricter rules, your `permissions`, a session's rules and saved

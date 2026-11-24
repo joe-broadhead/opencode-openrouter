@@ -1,5 +1,5 @@
 // The one reviewed record of OpenRouter's MCP tools. No imports: everything else (default rules, script methods, status
-// counts and the Jelly declaration) derives from this table, never from a hand-written copy.
+// counts and the legacy declaration) derives from this table, never from a hand-written copy.
 //
 // Evidence: the 31 names, with their descriptions, schemas and annotations, come from a signed-in, read-only capture of
 // OpenRouter's MCP server (test/fixtures/live-tools.json, 2026-11-12); 17 of them are also on OpenRouter's MCP page

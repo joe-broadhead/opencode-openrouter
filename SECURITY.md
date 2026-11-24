@@ -37,5 +37,5 @@ while the plugin's default rules are not in place. The plugin itself enforces no
 ## Secrets
 
 Never put an OpenRouter key in a script, a config file or an agent prompt. Sign in with `/connect` → **OpenRouter tools**,
-or `opencode mcp auth openrouter`; OpenCode stores and refreshes the credential. The plugin's checks use a loopback fake
-and no real credential.
+or `opencode mcp auth openrouter`; OpenCode stores the credential. The MCP key has no refresh and lasts at most seven
+days, so sign in again when it lapses. The plugin's checks use a loopback fake and no real credential.

@@ -1,4 +1,4 @@
-// The shipped skills: exactly the four, loadable, named after their folders, plain files, listed in the Jelly
+// The shipped skills: exactly the four, loadable, named after their folders, plain files, listed in the legacy
 // declaration and the package whitelist, and never naming a tool the reviewed catalog does not have.
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
@@ -26,7 +26,7 @@ function mentioned(text: string) {
 }
 
 describe("the shipped skills", () => {
-  test("are exactly the four, each a single SKILL.md, and exactly the Jelly declaration's list", () => {
+  test("are exactly the four, each a single SKILL.md, and exactly the legacy declaration's list", () => {
     expect(readdirSync(SKILLS_DIR).sort()).toEqual([...SKILL_NAMES].sort())
     for (const name of SKILL_NAMES) expect(readdirSync(join(SKILLS_DIR, name))).toEqual(["SKILL.md"])
     expect(pkg.jelly.skills).toEqual([...SKILL_NAMES])
@@ -113,7 +113,7 @@ describe("the shipped skills", () => {
     for (const tool of SPEND_TOOLS) expect(troubleshoot).toContain(`\`${tool}\``)
   })
 
-  test("name no script surface for the image tool, and keep it out of Code Mode", () => {
+  test("advertise no script or Code Mode call surface for the image tool", () => {
     const images = read("openrouter-images")
     expect(images).toContain("`openrouter_generate-image`")
     expect(images).not.toContain('tools.openrouter["generate-image"]')

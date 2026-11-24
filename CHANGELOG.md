@@ -12,9 +12,9 @@ install it as a new plugin.
 
 - The plugin package is `@we-the-rebel-alliance/openrouter-plugin` and starts at `0.0.0`.
 - One explicit spend class per reviewed OpenRouter tool, in `src/openrouter-tools.ts`: `spend` bills the OpenRouter
-  account, and when in doubt a tool is `spend`. The default rules, status (a `Spend` line), the skills, the docs and the
-  Jelly cost line derive it from that one column, and `actionEffectOf` maps each change to the contract effect it will
-  take (`spend`, or `notify` for feedback).
+  account, and when in doubt a tool is `spend`. The default rules, status (a `Spend` line) and the skills derive it
+  from that one column; the docs and the legacy cost line are checked against it. `actionEffectOf` maps each change to
+  the contract effect it will take (`spend`, or `notify` for feedback).
 - Status reports the spend class of the tools that bill the account and the access mode they run under.
 
 ### Changed
@@ -28,7 +28,7 @@ install it as a new plugin.
 
 ### Removed
 
-- `docs/jelly.md` and the old host-contract matrix; [docs/scripting.md](docs/scripting.md) is the remaining guide, and
+- The legacy app guide and the old host-contract matrix; [docs/scripting.md](docs/scripting.md) is the remaining guide, and
   the full docs set comes with the plugin-contract manifest.
 - The retired Jobs product from the scripting guide; a script is an automation, a shell script or any OpenCode client.
 - The release history before `0.0.0`. The repository keeps its history; the changelog starts here.

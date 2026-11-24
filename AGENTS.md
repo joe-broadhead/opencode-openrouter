@@ -64,7 +64,8 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - **Transforms are cheap, synchronous and never throw.** No file reads, network calls, awaited work or new timers in a
   transform callback. Record failures for status instead. A replay replaces what it observed, never appends.
 - **`src/openrouter-tools.ts` is the one record of OpenRouter's tools**, with no imports. Everything else derives from
-  it: the default rules, the script methods, status counts, the spend line and the Jelly declaration. Its 31 names, and
+  it: the default rules, the script methods, status counts, the spend line and the legacy declaration's tools. Its 31
+  names, and
   each tool's class, come from the signed-in capture in `test/fixtures/live-tools.json` (descriptions, schemas and
   annotations). Each tool has exactly one spend class: `spend: true` bills the OpenRouter account, and when in doubt it
   is true. `actionEffectOf` maps a change to the contract's `actions[].effect` (`spend`, or `notify` for feedback) from
@@ -74,11 +75,11 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `FREE_READS` (`scripts/live-catalog.ts`) and refuses every other `tools/call` before it is sent. A script method's
   `scriptOutput` becomes `live-observed` only when `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms
   it.
-- **The `jelly` section** of `package.json` is still carried for the old app: it declares every reviewed tool, the
-  skills, the sign-in, the `access` setting, a one-line `summary` and the `icon`, with only the keys Jelly reads, and its
-  `cost` line states the spend class. `test/unit/jelly.test.ts` keeps it in step with the catalog, and
-  `test/unit/declaration-drift.test.ts` with the committed live capture. It is removed with the plugin-contract
-  manifest; do not add to it.
+- **The legacy `jelly` declaration** in `package.json` is still carried: it declares every reviewed tool, the skills,
+  the sign-in, the `access` setting, a one-line `summary` and the `icon`, with only the keys that declaration reads, and
+  its `cost` line names the seven spending tools. `test/unit/jelly.test.ts` keeps it in step with the catalog and the
+  cost line, and `test/unit/declaration-drift.test.ts` with the committed live capture; the copied `test/support/jelly-*`
+  tooling stays with it. It is removed in 4b with the plugin-contract manifest; do not add to it.
 - **Errors** read `CODE: What happened. Next step: What to do.`, built by `pluginError`, `errorText` or `codeText`.
   `CODES` in `src/constants.ts` is the one table, and the README's `Errors` table is checked equal to it.
 - **Redaction.** Host or network text is shown only through `src/redact.ts`: one line, at most 160 characters, no

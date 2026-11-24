@@ -28,14 +28,21 @@ describe("the README", () => {
     expect(table(readme, "Errors")).toEqual(Object.entries(CODES).map(([code, { when }]) => [`\`${code}\``, when]))
   })
 
-  test("names the new repository and package, and claims no unpublished release", () => {
+  test("names the new repository and package, and installs only from a release tag", () => {
     expect(readme).toContain("we-the-rebel-alliance/openrouter-plugin")
-    expect(readme).toContain("There is no release yet")
-    expect(readme).toContain("github:we-the-rebel-alliance/openrouter-plugin#v<version>")
-    expect(readme).not.toContain("joe-broadhead")
-    expect(readme).not.toContain("opencode-openrouter")
     expect(readme).toContain("## Install\n")
     expect(readme).toContain("## Known limits")
+    const flat = readme.replace(/\s+/g, " ")
+    expect(flat).toContain(
+      "Install from a release: `opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v<version>`. The first release on plugin-contract is v0.0.0 (phase 4b).",
+    )
+    // Never an untagged or master checkout, and never a local path.
+    expect(readme).not.toContain("git clone")
+    expect(readme).not.toContain("/path/to/openrouter-plugin")
+    expect(readme).not.toContain("checkout of `master`")
+    expect(readme).not.toMatch(/opencode plugin add (?!github:we-the-rebel-alliance\/openrouter-plugin#v<version>)/)
+    expect(readme).not.toContain("joe-broadhead")
+    expect(readme).not.toContain("opencode-openrouter")
   })
 
   test("names the endpoint and the two OpenRouter connections", () => {
@@ -115,6 +122,10 @@ describe("every doc", () => {
       const fileLinks = urls.filter((url) => /\/(?:blob|tree)\//.test(url))
       for (const url of fileLinks) expect({ path, url }).toEqual({ path, url: expect.stringContaining(`https://github.com/${REPOSITORY}/blob/master/`) })
     }
+  })
+
+  test("names no app", () => {
+    for (const path of DOCS) expect({ path, app: /\b(?:Jelly|Memory|Artifacts)\b/.test(read(path)) }).toEqual({ path, app: false })
   })
 
   test("names a release tag only in the placeholder form, never an unpublished one", () => {

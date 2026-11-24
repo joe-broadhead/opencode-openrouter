@@ -1,11 +1,12 @@
-// The `jelly` section of package.json, which Jelly reads without loading the plugin. Every entry derives from the one
-// catalog and the default rules under the default access, all, so these tests keep them in step: every tool is `allow`,
-// and `readOnly` is the catalog's read class, which the live capture's readOnlyHint confirms (declaration-drift.test.ts).
+// The legacy `jelly` section of package.json, which the legacy host reads without loading the plugin. Every entry
+// derives from the one catalog and the default rules under the default access, all, so these tests keep them in step:
+// every tool is `allow`, and `readOnly` is the catalog's read class, which the live capture's readOnlyHint confirms
+// (declaration-drift.test.ts).
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
 import { nativeToolId } from "../../src/mcp.js"
-import { READ_TOOLS, REVIEWED_TOOLS, SPEND_TOOLS } from "../../src/openrouter-tools.js"
+import { READ_TOOLS, REVIEWED_TOOLS, SPEND_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { ACCESS, DEFAULT_ACCESS, parseOptions } from "../../src/options.js"
 import { BASE_ALLOW, defaultRules, lastMatch } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
@@ -17,7 +18,7 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
 }
 const { jelly } = pkg
 
-describe("the jelly declaration", () => {
+describe("the legacy declaration", () => {
   test("declares all 31 reviewed tools once, in catalog order, and no tool the catalog has not reviewed", () => {
     expect(jelly.tools.map((tool) => tool.permission)).toEqual(REVIEWED_TOOLS.map((tool) => nativeToolId(tool.name)))
     expect(jelly.tools).toHaveLength(31)
@@ -43,7 +44,7 @@ describe("the jelly declaration", () => {
     expect(jelly.tools.every((tool) => tool.effect === "allow")).toBe(true)
   })
 
-  test("uses only the keys Jelly reads: its contracts strip any other, and refuse an unknown key inside an entry", () => {
+  test("uses only the keys the declaration reads: its contract strips any other, and refuses an unknown key inside an entry", () => {
     expect(Object.keys(jelly).sort()).toEqual(["contributes", "cost", "icon", "rpc", "signIns", "skills", "summary", "title", "tools", "views"])
   })
 
@@ -53,7 +54,16 @@ describe("the jelly declaration", () => {
     expect(jelly.cost).not.toContain("\n")
   })
 
-  test("names the four skills, the one sign-in by server, and no views, Jelly RPC, feeds or widgets", () => {
+  test("the legacy cost line names exactly the seven spending tools, and send-feedback as feedback", () => {
+    expect(SPEND_TOOLS).toHaveLength(7)
+    for (const name of SPEND_TOOLS) expect(jelly.cost).toContain(name)
+    expect(jelly.cost).toContain("send-feedback sends feedback")
+    expect(jelly.cost).toContain("spends nothing")
+    const named = TOOL_NAMES.filter((name) => jelly.cost.includes(name)).sort()
+    expect(named).toEqual([...SPEND_TOOLS, "send-feedback"].sort())
+  })
+
+  test("names the four skills, the one sign-in by server, and no views, declaration RPC, feeds or widgets", () => {
     expect(jelly.title).toBe("OpenRouter")
     expect(jelly.icon).toBe("assets/icon.svg")
     expect(jelly.skills).toEqual([...SKILL_NAMES])
@@ -62,7 +72,8 @@ describe("the jelly declaration", () => {
     // says MCP.
     expect(jelly.signIns).toEqual([{ id: SERVER_NAME, label: DISPLAY_NAME, server: SERVER_NAME }])
     expect(jelly.signIns[0]!.label).not.toMatch(/\bMCP\b/i)
-    // The plugin's own status and tools RPCs are host RPCs; Jelly's rpc list is a different surface and stays empty.
+    // The plugin's own status and tools RPCs are host RPCs; the declaration's rpc list is a different surface and
+    // stays empty.
     expect(jelly.rpc).toEqual([])
     expect(jelly.views).toEqual([])
     expect(jelly.contributes).toEqual({
@@ -82,7 +93,7 @@ describe("the jelly declaration", () => {
     })
   })
 
-  test("the settings pass Jelly's setting contract, and access offers Jelly's three choices with the plugin's default", () => {
+  test("the settings pass the declaration's setting contract, and access offers its three choices with the plugin's default", () => {
     const { settings } = jelly.contributes as { settings: PluginSetting[] }
     expect(settingsProblems(settings)).toEqual([])
     const access = settings.find((setting) => setting.key === "access")!
@@ -105,7 +116,7 @@ describe("the jelly declaration", () => {
     }
   })
 
-  test("declares no spend, budget or media field but jelly's own top-level cost line: no other key at any depth names one", () => {
+  test("declares no spend, budget or media field but the declaration's own top-level cost line: no other key at any depth names one", () => {
     const keys = (value: unknown): string[] =>
       Array.isArray(value) ? value.flatMap(keys) : value !== null && typeof value === "object" ? Object.entries(value).flatMap(([key, item]) => [key, ...keys(item)]) : []
     const { cost: _cost, ...rest } = jelly
