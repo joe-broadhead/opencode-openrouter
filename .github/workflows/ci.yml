@@ -48,6 +48,9 @@ jobs:
           curl -sSfLO "${base}/actionlint_${VERSION}_checksums.txt"
           grep " actionlint_${VERSION}_linux_amd64.tar.gz$" "actionlint_${VERSION}_checksums.txt" | sha256sum -c -
           tar xzf "actionlint_${VERSION}_linux_amd64.tar.gz" actionlint
-          sudo install -m 0755 actionlint /usr/local/bin/actionlint
+          # A writable folder on PATH: the public runner has no passwordless sudo, and a stock runner needs none.
+          mkdir -p "$RUNNER_TEMP/bin"
+          install -m 0755 actionlint "$RUNNER_TEMP/bin/actionlint"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - run: npm ci --ignore-scripts
       - run: npm run check
