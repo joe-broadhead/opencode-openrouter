@@ -1,10 +1,10 @@
 // The operational guard: under ask-changes and read-only, health starts blocked and opens only with an owned server and
 // applied rules, and a tool that cannot be decorated is removed rather than left unguarded; under the default all it
 // holds nothing back. The decorator captures the original inside each pass, checks first, delegates exactly once and
-// returns its result unchanged; replays never stack; only owned OpenRouter tools are decorated; and the image tool
-// becomes direct only for an owned server.
+// returns its result unchanged; replays never stack; only owned OpenRouter tools are decorated; and every tool's options
+// are left exactly as the host made them.
 import { describe, expect, test } from "bun:test"
-import { createGuard, guardTools, IMAGE_TOOL, isOwnedOpenRouterTool, registerGuard } from "../../src/guard.js"
+import { createGuard, guardTools, isOwnedOpenRouterTool, registerGuard } from "../../src/guard.js"
 import type { ServerSource } from "../../src/mcp.js"
 import { transforms } from "./fake.js"
 
@@ -15,7 +15,8 @@ const PLUGIN: ServerSource = { type: "plugin" }
 const CONFLICT: ServerSource = { type: "conflict", safeDescription: "points elsewhere" }
 
 /** A tool editor over fresh tools, as each host rebuild makes them; `calls` counts the host executors' dispatches. */
-/** The OpenRouter tools in `registry()`: ping, send-message and the image tool. */
+/** The OpenRouter tools in `registry()`: ping, send-message and generate-image. */
+const IMAGE = "openrouter_generate-image"
 const TOOL_COUNT = 3
 
 function registry(extra: Tool[] = []) {
@@ -33,7 +34,7 @@ function registry(extra: Tool[] = []) {
     },
   })
   const tools = new Map<string, Tool>(
-    [tool("openrouter_ping"), tool("openrouter_send-message"), tool(IMAGE_TOOL, { namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" }), tool("openrouter_x_other", { namespace: "openrouter_x" }), tool("github_issue"), ...extra].map((item) => [item.id, item]),
+    [tool("openrouter_ping"), tool("openrouter_send-message"), tool(IMAGE, { namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" }), tool("openrouter_x_other", { namespace: "openrouter_x" }), tool("github_issue"), ...extra].map((item) => [item.id, item]),
   )
   const editor = {
     list: () => [...tools.values()],
@@ -187,13 +188,13 @@ describe("the decorator", () => {
     const originals = new Map([...tools].map(([id, tool]) => [id, tool.execute]))
     guardTools(editor as never, PLUGIN, guard.assertOperational)
     const changed = [...tools].filter(([id, tool]) => tool.execute !== originals.get(id)).map(([id]) => id).sort()
-    expect(changed).toEqual([IMAGE_TOOL, "openrouter_ping", "openrouter_send-message"])
+    expect(changed).toEqual([IMAGE, "openrouter_ping", "openrouter_send-message"])
 
     const other = registry()
     const before = new Map([...other.tools].map(([id, tool]) => [id, tool.execute]))
     guardTools(other.editor as never, CONFLICT, guard.assertOperational)
     expect([...other.tools].every(([id, tool]) => tool.execute === before.get(id))).toBe(true)
-    expect(other.tools.get(IMAGE_TOOL)!.options).toMatchObject({ codemode: true, pinned: true })
+    expect(other.tools.get(IMAGE)!.options).toMatchObject({ codemode: true, pinned: true })
   })
 
   test("a pending entry's tools are decorated, so none is ever exposed unguarded, but the image tool stays as it is", () => {
@@ -202,7 +203,7 @@ describe("the decorator", () => {
     const original = tools.get("openrouter_ping")!.execute
     guardTools(editor as never, { type: "pending" }, guard.assertOperational)
     expect(tools.get("openrouter_ping")!.execute).not.toBe(original)
-    expect(tools.get(IMAGE_TOOL)!.options).toEqual({ namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" })
+    expect(tools.get(IMAGE)!.options).toEqual({ namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" })
     expect(isOwnedOpenRouterTool({ id: "openrouter_ping", options: { namespace: "openrouter" } }, { type: "disabled" })).toBe(false)
     expect(isOwnedOpenRouterTool({ id: "openrouter_x_other", options: { namespace: "openrouter_x" } }, PLUGIN)).toBe(false)
   })
@@ -254,12 +255,12 @@ describe("the decorator", () => {
     expect(guardTools(editor as never, PLUGIN, guard.assertOperational).unnamespaced).toHaveLength(20)
   })
 
-  test("makes the owned image tool direct: codemode false, pinned removed, permission and namespace kept", () => {
+  test("leaves every tool's options exactly as the host made them: nothing is pinned and nothing is forced out of Code Mode", () => {
     const guard = healthy()
     for (const source of [PLUGIN, { type: "adopted", signIn: "oauth" } as ServerSource]) {
       const { tools, editor } = registry()
       guardTools(editor as never, source, guard.assertOperational)
-      expect(tools.get(IMAGE_TOOL)!.options).toEqual({ namespace: "openrouter", permission: "openrouter_generate-image", codemode: false })
+      expect(tools.get(IMAGE)!.options).toEqual({ namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" })
       expect(tools.get("openrouter_ping")!.options).toEqual({ namespace: "openrouter", codemode: true })
     }
   })
@@ -292,10 +293,10 @@ describe("the decorator", () => {
     const { tools, editor } = registry()
     tool.run(editor as never)
     expect(guard.operational()).toBe(true)
-    expect(tools.get(IMAGE_TOOL)!.options?.codemode).toBe(false)
+    expect(tools.get(IMAGE)!.options).toEqual({ namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" })
     source = CONFLICT
     const other = registry()
     tool.run(other.editor as never)
-    expect(other.tools.get(IMAGE_TOOL)!.options?.codemode).toBe(true)
+    expect(other.tools.get(IMAGE)!.options).toEqual({ namespace: "openrouter", codemode: true, pinned: true, permission: "openrouter_generate-image" })
   })
 })

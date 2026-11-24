@@ -23,7 +23,7 @@ import {
   type LiveTool,
 } from "../../scripts/live-catalog.js"
 import { ENDPOINT } from "../../src/constants.js"
-import { BILLABLE_TOOLS, CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, READ_TOOLS, REVIEWED_TOOLS, RPC_TOOLS } from "../../src/openrouter-tools.js"
+import { SPEND_TOOLS, CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, READ_TOOLS, REVIEWED_TOOLS, RPC_TOOLS } from "../../src/openrouter-tools.js"
 import { canonicalJson, sha256 } from "./canonical.js"
 
 const FIXTURE = new URL("../fixtures/live-tools.json", import.meta.url)
@@ -37,9 +37,9 @@ const tool = (name: string): LiveTool => recordTool({ name, description: `about 
 const fits = { called: true, isError: false, contentTypes: ["text"], structured: null, text: { length: 2, json: null } }
 
 describe("the capture's limits", () => {
-  test("calls only reads, never a billable, feedback or recipe-that-runs tool", () => {
+  test("calls only reads, never a spending, feedback or recipe-that-runs tool", () => {
     for (const name of FREE_READS) expect(READ_TOOLS).toContain(name)
-    for (const name of [...BILLABLE_TOOLS, ...CHANGE_TOOLS, "spawn-ori-eval"]) {
+    for (const name of [...SPEND_TOOLS, ...CHANGE_TOOLS, "spawn-ori-eval"]) {
       expect(FREE_READS).not.toContain(name)
       expect(NEVER_CALLED).toContain(name)
     }

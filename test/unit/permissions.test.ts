@@ -3,7 +3,7 @@
 // strict agents left alone, and unguarded agents told apart from an explicit user allow.
 import { describe, expect, test } from "bun:test"
 import { nativeToolId } from "../../src/mcp.js"
-import { BILLABLE_TOOLS, CHANGE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
+import { SPEND_TOOLS, CHANGE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
 import { ACCESS, type Access } from "../../src/options.js"
 import type { ServerSource } from "../../src/mcp.js"
 import { applyDefaultRules, BASE_ALLOW, BASELINE_ACTION, defaultRules, hasDefaultRules, insertRules, lastMatch, registerDefaultRules, rulesApply, agentCoverage, type Rule } from "../../src/permissions.js"
@@ -11,7 +11,7 @@ import { transforms } from "./fake.js"
 
 const rule = (action: string, effect: Rule["effect"]): Rule => ({ action, resource: "*", effect })
 const UNKNOWN = nativeToolId("tool-added-later")
-const FEEDBACK = CHANGE_TOOLS.filter((name) => !BILLABLE_TOOLS.includes(name))
+const FEEDBACK = CHANGE_TOOLS.filter((name) => !SPEND_TOOLS.includes(name))
 
 /** The host's last-match result for one action under `rules`, with no match asking. */
 const decide = (rules: readonly Rule[], action: string) => lastMatch(rules, action)?.effect ?? "ask"
@@ -27,18 +27,18 @@ describe("the generated block", () => {
     }
   })
 
-  test("follows the access matrix: reads allowed everywhere; billable tools, media, feedback and unknown tools deny, ask or allow", () => {
+  test("follows the access matrix: reads allowed everywhere; spending tools, media, feedback and unknown tools deny, ask or allow", () => {
     const expected: Record<Access, Rule["effect"]> = { "read-only": "deny", "ask-changes": "ask", all: "allow" }
     for (const access of ACCESS) {
       const rules = [BASE_ALLOW, ...defaultRules(access)]
       for (const name of READ_TOOLS) expect({ access, name, effect: decide(rules, nativeToolId(name)) }).toEqual({ access, name, effect: "allow" })
-      for (const name of [...BILLABLE_TOOLS, ...FEEDBACK]) expect({ access, name, effect: decide(rules, nativeToolId(name)) }).toEqual({ access, name, effect: expected[access] })
+      for (const name of [...SPEND_TOOLS, ...FEEDBACK]) expect({ access, name, effect: decide(rules, nativeToolId(name)) }).toEqual({ access, name, effect: expected[access] })
       expect({ access, effect: decide(rules, UNKNOWN) }).toEqual({ access, effect: expected[access] })
       // Another server's tools are not matched.
       expect(decide(rules, "github_create_issue")).toBe("allow")
     }
     // The live server's spenders: speech, video, batches, decisions and transcription ask under ask-changes, like send-message.
-    expect([...BILLABLE_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-message", "transcribe-audio"])
+    expect([...SPEND_TOOLS].sort()).toEqual(["generate-image", "generate-speech", "generate-video", "send-batch", "send-decision", "send-message", "transcribe-audio"])
     expect(FEEDBACK).toEqual(["send-feedback"])
     const askChanges = [BASE_ALLOW, ...defaultRules("ask-changes")]
     for (const name of ["generate-speech", "generate-video", "send-batch", "send-decision", "transcribe-audio"]) expect({ name, effect: decide(askChanges, nativeToolId(name)) }).toEqual({ name, effect: "ask" })

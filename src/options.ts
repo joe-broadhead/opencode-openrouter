@@ -3,7 +3,7 @@ import { pluginError } from "./constants.js"
 /** How much the default rules restrict OpenRouter's tools: allow all, ask before a change, or deny every change. */
 export const ACCESS = ["all", "ask-changes", "read-only"] as const
 export type Access = (typeof ACCESS)[number]
-/** The family default: every tool is allowed, billable inference and feedback included. People narrow it with `access`. */
+/** The family default: every tool is allowed, spending calls and feedback included. People narrow it with `access`. */
 export const DEFAULT_ACCESS: Access = "all"
 
 export interface Options {
@@ -12,7 +12,7 @@ export interface Options {
   readonly access: Access
 }
 
-const EXAMPLE = `"plugins": [{ "package": "github:joe-broadhead/opencode-openrouter#v0.0.7", "options": { "access": "ask-changes" } }]`
+const EXAMPLE = `"plugins": [{ "package": "github:we-the-rebel-alliance/openrouter-plugin#v<version>", "options": { "access": "ask-changes" } }]`
 const ACCEPTED = {
   access: `${ACCESS.map((value) => `"${value}"`).join(", ")}, with "${DEFAULT_ACCESS}" the default`,
   allowUntestedHost: "true or false (the default)",

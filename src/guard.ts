@@ -11,7 +11,7 @@
 // they follow already does), so the guard holds nothing back either: only an unloaded plugin stops a call.
 import type { Plugin } from "@opencode/plugin"
 import { errorText, pluginError, SERVER_NAME } from "./constants.js"
-import { namespaceOf, nativeToolId, type ServerSource } from "./mcp.js"
+import { namespaceOf, type ServerSource } from "./mcp.js"
 import type { Access } from "./options.js"
 import { reasonOf, shortReason } from "./redact.js"
 
@@ -23,9 +23,6 @@ export interface PolicyHealth {
   /** Diagnostics for status, in the `CODE: What happened. Next step: …` form. Empty while healthy. */
   readonly problems: readonly string[]
 }
-
-/** The image tool runs only as a direct tool: Code Mode's result path is not shown to keep its image. */
-export const IMAGE_TOOL = nativeToolId("generate-image")
 
 const NAMESPACE = namespaceOf(SERVER_NAME)
 
@@ -157,12 +154,12 @@ export interface GuardPass {
 const NAME_LIMIT = 20
 
 /**
- * One tool transform pass: decorates every owned OpenRouter tool's executor in place, and makes the image tool direct.
- * The original executor is captured inside this pass, before the assignment, and called exactly once; the wrapper never
- * calls the field it replaced, so replays never stack. Everything else about the tool (id, name, description, input and
- * output schema, options, permission) is left as the host made it. While the guard is `enforced`, a tool that cannot be
- * decorated is removed, so it can never run unguarded; under `access: "all"` it is left as it is. Synchronous and never
- * throws.
+ * One tool transform pass: decorates every owned OpenRouter tool's executor in place. The original executor is captured
+ * inside this pass, before the assignment, and called exactly once; the wrapper never calls the field it replaced, so
+ * replays never stack. Everything about the tool (id, name, description, input and output schema, options, permission)
+ * is left as the host made it: nothing is pinned, nothing is forced out of Code Mode. While the guard is `enforced`, a
+ * tool that cannot be decorated is removed, so it can never run unguarded; under `access: "all"` it is left as it is.
+ * Synchronous and never throws.
  */
 export function guardTools(editor: Tools, source: ServerSource, assertOperational: () => void, enforced = true): GuardPass {
   const failures: string[] = []
@@ -184,11 +181,6 @@ export function guardTools(editor: Tools, source: ServerSource, assertOperationa
         draft.execute = async (input, context) => {
           assertOperational()
           return original(input, context)
-        }
-        // Only for the actual image tool of the plugin's own or the user's exact entry.
-        if (tool.id === IMAGE_TOOL && (source.type === "plugin" || source.type === "adopted")) {
-          const { pinned: _pinned, ...options } = draft.options ?? {}
-          draft.options = { ...options, codemode: false }
         }
       })
     } catch (error) {

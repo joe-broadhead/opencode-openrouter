@@ -1,6 +1,6 @@
 # Scripting
 
-A script can call OpenRouter's reviewed tools with no model: a Jobs script, a shell script, or any program that can
+A script can call OpenRouter's reviewed tools with no model: an automation, a shell script, or any program that can
 reach the OpenCode server. It uses the tools RPC, `openrouter.models.tools`, through `opencode api` or an OpenCode
 client. The same calls are available to the model natively; a script uses one front door or the other for an
 operation, never both.
@@ -11,39 +11,41 @@ Each method is the upstream tool name, hyphens included, without the `openrouter
 path segment: `/api/rpc/openrouter.models.tools/list-models`. The methods come from the plugin's one catalog,
 `src/openrouter-tools.ts`.
 
-| Method | Class | What it does | Output evidence |
-| --- | --- | --- | --- |
-| `get-endpoint-uptime-history` | `read` | Hourly uptime of a model's provider endpoints, last 72 hours | synthetic |
-| `get-model` | `read` | One model's details | synthetic |
-| `get-session-cost` | `read` | Median cost per session of published coding harnesses (public statistics) | synthetic |
-| `list-app-rankings` | `read` | App rankings | live-observed |
-| `list-benchmarks` | `read` | Benchmarks | live-observed |
-| `list-daily-model-rankings` | `read` | Usage rankings | live-observed |
-| `list-model-endpoints` | `read` | A model's endpoints | synthetic |
-| `list-models` | `read` | Model catalog | live-observed |
-| `list-providers` | `read` | Providers | live-observed |
-| `list-task-classifications` | `read` | Task usage | live-observed |
-| `ping` | `read` | Health | live-observed |
-| `search-docs` | `read` | OpenRouter's documentation | live-observed |
-| `get-batch` | `read` | One batch's status and, once finished, its results | documented |
-| `get-credits` | `read` | The account's credit | live-observed |
-| `get-generation` | `read` | One generation's metadata | documented |
-| `get-preset` | `read` | One saved preset | synthetic |
-| `get-video` | `read` | A video job's status, cost and output links; starts nothing | documented |
-| `list-batches` | `read` | The workspace's batches | documented |
-| `list-preset-versions` | `read` | A preset's versions | synthetic |
-| `list-presets` | `read` | The account's saved presets | synthetic |
-| `install-ori-harness` | `read` | Retrieves an installation recipe; runs nothing | synthetic |
-| `spawn-ori-eval` | `read` | Retrieves an evaluation recipe; runs nothing | synthetic |
-| `send-batch` | `write` | Billable: submits a batch of inference requests | documented |
-| `send-decision` | `write` | Billable: asks a decision model typed questions | documented |
-| `send-message` | `write` | Billable test inference | documented |
-| `transcribe-audio` | `write` | Billable: transcribes an audio file | documented |
-| `send-feedback` | `send` | Feedback on one of the account's own generations | synthetic |
-| `describe` | none | Lists the methods, their class and permission action, whether OpenCode lists each tool now, each tool's live input schema, and, given a session, whether that session may call it | |
+| Method | Class | Spend | What it does | Output evidence |
+| --- | --- | --- | --- | --- |
+| `get-endpoint-uptime-history` | `read` | free | Hourly uptime of a model's provider endpoints, last 72 hours | synthetic |
+| `get-model` | `read` | free | One model's details | synthetic |
+| `get-session-cost` | `read` | free | Median cost per session of published coding harnesses (public statistics) | synthetic |
+| `list-app-rankings` | `read` | free | App rankings | live-observed |
+| `list-benchmarks` | `read` | free | Benchmarks | live-observed |
+| `list-daily-model-rankings` | `read` | free | Usage rankings | live-observed |
+| `list-model-endpoints` | `read` | free | A model's endpoints | synthetic |
+| `list-models` | `read` | free | Model catalog | live-observed |
+| `list-providers` | `read` | free | Providers | live-observed |
+| `list-task-classifications` | `read` | free | Task usage | live-observed |
+| `ping` | `read` | free | Health | live-observed |
+| `search-docs` | `read` | free | OpenRouter's documentation | live-observed |
+| `get-batch` | `read` | free | One batch's status and, once finished, its results | documented |
+| `get-credits` | `read` | free | The account's credit | live-observed |
+| `get-generation` | `read` | free | One generation's metadata | documented |
+| `get-preset` | `read` | free | One saved preset | synthetic |
+| `get-video` | `read` | free | A video job's status, cost and output links; starts nothing | documented |
+| `list-batches` | `read` | free | The workspace's batches | documented |
+| `list-preset-versions` | `read` | free | A preset's versions | synthetic |
+| `list-presets` | `read` | free | The account's saved presets | synthetic |
+| `install-ori-harness` | `read` | free | Retrieves an installation recipe; runs nothing | synthetic |
+| `spawn-ori-eval` | `read` | free | Retrieves an evaluation recipe; runs nothing | synthetic |
+| `send-batch` | `write` | spend | Spends: submits a batch of inference requests | documented |
+| `send-decision` | `write` | spend | Spends: asks a decision model typed questions | documented |
+| `send-message` | `write` | spend | Spending test inference | documented |
+| `transcribe-audio` | `write` | spend | Spends: transcribes an audio file | documented |
+| `send-feedback` | `send` | notify | Feedback on one of the account's own generations | synthetic |
+| `describe` | none | — | Lists the methods, their class and permission action, whether OpenCode lists each tool now, each tool's live input schema, and, given a session, whether that session may call it | |
 
-The **output evidence** column is the strongest evidence that the method's useful result fits the RPC's result, which
-keeps structured content and text and drops every other kind of content (see [contract.md](contract.md)):
+The **spend** column is the tool's one spend class from `src/openrouter-tools.ts`: `spend` bills the account,
+`notify` sends feedback, and `free` costs nothing. The **output evidence** column is the strongest evidence that the
+method's useful result fits the RPC's result, which keeps structured content and text and drops every other kind of
+content (`src/host/tools-rpc.ts`):
 
 - **live-observed**: a signed-in, read-only capture of OpenRouter's server called the method and got text or structured
   content back (`test/fixtures/live-tools.json`, 2026-11-12). Only free reads were called.
@@ -59,9 +61,10 @@ These reviewed tools are **not** methods, and status reports them under `scripti
 exist: OpenCode answers `rpc.method_not_found` before the plugin runs, and nothing is sent to OpenRouter.
 
 - `generate-image` is **not** a method: its image comes back as an image block, which this RPC drops, so a script would
-  pay for an image it never receives. Generate images natively, in a conversation, where OpenCode delivers the image.
-- `generate-speech` is **not** a method: it bills for audio that comes back as an audio block.
-- `generate-video` is **not** a method: it bills for a video, which it may return inline once finished. Poll a job you
+  spend for an image it never receives. Generate images with the native tool in a conversation, where OpenCode delivers
+  the image.
+- `generate-speech` is **not** a method: it spends for audio that comes back as an audio block.
+- `generate-video` is **not** a method: it spends for a video, which it may return inline once finished. Poll a job you
   started natively with the `get-video` method.
 - `get-current-key` is **not** a method: it describes the signed-in key itself (its label, spend limit, remaining limit
   and usage), which the plugin keeps out of scripts. Use `get-credits` for the account's balance.
@@ -78,8 +81,8 @@ are the same rules the native path uses, and the same operational guard:
   nothing sent, because no one is there to answer it. A `deny` is refused with nothing sent.
 - **A script gets the same default as the model: every method is allowed.** At the default `access: "all"`, the
   plugin's block allows every reviewed tool and the `openrouter_*` namespace, so a script can run `send-message`,
-  `send-batch`, `send-decision`, `transcribe-audio` and `send-feedback`, which bill the account or send feedback, with
-  no prompt. To restrict a script, set `"access": "ask-changes"` (each of those five asks, and an ask is refused, so a
+  `send-batch`, `send-decision`, `transcribe-audio` and `send-feedback`, which spend the account's credit or send
+  feedback, with no prompt. To restrict a script, set `"access": "ask-changes"` (each of those five asks, and an ask is refused, so a
   script then needs an explicit `allow` for each in the session's or the agent's rules) or `"read-only"` (they are
   denied), or give the script's agent or session a later rule. Reads are allowed under every value.
 - **Under `ask-changes` or `read-only`, an unguarded agent runs everything.** A custom agent with OpenCode's base allow (`* * allow`) but without the
@@ -100,7 +103,7 @@ session found through history or a list: the script would run under that session
 opencode api post /api/session -d '{"title":"model survey","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
-Session rules come after the agent's, so a session can narrow a script, or, under `ask-changes`, grant it one paid
+Session rules come after the agent's, so a session can narrow a script, or, under `ask-changes`, grant it one spending
 action. This session can read and send test messages, and nothing else from OpenRouter, whatever `access` is:
 
 ```sh
@@ -140,19 +143,20 @@ reports those separately.
 
 A result comes back as `{ output?, text }`: the tool's structured content when it has any, and its text parts joined by
 newlines. Model output, documentation text and recipes in it are untrusted data: they never authorise a command, an
-install or another paid call.
+install or another spending call.
 
-## Paid calls and uncertain outcomes
+## Spending calls and uncertain outcomes
 
-`send-message`, `send-batch`, `send-decision` and `transcribe-audio` bill the account, and `send-feedback` sends feedback
-to OpenRouter. None is idempotent, and the RPC never retries. When such a call is cancelled, times out, loses its
-connection or fails upstream, it may still have run and been billed. Before deliberately sending it again, look for a generation id in any output and check it with
-`get-generation`, or check your activity on openrouter.ai. The error's next step says the same.
+`send-message`, `send-batch`, `send-decision` and `transcribe-audio` spend the account's credit, and `send-feedback`
+sends feedback to OpenRouter. None is idempotent, and the RPC never retries. When such a call is cancelled, times out,
+loses its connection or fails upstream, it may still have run and spent the account's credit. Before deliberately
+sending it again, look for a generation id in any output and check it with `get-generation`, or check your activity on
+openrouter.ai. The error's next step says the same.
 
-A Jobs script that calls any of them should run with retries off: a retry is a second paid call. A batch bills each
-request that completes, over up to 24 hours: follow it with `get-batch`, never by sending it again.
+A script or automation that calls any of them should run with retries off: a retry is a second spending call. A batch
+spends each request that completes, over up to 24 hours: follow it with `get-batch`, never by sending it again.
 
-The plugin sets no spending limit, and at the default `access: "all"` nothing asks before a paid call. The cap on the
+The plugin sets no spending limit, and at the default `access: "all"` nothing asks before a spending call. The cap on the
 key OpenRouter mints at sign-in is OpenRouter's control.
 
 ## The location
@@ -177,7 +181,7 @@ A refusal or failure is the RPC error `failed`, with a message `CODE: what happe
 | `AUTH_REQUIRED`, `CONNECTING`, `CONNECTION_FAILED`, `DISABLED`, `NOT_REGISTERED` | The `openrouter` server needs a sign-in, is still connecting, could not connect, is disabled, or is missing. `/openrouter-status` gives the details. |
 | `TOOL_UNAVAILABLE` | The server is connected, but OpenCode does not list the tool. |
 | `UPSTREAM_ERROR` | OpenRouter answered with an error. The message holds the first line of its text, at most 300 characters, with tokens and URL query strings removed. |
-| `CANCELLED` | The request was cancelled. A paid or feedback call may still have run. |
+| `CANCELLED` | The request was cancelled. A spending or feedback call may still have run. |
 
 OpenCode itself answers `rpc.method_not_found` for a method that does not exist, such as a native-only tool or a tool
 OpenRouter adds later, and `rpc.invalid_input` for a body that is not the envelope above.

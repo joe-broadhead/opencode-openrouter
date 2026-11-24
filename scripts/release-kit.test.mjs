@@ -1974,11 +1974,25 @@ describe("CI: macOS on pushes to master and for releases, never on pull requests
     assert.deepEqual(ciJobsProblems(undefined, ["macos-26"]), ["no successful job on macos-26"])
   })
 
-  test("this repository's ci.yml: a pull request's matrix has no macOS entry, and a master push's does (npm run check)", () => {
-    const matrix = ciMatrix(readFileSync(join(SCRIPTS, "..", ".github", "workflows", "ci.yml"), "utf8"))
-    assert.deepEqual(matrix.problems, [])
-    assert.equal(matrix.pullRequest.some((runner) => /^macos-/.test(runner)), false)
-    assert.ok(matrix.push.includes("macos-26"), `a push to master runs ${matrix.push.join(", ")}`)
+  // The plugin standard of phase 4 replaces the family's event-gated matrix with one job, id and name `ci`, on the
+  // public-runner rule: `vars.CI_RUNNER_PUBLIC` when the repository sets it, else ubuntu-24.04. The release kit's own
+  // planner still reads the old matrix and is replaced with the kit in phase 4b, so this repository's CI no longer
+  // carries one and this test asserts the standard's shape instead.
+  test("this repository's ci.yml: one job, id and name ci, on the public-runner rule (npm run check)", () => {
+    const text = readFileSync(join(SCRIPTS, "..", ".github", "workflows", "ci.yml"), "utf8")
+    assert.match(text, /^ {2}ci:\n {4}name: ci$/m, "the one job is id and name ci")
+    assert.equal((text.split(/^jobs:\n/m)[1].match(/^ {2}[\w-]+:$/gm) ?? []).length, 1, "one job")
+    assert.doesNotMatch(text, /^ {4}strategy:$/m, "no matrix: the required check has one name")
+    assert.match(
+      text,
+      /^ {4}runs-on: \$\{\{ \(github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\) && \(vars\.CI_RUNNER_PUBLIC \|\| 'ubuntu-24\.04'\) \|\| 'ubuntu-24\.04' \}\}$/m,
+      "the public-runner rule",
+    )
+    assert.match(text, /^ {4}timeout-minutes: \d+$/m)
+    assert.match(text, /node-version: 24/)
+    assert.match(text, /npm run check/)
+    assert.match(text, /^permissions:\n {2}contents: read$/m)
+    assert.match(text, /uses: actions\/checkout@[0-9a-f]{40} # v\d/)
   })
 })
 

@@ -1,11 +1,11 @@
-// The restated setting contract refuses what Jelly's refuses, so the declaration test cannot pass on a check that
-// takes anything.
+// The restated setting contract refuses what the legacy contract refuses, so the declaration test cannot pass on a
+// check that takes anything.
 import { describe, expect, test } from "bun:test"
 import { ACCESS_CHOICES, settingProblems, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 const base = { key: "mode", label: "Mode", type: "string", description: "A mode." }
 
-describe("the restated Jelly setting contract", () => {
+describe("the restated legacy setting contract", () => {
   test("takes a plain setting, a closed set and a bounded number", () => {
     expect(settingProblems(base)).toEqual([])
     expect(settingProblems({ ...base, choices: ACCESS_CHOICES, default: "all" })).toEqual([])
@@ -14,7 +14,7 @@ describe("the restated Jelly setting contract", () => {
     expect(settingProblems({ ...base, type: "number", min: 0.01, step: 0.01 })).toEqual([])
   })
 
-  test("refuses what Jelly's strict schema refuses", () => {
+  test("refuses what the legacy strict schema refuses", () => {
     const refused = [
       { ...base, unknown: true },
       { ...base, enum: ["a"] },
@@ -36,7 +36,7 @@ describe("the restated Jelly setting contract", () => {
     expect(settingsProblems([base, base])).not.toEqual([])
   })
 
-  test("checks a saved value as Jelly's host does", () => {
+  test("checks a saved value as the legacy host does", () => {
     const closed = { enum: ["a", "b"] }
     expect(settingValueIssue(closed, "a")).toBeNull()
     expect(settingValueIssue(closed, "c")).toBe("not one of the declared values")

@@ -3,127 +3,32 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
-## [0.0.7] - 2026-11-23
+## 0.0.0 (unreleased)
 
-### Changed
-
-- The tools RPC transport is source-contract's `tools-rpc` module, pinned at `v0.3.0` and bundled into `dist/index.js`. `src/host/tools-rpc.ts` is OpenRouter's part of it. The vendored copy and its `check-copies` pin are gone. Spend rules are unchanged.
-- This release checks the transport against a loopback fake on the supported OpenCode test matrix. It does not refresh the signed-in tool capture or verify live billing.
-
-## [0.0.6] - 2026-11-18
-
-### Changed
-
-- Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2. The supported range is unchanged (`>=2.2.3 <2.4.0`).
-
-## [0.0.5] - 2026-11-15
+The first release under the new name and organization. It has no compatibility with any earlier release:
+install it as a new plugin.
 
 ### Added
 
-- **For jelly:** `jelly.cost`, the line jelly shows on the plugin's review before it installs: "Seven tools spend credit
-  on the OpenRouter key you sign in with: send-message, send-batch, send-decision, transcribe-audio, and image, speech
-  and video generation. You set the key's spend cap on OpenRouter's consent page (USD 10 by default); the plugin sets
-  none."
-
-## [0.0.4] - 2026-11-15
-
-### Changed
-
-- Admits OpenCode 2.3: the host range is `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, and CI
-  runs the host and pack suites on each of them. An out-of-range example is now 2.4.0. On 2.3, pressing Stop aborts a
-  native OpenRouter call through the plugin's guard as an abort did before; a paid call stopped after dispatch may
-  still have run.
-
-## [0.0.3] - 2026-11-14
+- The plugin package is `@we-the-rebel-alliance/openrouter-plugin` and starts at `0.0.0`.
+- One explicit spend class per reviewed OpenRouter tool, in `src/openrouter-tools.ts`: `spend` bills the OpenRouter
+  account, and when in doubt a tool is `spend`. The default rules, status (a `Spend` line) and the skills derive it
+  from that one column; the docs and the legacy cost line are checked against it. `actionEffectOf` maps each change to
+  the contract effect it will take (`spend`, or `notify` for feedback).
+- Status reports the spend class of the tools that bill the account and the access mode they run under.
 
 ### Changed
 
-- `package.json` is `"private": true`, so nothing can be published to npm; an install from the release tag is unaffected.
+- OpenCode 2.4.1 exactly: `@opencode/*` devDependencies and `effect` `4.1.0`, host range `>=2.4.1 <2.5.0`, and 2.4.1 as
+  the only tested release. Older test matrices and their code paths are gone.
+- `generate-image` is no longer forced out of Code Mode: it stays in the `openrouter` namespace like every other tool.
+  Nothing is pinned, so no tool's signature is sent on every turn. Images still arrive through OpenCode's native tool
+  result; the tools RPC still excludes the media generators.
+- Status follows the current rules, tools and spend classification.
 
-## [0.0.2] - 2026-11-14
+### Removed
 
-### Changed
-
-- **Breaking:** the default `access` is now `all`, the family's default: every tool runs without asking, the seven billable tools
-  (`send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`,
-  `generate-video`) and `send-feedback` included, from the model and from scripts alike. `ask-changes` (they ask) and
-  `read-only` (they are denied) work exactly as before, and are now the opt-in limits. The skills still call a billable
-  tool only on the user's explicit request; that is guidance to the model, not a permission.
-  If you relied on the old default, set `access: "ask-changes"`: billable calls now run without asking at the default.
-- The guard holds nothing back under `all`: the rules allow every tool there, so a call is no longer refused with
-  `POLICY_UNAVAILABLE` while the rules are pending or failed. Under `ask-changes` and `read-only` it blocks exactly as
-  before, and an unloading plugin stops a call under every value.
-- Jelly: the declaration's 31 tools are all `allow`, each `readOnly` unchanged (the server's own `readOnlyHint`), and
-  the `access` setting's default is `all`. `install-ori-harness` and `spawn-ori-eval` stay read-only: each returns a
-  recipe as text and runs nothing.
-- Jelly: `docs/jelly.md` now says the icon is OpenRouter's own glyph (it said a neutral drawing), and that the sign-in
-  key lasts at most seven days with no refresh, so a person signs in again at least once a week.
-
-### Added
-
-- `test/unit/declaration-drift.test.ts` checks the Jelly declaration against the committed live capture
-  (`test/fixtures/live-tools.json`, 2026-11-12): every served tool declared, every declared tool served, each
-  `readOnly` the server's hint, every effect `allow`. No fresh capture was taken for this release.
-- `SECURITY.md`: reporting, data handling, and what the default access allows.
-
-## [0.0.1] - 2026-11-13
-
-### Added
-
-- The `jelly` settings declare their choices: `access` offers Jelly's three choices, **Allowed**, **Ask before changes**
-  and **Read only**, with `ask-changes` still the default (needs a jelly that includes app#1301).
-
-## [0.0.0] - 2026-11-12
-
-### Added
-
-- The `openrouter` MCP server at `https://mcp.openrouter.ai/mcp`, registered with OpenCode's own sign-in, or the
-  user's exact entry adopted unchanged. A conflicting or disabled entry is left untouched.
-- The server's `/connect` entry is named "OpenRouter tools", apart from the built-in OpenRouter model provider.
-- The reviewed catalog of the 31 tools OpenRouter's live server lists, each classified from its live description,
-  schemas and annotations: 23 reads; seven billable tools (`send-message`, `send-batch`, `send-decision`,
-  `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video`); and `send-feedback`.
-- The `access` and `allowUntestedHost` options, with `ask-changes` the default.
-- Default permission rules in every agent with OpenCode's base allow, generated from the catalog: reads allowed;
-  every billable tool, feedback and any tool OpenRouter adds later denied, asked or allowed by
-  `access`. Later rules still win; agents without the base allow are unchanged. A conflicting or disabled `openrouter`
-  entry gets no rules.
-- An operational guard on every OpenRouter tool: until the rules are applied and the server entry is the plugin's own or
-  the user's exact one, and after the plugin unloads, every call fails with `POLICY_UNAVAILABLE` before anything is sent.
-- `generate-image` runs as a direct tool, outside Code Mode.
-- Four skills: `openrouter` (research and integration), `openrouter-evaluate` (bounded model tests, and decision tests
-  and batches on explicit request), `openrouter-images` (image generation, and speech, video and transcription on
-  explicit request) and `openrouter-troubleshoot` (diagnosis, with `get-current-key` after an out-of-credit error).
-  Every billable tool is called only on the user's explicit request, once, and never repeated after an uncertain
-  outcome without first checking `get-generation`, `get-batch` or `get-video`. They are registered from the installed
-  package. A skill of the same name that you already have is kept and reported as shadowed; a missing or malformed skill
-  file is recorded as `SKILLS_INVALID` and does not stop the plugin.
-- One local status model, shown by `/openrouter-status` (a synthetic message, no model turn), the `/openrouter` dialog
-  and its palette entry (refresh with `r`, close with Escape), and the status RPC `openrouter.models` / `status`:
-  connection state, access and rules, the tool catalog with unknown and missing tools and when it was last seen, the
-  script capability, skills, agents without the rules or with their own allow, and one next step. It never calls
-  OpenRouter. A status that cannot be read is `STATUS_UNAVAILABLE`.
-- The tools RPC `openrouter.models.tools` for scripts and Jobs, the family's shared adapter: `describe` and 27 reviewed
-  methods by their exact hyphenated names, run through OpenCode's own executor as a named session's agent. Only an
-  `allow` runs; an `ask` or a `deny` is refused with nothing sent, and the plugin's guard refuses every method with
-  `POLICY_UNAVAILABLE` while its rules are not in place. `generate-image`, `generate-speech` and `generate-video`
-  (media the RPC drops) and `get-current-key` (the signed-in key's own metadata) are native only, so their routes do not
-  exist. After a paid or feedback call that may have run, the next step says to check the generation before sending it
-  again. Nine read methods have their output checked against OpenRouter's live server; the rest against their declared
-  output schema or the test server.
-- The `jelly` declaration: all 31 reviewed tools with the default rules' effect (reads allowed and read-only; the seven
-  billable tools and `send-feedback` ask), the four skills, the "OpenRouter tools" sign-in by server, and the `access`
-  setting with `ask-changes` the default. No views, Jelly RPC, feeds or widgets.
-- `scripts/capture-live.ts`, a read-only capture of OpenRouter's live catalog, run by hand after a sign-in, never by the
-  checks: it records the tool names, description digests, schemas and annotations and the result shapes of free reads,
-  and refuses every other tool call before it is sent. `test/fixtures/live-tools.json` holds the 2026-11-12 capture, and
-  `test/unit/live-catalog.test.ts` fails on an unknown or missing tool, an edited fixture, a read-only hint the catalog
-  contradicts, or a script method's evidence label the capture does not support.
-
-### Changed
-
-- The icon is OpenRouter's published Volt-on-Ink square glyph, only scaled, used under OpenRouter's brand guidelines.
-  `opencode.vendor.mark` is `true`, and the README carries OpenRouter's trademark line.
-- `scripts/check-icons.mjs` is the icon contract's revision 2: with `opencode.vendor.mark: true` it accepts the vendor's
-  own mark in place of the family tile (any square viewBox, path numbers bounded by four times its width) and requires
-  the README to say "not affiliated with" the vendor and to carry a trademark line. The sanitizer block is unchanged.
+- The legacy app guide and the old host-contract matrix; [docs/scripting.md](docs/scripting.md) is the remaining guide, and
+  the full docs set comes with the plugin-contract manifest.
+- The retired Jobs product from the scripting guide; a script is an automation, a shell script or any OpenCode client.
+- The release history before `0.0.0`. The repository keeps its history; the changelog starts here.

@@ -1,51 +1,28 @@
 # OpenRouter for OpenCode
 
 An unofficial OpenCode plugin for [OpenRouter's hosted MCP server](https://openrouter.ai/docs/guides/overview/mcp-server):
-live models, endpoints and providers, benchmarks and rankings, OpenRouter's documentation, account credit, generation,
-batch and preset lookups, test prompts, decisions and batches, transcription, and image, speech and video generation,
-through OpenCode's own MCP connection and sign-in.
+live models, endpoints and providers, prices and rankings, OpenRouter's documentation, account credit, generation, batch
+and preset lookups, test prompts, decisions and batches, transcription, and image, speech and video generation, through
+OpenCode's own MCP connection and sign-in.
 
 Unofficial; not affiliated with OpenRouter. OpenRouter and its logo are trademarks of OpenRouter, Inc., used here only to identify the service this plugin connects to. The icon is OpenRouter's published Volt-on-Ink square glyph, only scaled, from [openrouter.ai/brand](https://openrouter.ai/brand).
 
-The plugin is in early development. It registers the `openrouter` MCP server, adopts your own exact entry for it, reports
-a conflicting one, and names the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to
-every agent: by default every tool runs without asking, billable inference and feedback included, and the `access`
-option makes billable tools and feedback ask first or never run. Under those stricter values a guard refuses every
-OpenRouter tool call before anything is sent while the rules are not in place. It also ships four skills, a status
-command and dialog that never call OpenRouter, and script access to the reviewed tools through a tools RPC.
+The plugin registers the `openrouter` MCP server, adopts your own exact entry for it, reports a conflicting one, and names
+the server's sign-in "OpenRouter tools" in `/connect`. It adds default permission rules to every agent: by default every
+tool runs without asking, spending calls and feedback included, and the `access` option makes them ask first or never
+run. Under those stricter values a guard refuses every OpenRouter tool call before anything is sent while the rules are
+not in place. It also ships four skills, a status command and dialog that never call OpenRouter, and script access to the
+reviewed tools through a tools RPC.
 
 ## Requirements
 
-- OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`). The checks run on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2.
+- OpenCode 2.4.1 (`>=2.4.1 <2.5.0`). The checks run on 2.4.1.
 - An OpenRouter account, to sign in to the MCP server.
 
 ## Install
 
-```sh
-opencode plugin add github:joe-broadhead/opencode-openrouter#v0.0.7
-opencode reload
-opencode mcp auth openrouter
-```
-
-Or add it to `opencode.json`:
-
-```json
-{
-  "plugins": [
-    {
-      "package": "github:joe-broadhead/opencode-openrouter#v0.0.7",
-      "options": { "access": "all", "allowUntestedHost": false }
-    }
-  ]
-}
-```
-
-You can also sign in from `/connect` → **OpenRouter tools**, or from `/mcps` → `openrouter`.
-
-The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
-release is a new tag, and a Git install does not update by itself. To move to a newer release, remove the old entry
-with `opencode plugin remove github:joe-broadhead/opencode-openrouter#v0.0.6`, then add the new tag with
-`opencode plugin add github:joe-broadhead/opencode-openrouter#v<version>`.
+Install from a release: `opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v<version>`. The first
+release on plugin-contract is v0.0.0 (phase 4b).
 
 ## Two OpenRouter connections
 
@@ -58,16 +35,25 @@ OpenCode can hold two separate OpenRouter credentials, and this plugin uses only
 - **OpenRouter** is OpenCode's built-in model provider, for chatting with OpenRouter's models. OpenCode manages its key
   separately; this plugin never reads or changes it.
 
+OpenCode 2.4.1 passes the server's instructions to the model verbatim and offers no override: the plugin cannot drop or
+replace them. Its namespace line only marks results as untrusted data, never instructions.
+
 ## Options
 
 | Option | Values | Default | What it does |
 | --- | --- | --- | --- |
-| `access` | `all`, `ask-changes`, `read-only` | `all` | How much the default rules restrict billable inference, image generation, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
-| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.2.3 <2.4.0`. |
+| `access` | `all`, `ask-changes`, `read-only` | `all` | How much the default rules restrict spending calls, feedback and tools OpenRouter adds later. See [Permissions](#permissions). |
+| `allowUntestedHost` | `true`, `false` | `false` | Start on an OpenCode version outside `>=2.4.1 <2.5.0`. |
 
 An unknown option, or a wrong value, stops the plugin with `OPTIONS_INVALID` and the list of accepted options.
 
-## Permissions
+## Permissions and spend classes
+
+Every reviewed tool has exactly one spend class in `src/openrouter-tools.ts`: `spend` (one call bills the OpenRouter
+account) or not. The seven spending tools are `send-message`, `send-batch`, `send-decision`, `transcribe-audio`,
+`generate-image`, `generate-speech` and `generate-video`; `send-feedback` sends feedback and spends nothing; every other
+tool is a free read. The default rules, status and the skills derive the same classification from that one table;
+these docs and the legacy cost line are checked against it, so no surface keeps its own copy.
 
 The plugin adds one block of rules to every agent that starts from OpenCode's base allow (`* * allow`), right after that
 rule, so everything after it still wins: the agent's own stricter rules, your `permissions`, a session's rules and saved
@@ -77,8 +63,8 @@ reviewed tool:
 | Tools | `read-only` | `ask-changes` | `all` (default) |
 | --- | --- | --- | --- |
 | Reads: models, endpoints and their uptime, providers, benchmarks, rankings, harness session costs, docs, `ping`; your credit, key, generations, batches, video jobs and presets; the Ori recipes | allow | allow | allow |
-| Billable: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` | deny | ask | allow |
-| Feedback: `send-feedback` | deny | ask | allow |
+| Spend: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` | deny | ask | allow |
+| Notify: `send-feedback` | deny | ask | allow |
 | A tool OpenRouter adds later | deny | ask | allow |
 
 The block is added only while `openrouter` is the plugin's own entry or your exact one, and while the plugin has not
@@ -87,8 +73,6 @@ checked the entry yet. A conflicting or disabled entry is your own server: it ge
 These are defaults, not an administrative policy: a later allow in your config or an approval you save changes the
 result. An agent without the base allow, such as one you wrote with its own `* * deny`, is left unchanged. A custom
 agent can miss the block; give it the block yourself, the same rules in the same order, before its own rules.
-
-`generate-image` is a direct tool, outside Code Mode, so its image reaches the conversation as an image.
 
 ### The guard
 
@@ -119,7 +103,7 @@ describes how to use the tools, and OpenCode's permissions still decide whether 
 | --- | --- |
 | `openrouter` | Finding and shortlisting models, comparing endpoints and their uptime, explaining routing, usage trends, harness session costs, your saved presets, and integration questions answered from OpenRouter's current documentation. Read-only. |
 | `openrouter-evaluate` | A bounded test or comparison of models on a real prompt: a plan, then serial `send-message` calls, the output, and the cost OpenRouter reports. Decision tests (`send-decision`), batches (`send-batch`) and Ori only when you ask for them. |
-| `openrouter-images` | An image requested from OpenRouter, generated once through the native `generate-image` tool so the image reaches you; also speech, video and transcription when you ask for them, each called once, a video job followed with `get-video`. |
+| `openrouter-images` | An image requested from OpenRouter, generated once so the image reaches you; also speech, video and transcription when you ask for them, each called once, a video job followed with `get-video`. |
 | `openrouter-troubleshoot` | Connection, sign-in, credit, key-limit, generation, batch, video-job, routing or tool failures, diagnosed with read operations (`get-current-key` after an out-of-credit error). Feedback only when you ask for it. |
 
 If you already have a skill with one of these names, yours is kept and the plugin's is not registered. A skill file that
@@ -135,21 +119,11 @@ server's connection, sign-in or agents change while it is open. Scripts read the
 opencode api POST /api/rpc/openrouter.models/status -d '{"input":{}}' -H "x-opencode-directory:$PWD"
 ```
 
-The report shows:
-
-- **Connection**: `connected`, `connecting`, `sign-in required`, `failed`, `disabled`, `not configured`, `conflict`, or
-  blocked because the plugin's policy is not in place, and whose `openrouter` entry it is.
-- **Access** and **Default rules**: what the rules do under `access`, and whether they applied.
-- **Tools**: how many tools OpenCode lists for the server, how many the plugin has reviewed, the names of up to 20 it has
-  not, reviewed tools that are missing, and when the plugin last saw the catalog. A server that connected moments ago and
-  is still listing its tools is told apart from one that lists none.
-- **Scripts**: the number of script methods, the native-only tools, and how many methods have their output
-  checked against OpenRouter's live server.
-- **Skills**: loaded, missing, invalid, or shadowed by a skill of yours with the same name.
-- **Agents without default rules**, with the exact block to paste, and agents whose own rule allows OpenRouter's
-  changes, which is your decision and is left alone.
-- **OpenCode**: the version, whether it is tested, and the supported range.
-- **Problems** and one **Next step**.
+The report shows the connection and whose `openrouter` entry it is; `access` and what the rules do under it; the spend
+class of every spending tool; whether the rules applied; how many tools OpenCode lists, how many the plugin has reviewed
+and the names of up to 20 it has not; the script methods and the native-only tools; the skills; agents without the
+default rules, with the exact block to paste; agents whose own rule allows OpenRouter's changes, which is your decision
+and is left alone; the OpenCode version and range; and one next step.
 
 Status reads only OpenCode's own lists and the plugin's memory. It never calls `ping`, reads credit, lists models or
 looks up a generation, and it never shows a key, a sign-in URL, a balance or an expiry. To check OpenRouter itself, ask
@@ -157,10 +131,10 @@ for `ping` through the ordinary tool path.
 
 ## Scripts
 
-Scripts and Jobs call 27 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a session and
-the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs, an `ask` is
-refused because no one can answer it, and a `deny` is refused. Under the default `all` every method runs, the billable
-`send-message`, `send-batch`, `send-decision` and `transcribe-audio`, and `send-feedback`, included. Under
+Scripts and automations call 27 reviewed tools with no model through the tools RPC `openrouter.models.tools`, as a
+session and the agent it names. A script gets the same decision a conversation would, with no prompt: an `allow` runs,
+an `ask` is refused because no one can answer it, and a `deny` is refused. Under the default `all` every method runs,
+the spending `send-message`, `send-batch`, `send-decision` and `transcribe-audio`, and `send-feedback`, included. Under
 `ask-changes` those five need an explicit allow rule for the script's session or agent, and under `ask-changes` and
 `read-only` every call fails with `POLICY_UNAVAILABLE` before anything is sent while the plugin's rules are not in place.
 
@@ -169,8 +143,8 @@ Four tools are not script methods, and their routes do not exist: `generate-imag
 receives, and `get-current-key`, which describes the signed-in key itself. Use them in a conversation.
 
 Nine read methods have their output checked against OpenRouter's live server; the rest against their declared output
-schema or a test server. See [docs/scripting.md](docs/scripting.md) for the methods, the envelope, the errors and how to
-handle a paid call whose outcome is uncertain.
+schema or a test server. [docs/scripting.md](docs/scripting.md) lists the methods, the envelope, the errors and how to
+handle a spending call whose outcome is uncertain.
 
 ## Errors
 
@@ -198,17 +172,14 @@ Every error reads `CODE: What happened. Next step: What to do.`
   `search-docs`, `ping` and `get-credits`. No other tool was called live, `get-model` and `list-model-endpoints`
   included; their output is known from declared schemas or a local test server. OpenRouter may change its tools at any
   time.
-- **Which tools bill.** OpenRouter's documentation states it for every tool except `transcribe-audio`, which the plugin
-  treats as billable anyway, and the nine reads added after the documentation page (`get-batch`, `list-batches`,
-  `get-video`, `get-preset`, `list-presets`, `list-preset-versions`, `get-current-key`, `get-endpoint-uptime-history`,
-  `get-session-cost`), which it treats as free. Those judgements are assumed from tool descriptions the capture did not
-  store.
-- **Paid and feedback tools were never run by this project.** `send-message`, `send-batch`, `send-decision`,
-  `transcribe-audio`, `generate-image`, `generate-speech`, `generate-video` and `send-feedback` were never called
-  against OpenRouter, so how their media reaches you (a video above all) has not been checked live.
+- **Which tools spend.** OpenRouter's documentation states it for every tool except `transcribe-audio`, which the plugin
+  treats as spending anyway, and the nine reads added after the documentation page, which it treats as free. Those
+  judgements are assumed from tool descriptions the capture did not store.
+- **Spending and feedback tools were never run by this project.** How their media reaches you (a video above all) has
+  not been checked live.
 - **Your key, your cap.** You sign in with your own OpenRouter account; the key it mints is yours, with the spend limit
   you set on OpenRouter's consent page. The plugin enforces no spending limit of its own.
-- **Spending is allowed by default.** At the default `access: "all"` a model or a script may run billable tools with no
+- **Spending is allowed by default.** At the default `access: "all"` a model or a script may run spending tools with no
   prompt; the skills call one only when you ask for it, but that is guidance to the model, not a permission. Set
   `access` to `ask-changes` to be asked first, or `read-only` to stop them.
 - **The sign-in lasts at most seven days.** OpenRouter mints the key with no refresh, so sign in again from `/connect`
@@ -217,8 +188,6 @@ Every error reads `CODE: What happened. Next step: What to do.`
   removes the prompt for that tool.
 - Script methods return text and structured results only. `generate-image`, `generate-speech`, `generate-video` and
   `get-current-key` run only natively.
-- **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly
-  refuses the plugin's declaration.
 
 ## License
 

@@ -1,10 +1,9 @@
 # Repository rules
 
-This repository builds `@joe-broadhead/opencode-openrouter`, an OpenCode plugin that registers OpenRouter's hosted MCP
-server and names its sign-in "OpenRouter tools". It has no tool of its own: OpenCode owns the MCP connection, OAuth,
-credentials, native tool execution and permission decisions. Read [docs/contract.md](docs/contract.md) before you
-change code: it labels every host and service fact the code relies on. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the
-checks.
+This repository builds `@we-the-rebel-alliance/openrouter-plugin`, an OpenCode plugin that registers OpenRouter's hosted
+MCP server and names its sign-in "OpenRouter tools". It has no tool of its own: OpenCode owns the MCP connection, OAuth,
+credentials, native tool execution and permission decisions. Read [docs/scripting.md](docs/scripting.md) for the tools
+RPC, and [CONTRIBUTING.md](CONTRIBUTING.md) for the checks.
 
 ## Where things go
 
@@ -18,24 +17,27 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   `src/tui.ts` and the status RPC `openrouter.models` / `status`. It reads `PluginState` and OpenCode's own lists
   (`ctx.mcp.list()`, `ctx.tool.list()`, agents, skills), never OpenRouter. The TUI reads the status RPC only; it holds
   event listeners only while the dialog is open, and never reopens a dialog the user closed.
-- **Scripts**: `src/host/tools-rpc.ts` is OpenRouter's part of the tools RPC. The transport is source-contract's `tools-rpc` module. Its methods are `RPC_TOOLS`; `NATIVE_ONLY`
-  (`generate-image`) is never a method and is reported separately in status. The plugin registers it with
-  `operationalShapers(guard.assertOperational)`, so the guard runs before every script dispatch.
+- **Scripts**: `src/host/tools-rpc.ts` is OpenRouter's part of the tools RPC. The transport is source-contract's
+  `tools-rpc` module. Its methods are `RPC_TOOLS`; the native-only tools (`NATIVE_ONLY`) are never methods and are
+  reported separately in status. The plugin registers it with `operationalShapers(guard.assertOperational)`, so the
+  guard runs before every script dispatch.
 - **Skills**: `skills/<name>/SKILL.md` and `src/skills.ts`: read at step 2 outside every transform, registered at step 7.
   A new skill is added to `SKILL_NAMES` and to `jelly.skills` in `package.json`. A user's skill of the same name wins and
   is reported `shadowed`; a missing or malformed file is `SKILLS_INVALID` in `PluginState`, never a setup failure.
 
 ## Rules
 
-- **Public API only.** Use only the public `@opencode/plugin` 2.2.3 API. `opencode.host` in `package.json` and
-  `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.4.0`, never `^2.2.3`. `TESTED_HOSTS` in
-  `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2): the host and pack stages and CI
-  run on each. Inside the range an untested release, such as 2.2.99, still starts.
+- **Public API only.** Use only the public `@opencode/plugin` 2.4.1 API. `opencode.host` in `package.json` and
+  `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.4.1 <2.5.0`, never `^2.4.1`. `TESTED_HOSTS` in
+  `src/constants.ts` is the one list of tested releases, and it holds `2.4.1` alone: the host and pack stages and CI run
+  on it. Inside the range an untested release, such as 2.4.2, still starts.
+- **No pins and no hooks.** No tool is `pinned`, and no tool is forced out of Code Mode. There is no per-request
+  `context`, `prompt`, `compaction` or `idle` hook. A cost line belongs in status, not in a hook.
 - **The icon is OpenRouter's own glyph.** `assets/icon.svg` (and the two PNGs rendered from it with resvg) is OpenRouter's published Volt-on-Ink square glyph from https://openrouter.ai/brand, only scaled (its path data is pre-scaled to the 48 grid; the Ink backdrop square is the vendor's own and has no rounded corners). Do not stretch, recolour, redraw, round or combine it, and keep the README's trademark line. `opencode.vendor.mark: true` tells `scripts/check-icons.mjs` (contract revision 2) so. Revision 2 of that script is ahead of the kit's copy until the release-kit rollout; do not edit it here.
 - **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead.
 - **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and `@opencode/client`
-  are devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs
-  the other tested SDKs into a temp folder.
+  are devDependencies pinned to exactly `2.4.1`, and `effect` to `4.1.0` because the client's peer asks for it. Do not
+  add another host version to the lockfile.
 - **Ship prebuilt, one file per entry.** `scripts/build.mjs` bundles `src/index.ts` and `src/tui.ts` with esbuild into the
   self-contained `dist/index.js` and `dist/tui.js`: no chunks, no relative imports, and only host-provided modules
   external. `tsc` only typechecks.
@@ -56,23 +58,28 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
   tools on the base allow.
 - **The guard fails closed under `ask-changes` and `read-only`.** Health starts blocked and opens only when the rules
   applied and the server is owned. Under the default `all` the rules allow every tool, so the guard holds nothing back;
-  only an unloading plugin stops a call. Every
-  OpenRouter tool's executor is decorated in place, the original captured inside each pass and called once; the check is
-  live. Never add a permission hook, a second prompt or a retry to it.
+  only an unloading plugin stops a call. Every OpenRouter tool's executor is decorated in place, the original captured
+  inside each pass and called once; the check is live. Never add a permission hook, a second prompt or a retry to it,
+  and never change a tool's options in it.
 - **Transforms are cheap, synchronous and never throw.** No file reads, network calls, awaited work or new timers in a
   transform callback. Record failures for status instead. A replay replaces what it observed, never appends.
-- **`src/openrouter-tools.ts` is the one record of OpenRouter's tools**, with no imports. Everything else derives from it.
-  Its 31 names, and each tool's class, come from the signed-in capture in `test/fixtures/live-tools.json` (descriptions,
-  schemas and annotations); anything that bills or may spend is billable, and when in doubt it is.
-  `test/fixtures/documented-tools.json` is labelled `documented` and never stands in for a live capture. The capture is recorded in
-  `test/fixtures/provenance.json` with its host version, protocol and digest. Only `scripts/capture-live.ts` writes it, by
-  hand, never from `npm run check` or CI; it calls only the free reads in `FREE_READS` (`scripts/live-catalog.ts`) and
-  refuses every other `tools/call` before it is sent. A script method's `scriptOutput` becomes `live-observed` only when
-  `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms it.
-- **The `jelly` section** of `package.json` declares every reviewed tool, the skills, the sign-in, the `access` setting,
-  a one-line `summary` and the `icon`, with only the keys Jelly reads. Each tool's effect is the default rules' decision
-  under the default `access`, `all` (so every tool is `allow`); `test/unit/jelly.test.ts` keeps it in step with the
-  catalog, and `test/unit/declaration-drift.test.ts` with the committed live capture. See [docs/jelly.md](docs/jelly.md).
+- **`src/openrouter-tools.ts` is the one record of OpenRouter's tools**, with no imports. Everything else derives from
+  it: the default rules, the script methods, status counts, the spend line and the legacy declaration's tools. Its 31
+  names, and
+  each tool's class, come from the signed-in capture in `test/fixtures/live-tools.json` (descriptions, schemas and
+  annotations). Each tool has exactly one spend class: `spend: true` bills the OpenRouter account, and when in doubt it
+  is true. `actionEffectOf` maps a change to the contract's `actions[].effect` (`spend`, or `notify` for feedback) from
+  that one column. `test/fixtures/documented-tools.json` is labelled `documented` and never stands in for a live
+  capture. The capture is recorded in `test/fixtures/provenance.json` with its host version, protocol and digest. Only
+  `scripts/capture-live.ts` writes it, by hand, never from `npm run check` or CI; it calls only the free reads in
+  `FREE_READS` (`scripts/live-catalog.ts`) and refuses every other `tools/call` before it is sent. A script method's
+  `scriptOutput` becomes `live-observed` only when `test/unit/live-catalog.test.ts`'s reconcile says the capture confirms
+  it.
+- **The legacy `jelly` declaration** in `package.json` is still carried: it declares every reviewed tool, the skills,
+  the sign-in, the `access` setting, a one-line `summary` and the `icon`, with only the keys that declaration reads, and
+  its `cost` line names the seven spending tools. `test/unit/jelly.test.ts` keeps it in step with the catalog and the
+  cost line, and `test/unit/declaration-drift.test.ts` with the committed live capture; the copied `test/support/jelly-*`
+  tooling stays with it. It is removed in 4b with the plugin-contract manifest; do not add to it.
 - **Errors** read `CODE: What happened. Next step: What to do.`, built by `pluginError`, `errorText` or `codeText`.
   `CODES` in `src/constants.ts` is the one table, and the README's `Errors` table is checked equal to it.
 - **Redaction.** Host or network text is shown only through `src/redact.ts`: one line, at most 160 characters, no
@@ -80,11 +87,11 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - **Native-only tools.** A tool whose useful result is media the tools RPC drops (`rpcExclusion: "native-media-required"`)
   or that describes the signed-in key (`"key-metadata"`) is never a script method. A new media generator joins them.
 - **The tools RPC.** `src/host/tools-rpc.ts` is OpenRouter's part of it. The transport is source-contract's `tools-rpc`
-  module, pinned in `package.json` and bundled into `dist/index.js`; change the transport there, never here.
-  `test/unit/tools-rpc.test.ts` is the family's suite. Keep the RPC id `openrouter.models.tools` and the hyphenated method names: scripts call them by name.
-  A method's output evidence is the `scriptOutput` column of the catalog; only a signed-in capture may make it
-  `live-observed`, and a method whose live result is media leaves `RPC_TOOLS`. The next steps never tell a script to
-  repeat `send-message` or `send-feedback` after an uncertain outcome.
+  module, pinned to an exact commit in `package.json` and bundled into `dist/index.js`; change the transport there, never
+  here. `test/unit/tools-rpc.test.ts` is the family's suite. Keep the RPC id `openrouter.models.tools` and the hyphenated
+  method names: scripts call them by name. A method's output evidence is the `scriptOutput` column of the catalog; only a
+  signed-in capture may make it `live-observed`, and a method whose live result is media leaves `RPC_TOOLS`. The next
+  steps never tell a script to repeat `send-message` or `send-feedback` after an uncertain outcome.
 - **No paid or signed-in calls from a check.** Tests use the loopback fake with synthetic names, prompts, tokens and
   accounts. Never sign in to OpenRouter or call its API from a check.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
@@ -95,16 +102,13 @@ namespace (6), the status command, the status RPC and the tools RPC (7), and the
 - **Text.** Docs and model-facing text describe what the code does now: no process narrative, machine-local paths,
   secrets or personal data. Never claim an unpublished tag can be installed.
 - **Releases** come only from `.github/workflows/release.yml` ("Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)). A
-  release-prep PR sets `version` in `package.json` and the install specs and runs `node scripts/changelog.mjs release`;
-  once it is on `master` and CI passed, start the release with
-  `gh workflow run release.yml --ref master -f sha=<its full sha>`. The workflow builds `dist/`, makes the release
-  commit on a temporary `release/v<version>` branch, checks and stages everything, and waits for the owner to approve
-  the `release` environment; only then does it create the tag `v<version>` and the GitHub Release. Never push a tag or a
-  `release/*` branch, and never commit, tag or publish a release by hand. Agents never approve a release, never call the
-  deployment-approval API, and never bypass a ruleset or the environment.
-- **No personal email in anything we publish.** Every commit is authored and committed as
-  `joe-broadhead <91376460+joe-broadhead@users.noreply.github.com>`, except the release commit and tag, which the
-  release workflow makes as `github-actions[bot]`. Check `git config user.email` before committing.
+  release-prep PR sets `version` in `package.json` and runs `node scripts/changelog.mjs release`; once it is on `master`
+  and CI passed, the owner starts the release with
+  `gh workflow run release.yml --ref master -f sha=<its full sha>`. Never push a tag or a `release/*` branch, and never
+  commit, tag or publish a release by hand. Agents never approve a release, never call the deployment-approval API, and
+  never bypass a ruleset or the environment.
+- **No personal email in anything we publish.** Check `git config user.email` before committing and use the repository's
+  bot identity, never a personal address.
 - **One check command.** `npm run check` passes before every commit. Never skip, weaken or delete a test to get green.
 
 ## Forbidden in this repository

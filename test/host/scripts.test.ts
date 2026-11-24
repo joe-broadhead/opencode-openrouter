@@ -55,7 +55,7 @@ describe(`script permission parity on OpenCode ${HOST_VERSION}, access ask-chang
     expect(host.fake.calls.slice(before)).toEqual(["list-models", "list-models"])
   })
 
-  test("billable inference and feedback ask natively; a script is refused at once, with no prompt left and nothing sent", async () => {
+  test("spending inference and feedback ask natively; a script is refused at once, with no prompt left and nothing sent", async () => {
     const sessionID = await session(host)
     const before = host.fake.calls.length
     for (const method of ["send-message", "send-batch", "send-decision", "transcribe-audio", "send-feedback"]) {
@@ -101,7 +101,7 @@ describe("script permission parity, access read-only", () => {
   })
   afterAll(() => host?.close())
 
-  test("billable inference and feedback are denied on both paths with zero dispatch; a read still runs", async () => {
+  test("spending inference and feedback are denied on both paths with zero dispatch; a read still runs", async () => {
     const sessionID = await session(host)
     for (const method of ["send-message", "send-feedback"]) {
       expect(await script(host, method, { sessionID, input: {} })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })

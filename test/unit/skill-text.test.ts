@@ -1,9 +1,9 @@
-// The shipped skills: exactly the four, loadable, named after their folders, plain files, listed in the Jelly
+// The shipped skills: exactly the four, loadable, named after their folders, plain files, listed in the legacy
 // declaration and the package whitelist, and never naming a tool the reviewed catalog does not have.
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
-import { BILLABLE_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { SPEND_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { parseSkill, SKILL_NAMES, SKILLS_DIR } from "../../src/skills.js"
 
 const read = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8")
@@ -26,7 +26,7 @@ function mentioned(text: string) {
 }
 
 describe("the shipped skills", () => {
-  test("are exactly the four, each a single SKILL.md, and exactly the Jelly declaration's list", () => {
+  test("are exactly the four, each a single SKILL.md, and exactly the legacy declaration's list", () => {
     expect(readdirSync(SKILLS_DIR).sort()).toEqual([...SKILL_NAMES].sort())
     for (const name of SKILL_NAMES) expect(readdirSync(join(SKILLS_DIR, name))).toEqual(["SKILL.md"])
     expect(pkg.jelly.skills).toEqual([...SKILL_NAMES])
@@ -49,12 +49,22 @@ describe("the shipped skills", () => {
     expect(skill.description!.length).toBeLessThanOrEqual(1024)
   })
 
-  test("carry the descriptions that route a request to each skill", () => {
+  test("carry the one-line descriptions that route a request to each skill, within the 300-character budget", () => {
     const description = (name: string) => parseSkill(name, "/x", read(name)).description
-    expect(description("openrouter")).toStartWith("Use live OpenRouter information to find and shortlist models")
-    expect(description("openrouter-evaluate")).toStartWith("Run a bounded, authorized comparison or prompt test using OpenRouter models")
-    expect(description("openrouter-images")).toStartWith("Generate requested images through OpenRouter's connected MCP service")
-    expect(description("openrouter-troubleshoot")).toStartWith("Diagnose OpenRouter MCP connection, authentication, discovery, credit, generation, routing, or tool failures")
+    expect(description("openrouter")).toBe(
+      "Find and compare OpenRouter models, endpoints and routing, usage trends, and integration questions from current docs. For paid tests, images or failures, use openrouter-evaluate, openrouter-images or openrouter-troubleshoot.",
+    )
+    expect(description("openrouter-evaluate")).toBe(
+      "A bounded, authorized test of OpenRouter models on real prompts, reporting outputs, behaviour and cost. Use Ori only when the user asks for an Ori or harness evaluation.",
+    )
+    expect(description("openrouter-images")).toBe(
+      "Image, speech or video generation and audio transcription through OpenRouter when the user asks for OpenRouter; check the tool schema before assuming edits or reference images.",
+    )
+    expect(description("openrouter-troubleshoot")).toBe(
+      "Diagnose OpenRouter MCP connection, authentication, discovery, credit, generation, routing, or tool failures using safe local diagnostics and current service information. Prepare or submit generation feedback only when the user explicitly requests that action.",
+    )
+    for (const name of SKILL_NAMES) expect({ name, length: description(name)!.length }).toEqual({ name, length: expect.any(Number) })
+    for (const name of SKILL_NAMES) expect(description(name)!.length).toBeLessThanOrEqual(300)
   })
 
   test.each([...SKILL_NAMES])("%s names only tools in the reviewed catalog, in every form it uses", (name) => {
@@ -80,14 +90,14 @@ describe("the shipped skills", () => {
     for (const tool of TOOL_NAMES) expect({ tool, used: all.has(tool) }).toEqual({ tool, used: true })
   })
 
-  test("the research skill calls no billable tool, and routes paid and media requests to the other skills", () => {
+  test("the research skill calls no spending tool, and routes paid and media requests to the other skills", () => {
     const research = read("openrouter")
-    for (const tool of BILLABLE_TOOLS) expect(research).toContain(`\`${tool}\``)
-    expect(research).toContain("Route paid tests to the evaluate skill and media requests to the images skill")
+    for (const tool of SPEND_TOOLS) expect(research).toContain(`\`${tool}\``)
+    expect(research).toContain("Route spending tests to the evaluate skill and media requests to the images skill")
     expect(research).toContain("not the user's own spend")
   })
 
-  test("every billable tool is used only on an explicit request, called once, and checked before any repeat", () => {
+  test("every spending tool is used only on an explicit request, called once, and checked before any repeat", () => {
     const evaluate = read("openrouter-evaluate")
     expect(evaluate).toContain("use those two only when the user explicitly asks")
     expect(evaluate).toContain("Use `send-batch` only when the user explicitly asks for an offline batch")
@@ -100,10 +110,10 @@ describe("the shipped skills", () => {
     const troubleshoot = read("openrouter-troubleshoot")
     expect(troubleshoot).toContain("use `get-current-key` first")
     expect(troubleshoot).toContain("check `get-generation`, `get-batch`, or `get-video` for what actually ran")
-    for (const tool of BILLABLE_TOOLS) expect(troubleshoot).toContain(`\`${tool}\``)
+    for (const tool of SPEND_TOOLS) expect(troubleshoot).toContain(`\`${tool}\``)
   })
 
-  test("name no script surface for the image tool, and keep it out of Code Mode", () => {
+  test("advertise no script or Code Mode call surface for the image tool", () => {
     const images = read("openrouter-images")
     expect(images).toContain("`openrouter_generate-image`")
     expect(images).not.toContain('tools.openrouter["generate-image"]')

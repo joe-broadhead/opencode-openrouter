@@ -23,11 +23,12 @@ export const TOOLS_RPC_ID = toolsRpcId(PLUGIN_ID)
 /**
  * The reviewed OpenRouter tools a script may call, by exact upstream name with its hyphens, from the plugin's one
  * catalog in `src/openrouter-tools.ts`: every tool whose `rpc` is true, with its effect as the class (`read`, `write` for
- * a billable call, `send` for feedback). The native-only tools are not methods: the media generators, because the
- * transport's result keeps structured content and text and drops an image, audio or video block, so a script would pay
- * for media it never receives; and `get-current-key`, which describes the signed-in key. Their routes are unknown to
- * the contract, which refuses them before anything runs. A tool OpenRouter adds later is never a method until it is
- * reviewed in the catalog. The class never decides whether a call runs: the rules do.
+ * a spending call, `send` for feedback; each change's contract `actions[].effect` is `spend` or `notify`, from the one
+ * catalog). The native-only tools are not methods: the media generators, because the transport's result keeps
+ * structured content and text and drops an image, audio or video block, so a script would pay for media it never
+ * receives; and `get-current-key`, which describes the signed-in key. Their routes are unknown to the contract, which
+ * refuses them before anything runs. A tool OpenRouter adds later is never a method until it is reviewed in the
+ * catalog. The class never decides whether a call runs: the rules do.
  */
 export const METHODS: readonly MethodSpec[] = REVIEWED_TOOLS.filter((tool) => tool.rpc).map((tool): MethodSpec => ({ kind: "mcp", name: tool.name, class: tool.effect }))
 
@@ -62,11 +63,11 @@ export const operationalShapers = (assertOperational: () => void): Shapers => ({
  * disconnected or failed upstream), repeating it may run and bill it twice. So these next steps never say "call again"
  * for them; a read can simply be repeated. Each is one sentence that ends with a full stop.
  */
-/** The script methods that change something, from the catalog: the billable ones, then the rest (feedback). */
-const PAID_METHODS = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.billable).map((tool) => tool.name)
+/** The script methods that change something, from the catalog: the spending ones, then the rest (feedback). */
+const SPEND_METHODS = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.spend).map((tool) => tool.name)
 const ASKING_METHODS = REVIEWED_TOOLS.filter((tool) => tool.rpc && tool.effect !== "read").map((tool) => tool.name)
-const OTHER_CHANGES = ASKING_METHODS.filter((name) => !PAID_METHODS.includes(name))
-const BEFORE_REPEATING = `for a billable method (${PAID_METHODS.join(", ")}) or ${OTHER_CHANGES.join(", ")} the call may already have run and been billed, so look for its generation or batch id in any output and check it with get-generation or get-batch, or check your activity on openrouter.ai, before you deliberately send it again`
+const OTHER_CHANGES = ASKING_METHODS.filter((name) => !SPEND_METHODS.includes(name))
+const BEFORE_REPEATING = `for a method that spends (${SPEND_METHODS.join(", ")}) or ${OTHER_CHANGES.join(", ")} the call may already have run and been billed, so look for its generation or batch id in any output and check it with get-generation or get-batch, or check your activity on openrouter.ai, before you deliberately send it again`
 export const NEXT_STEPS: NextSteps = {
   SESSION_UNKNOWN: `Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id.`,
   SESSION_AGENT_REQUIRED: `Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id.`,

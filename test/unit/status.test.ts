@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { CODES, PLUGIN_ID, SERVER_NAME, SUPPORTED_HOST } from "../../src/constants.js"
 import { checkHost } from "../../src/host-version.js"
 import type { ServerSource } from "../../src/mcp.js"
-import { NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { NATIVE_ONLY, RPC_TOOLS, SPEND_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
 import { buildStatus, formatStatus, LISTING_MS, readStatus, registerStatusCommand, registerStatusRpc, STATUS_COMMAND, StatusRpc, type StatusFacts, type StatusSource } from "../../src/status.js"
@@ -19,7 +19,7 @@ const CONFLICT =
   "SERVER_CONFLICT: Your OpenCode config's mcp.servers.openrouter points at another host (example.com); the plugin uses https://mcp.openrouter.ai/mcp. The plugin leaves it untouched and adds no rules, guard or label to it. Next step: Set mcp.servers.openrouter.url to exactly https://mcp.openrouter.ai/mcp, or rename or remove that entry so the plugin can add its own."
 
 const facts = (overrides: Partial<StatusFacts> = {}): StatusFacts => ({
-  host: checkHost("2.2.3", false),
+  host: checkHost("2.4.1", false),
   access: "ask-changes",
   source: PLUGIN,
   server: { status: "connected" },
@@ -38,7 +38,7 @@ describe("the status model", () => {
     const status = buildStatus(facts())
     expect(status).toEqual({
       version: VERSION,
-      host: { version: "2.2.3", range: SUPPORTED_HOST, tested: true },
+      host: { version: "2.4.1", range: SUPPORTED_HOST, tested: true },
       state: "connected",
       access: "ask-changes",
       source: "plugin",
@@ -158,7 +158,7 @@ describe("the report", () => {
   test("names each fact on its own row and the next step last", () => {
     const text = formatStatus(buildStatus(facts({ coverage: { unguarded: ["reviewer"], explicitlyAllowed: ["build"] } })))
     const rows = text.split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2).split(":")[0])
-    expect(rows).toEqual(["Connection", "Access", "Default rules", "Tools", "Scripts", "Skills", "Agents without default rules", "Agents that allow OpenRouter changes with their own rule", "OpenCode", "Problems", "Next step"])
+    expect(rows).toEqual(["Connection", "Access", "Spend", "Default rules", "Tools", "Scripts", "Skills", "Agents without default rules", "Agents that allow OpenRouter changes with their own rule", "OpenCode", "Problems", "Next step"])
     expect(text.split("\n")[0]).toBe("OpenRouter status")
     expect(text).toContain("- Connection: connected (registered by this plugin)")
     expect(text).toContain("- Access: ask-changes: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later ask first")
@@ -167,18 +167,27 @@ describe("the report", () => {
     // The exact block for the listed agent, one rule a line.
     expect(text).toContain(`- Agents without default rules: reviewer\n  ${JSON.stringify(defaultRules("ask-changes")[0])},`)
     expect(text).toContain("- Agents that allow OpenRouter changes with their own rule: build")
-    expect(text).toContain(`- OpenCode: 2.2.3 (tested; supported range ${SUPPORTED_HOST})`)
+    expect(text).toContain(`- OpenCode: 2.4.1 (tested; supported range ${SUPPORTED_HOST})`)
   })
 
   test("says read-only denies and all allows, and an untested host the user allowed", () => {
     expect(formatStatus(buildStatus(facts({ access: "read-only" })))).toContain("- Access: read-only: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later are denied")
-    expect(formatStatus(buildStatus(facts({ access: "all" })))).toContain("- Access: all: every OpenRouter tool is allowed, billable inference and feedback included")
-    expect(formatStatus(buildStatus(facts({ host: checkHost("2.4.0", true) })))).toContain("- OpenCode: 2.4.0 (untested; supported range >=2.2.3 <2.4.0). It is outside the supported range;")
+    expect(formatStatus(buildStatus(facts({ access: "all" })))).toContain("- Access: all: every OpenRouter tool is allowed, spending calls and feedback included")
+    expect(formatStatus(buildStatus(facts({ host: checkHost("2.5.0", true) })))).toContain("- OpenCode: 2.5.0 (untested; supported range >=2.4.1 <2.5.0). It is outside the supported range;")
+  })
+
+  test("states the one spend classification and the posture every spending tool runs under", () => {
+    const postures = { all: "run without asking", "ask-changes": "ask first", "read-only": "are denied" } as const
+    for (const access of ["all", "ask-changes", "read-only"] as const) {
+      expect(formatStatus(buildStatus(facts({ access })))).toContain(
+        `- Spend: 7 tools spend the account's credit (${SPEND_TOOLS.join(", ")}): at ${access} they ${postures[access]}. send-feedback sends feedback and spends nothing.`,
+      )
+    }
   })
 
   test("never holds a key, an auth URL, a balance or an expiry", () => {
     const text = formatStatus(buildStatus(facts()))
-    for (const word of ["sk-or", "authorize", "balance", "credit", "expires"]) expect(text.toLowerCase()).not.toContain(word)
+    for (const word of ["sk-or", "authorize", "balance", "expires"]) expect(text.toLowerCase()).not.toContain(word)
   })
 })
 
@@ -186,7 +195,7 @@ describe("the report", () => {
 function sources(overrides: { tools?: { id: string; options?: { namespace?: string } }[]; changedAt?: number } = {}) {
   const calls: string[] = []
   const state: StatusSource = {
-    host: checkHost("2.2.3", false),
+    host: checkHost("2.4.1", false),
     options: { access: "ask-changes" },
     server: () => ({ source: PLUGIN, problems: [] }),
     policy: () => ({ installation: "ready", problems: [] }),

@@ -32,7 +32,7 @@ export const FREE_READS: readonly string[] = [
 export const ACCOUNT_READS: readonly string[] = ["get-credits"]
 
 /**
- * Tools a capture never calls: every change in the catalog (billable inference, media, batches, decisions,
+ * Tools a capture never calls: every change in the catalog (spending inference, media, batches, decisions,
  * transcription, feedback) and the recipe whose follow-up runs an evaluation. The capture's real limit is FREE_READS,
  * an allowlist; this list is what the reconcile checks the fixture against.
  */
