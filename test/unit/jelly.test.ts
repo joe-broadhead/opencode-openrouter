@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { DISPLAY_NAME, SERVER_NAME } from "../../src/constants.js"
 import { nativeToolId } from "../../src/mcp.js"
-import { BILLABLE_TOOLS, READ_TOOLS, REVIEWED_TOOLS } from "../../src/openrouter-tools.js"
+import { READ_TOOLS, REVIEWED_TOOLS, SPEND_TOOLS } from "../../src/openrouter-tools.js"
 import { ACCESS, DEFAULT_ACCESS, parseOptions } from "../../src/options.js"
 import { BASE_ALLOW, defaultRules, lastMatch } from "../../src/permissions.js"
 import { SKILL_NAMES } from "../../src/skills.js"
@@ -32,13 +32,13 @@ describe("the jelly declaration", () => {
     expect(jelly.tools.map((tool) => tool.name)).toContain("openrouter.send-message")
   })
 
-  test("each declared effect is what the default rules decide under the default access; reads are read-only, billable tools are not", () => {
+  test("each declared effect is what the default rules decide under the default access; reads are read-only, spending tools are not", () => {
     const rules = [BASE_ALLOW, ...defaultRules(DEFAULT_ACCESS)]
     for (const tool of jelly.tools) expect([tool.permission, tool.effect]).toEqual([tool.permission, lastMatch(rules, tool.permission)!.effect])
     for (const name of READ_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "allow", readOnly: true })
-    for (const name of BILLABLE_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "allow", readOnly: false })
+    for (const name of SPEND_TOOLS) expect(jelly.tools.find((tool) => tool.permission === nativeToolId(name))).toMatchObject({ effect: "allow", readOnly: false })
     expect(jelly.tools.find((tool) => tool.permission === nativeToolId("send-feedback"))).toMatchObject({ effect: "allow", readOnly: false })
-    // The family default: every tool is allowed at access all, paid calls included.
+    // The family default: every tool is allowed at access all, spending calls included.
     expect(DEFAULT_ACCESS).toBe("all")
     expect(jelly.tools.every((tool) => tool.effect === "allow")).toBe(true)
   })
@@ -105,11 +105,11 @@ describe("the jelly declaration", () => {
     }
   })
 
-  test("declares no billing, budget or media field but jelly's own top-level cost line: no other key at any depth names one", () => {
+  test("declares no spend, budget or media field but jelly's own top-level cost line: no other key at any depth names one", () => {
     const keys = (value: unknown): string[] =>
       Array.isArray(value) ? value.flatMap(keys) : value !== null && typeof value === "object" ? Object.entries(value).flatMap(([key, item]) => [key, ...keys(item)]) : []
     const { cost: _cost, ...rest } = jelly
-    expect(keys(rest).filter((key) => /billing|budget|price|cost|media|spend/i.test(key))).toEqual([])
+    expect(keys(rest).filter((key) => /spend|budget|price|cost|media|spend/i.test(key))).toEqual([])
     expect(typeof jelly.cost).toBe("string")
   })
 

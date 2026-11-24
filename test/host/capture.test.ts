@@ -1,7 +1,7 @@
 // scripts/capture-live.ts against the loopback fake, on the public @opencode/sdk host: it records every tools/list page,
-// calls only the free reads, never a billable or feedback tool, writes no credential, stops at the sign-in page when
+// calls only the free reads, never a spending or feedback tool, writes no credential, stops at the sign-in page when
 // asked, and completes a sign-in through OpenCode's own OAuth before it captures. Each capture runs in a fresh process
-// (test/host/capture-child.ts), as the script does, because OpenCode 2.2.6 reads `globalThis.fetch` once per process.
+// (test/host/capture-child.ts), as the script does, because OpenCode reads `globalThis.fetch` once per process.
 // Synthetic: it proves the tool, not OpenRouter's server.
 import { ROOT, HOST_SDK_DIR } from "./isolate.js"
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"

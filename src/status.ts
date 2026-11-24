@@ -7,7 +7,7 @@ import type { Plugin, Rpc } from "@opencode/plugin"
 import { codeText, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
 import type { ServerSource } from "./mcp.js"
-import { CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, NATIVE_ONLY, reviewedTool, RPC_TOOLS, TOOL_NAMES } from "./openrouter-tools.js"
+import { CHANGE_TOOLS, LIVE_VERIFIED_SCRIPT_METHODS, NATIVE_ONLY, NOTIFY_TOOLS, reviewedTool, RPC_TOOLS, SPEND_TOOLS, TOOL_NAMES } from "./openrouter-tools.js"
 import { ACCESS, type Access } from "./options.js"
 import { defaultRules, type AgentCoverage } from "./permissions.js"
 import { shortReason } from "./redact.js"
@@ -85,7 +85,7 @@ export interface Status {
   }
   readonly policy: { readonly installation: "pending" | "ready" | "failed" }
   readonly skills: readonly { readonly name: string; readonly state: SkillState; readonly shadowedBy?: string }[]
-  /** Agents where a billable, feedback or unreviewed OpenRouter call would run with no prompt under a broad allow. */
+  /** Agents where a spending, feedback or unreviewed OpenRouter call would run with no prompt under a broad allow. */
   readonly unguardedAgents: readonly string[]
   /** Agents whose own rule allows such a call: an intentional decision, shown, never overridden. */
   readonly explicitlyAllowedAgents: readonly string[]
@@ -222,10 +222,18 @@ const SOURCE_TEXT: Record<ServerSource["type"], string> = {
   pending: "not checked yet",
 }
 
+/** How the spending tools fare under `access`; the rules, not this line, decide. */
+const SPEND_POSTURE = { all: "run without asking", "ask-changes": "ask first", "read-only": "are denied" } as const
+
+/** The spend classification, derived from the one catalog: which tools bill the account and which only notify. */
+function spendText({ access }: Status) {
+  return `${SPEND_TOOLS.length} tools spend the account's credit (${SPEND_TOOLS.join(", ")}): at ${access} they ${SPEND_POSTURE[access]}. ${NOTIFY_TOOLS.join(", ")} sends feedback and spends nothing.`
+}
+
 /** What the default rules do under `access`, derived from the catalog so it cannot go stale. */
 const postureOf = (access: Access) => {
   const changes = `${CHANGE_TOOLS.join(", ")} and tools OpenRouter adds later`
-  if (access === "all") return "every OpenRouter tool is allowed, billable inference and feedback included"
+  if (access === "all") return "every OpenRouter tool is allowed, spending calls and feedback included"
   return `reads run without asking; ${changes} ${access === "ask-changes" ? "ask first" : "are denied"}`
 }
 
@@ -289,6 +297,7 @@ export function formatStatus(status: Status) {
     "OpenRouter status",
     `- Connection: ${STATE_TEXT[status.state]} (${details})`,
     `- Access: ${status.access}: ${postureOf(status.access)}`,
+    `- Spend: ${spendText(status)}`,
     `- Default rules: ${POLICY_TEXT[status.policy.installation]}`,
     `- Tools: ${catalogText(status)}`,
     `- Scripts: ${scriptingText(status)}`,

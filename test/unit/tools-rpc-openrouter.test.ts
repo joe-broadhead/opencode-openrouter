@@ -138,7 +138,7 @@ describe("OpenRouter's block", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("never put an OpenRouter key in a script")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.openrouter")
     expect(NEXT_STEPS.PERMISSION_DENIED).toContain("a script cannot answer a prompt")
-    // The methods that ask under ask-changes come from the catalog, every billable one and feedback, never a hand-written pair.
+    // The methods that ask under ask-changes come from the catalog, every spending one and feedback, never a hand-written pair.
     expect(NEXT_STEPS.PERMISSION_DENIED).toContain(`under access "ask-changes" send-batch, send-decision, send-message, transcribe-audio, send-feedback ask`)
     for (const name of RPC_TOOLS.filter((method) => REVIEWED_TOOLS.find((tool) => tool.name === method)!.effect !== "read")) expect(NEXT_STEPS.CANCELLED).toContain(name)
     expect(NEXT_STEPS.ACCOUNT_UNKNOWN).toBeUndefined()

@@ -21,7 +21,7 @@
 // It watches the MCP server's HTTP responses in this process to record the raw `initialize` and `tools/list` pages
 // (every page), and refuses, before it is sent, every `tools/call` except the free reads in FREE_READS: it never calls
 // send-message, generate-image, send-feedback or spawn-ori-eval. It records each tool's name, its description in full
-// (public tool metadata, with its digest and length, so a billing judgement read from it can be checked later), its
+// (public tool metadata, with its digest and length, so a spend judgement read from it can be checked later), its
 // schemas and annotations, and, for each free read it calls, the shape of the result (types only). Any request body it
 // cannot read is refused too.
 import { spawnSync } from "node:child_process"
@@ -153,7 +153,7 @@ const reasonOf = (error: unknown) =>
 
 /**
  * Runs one capture. Call it in a fresh process, before anything has loaded OpenCode: the tap replaces
- * `globalThis.fetch`, which OpenCode 2.2.6 reads once per process.
+ * `globalThis.fetch`, which OpenCode resolves once per process.
  */
 export async function capture(options: CaptureOptions): Promise<CaptureResult> {
   const log = options.log ?? (() => {})
@@ -184,7 +184,7 @@ export async function capture(options: CaptureOptions): Promise<CaptureResult> {
       const found = await row()
       return found && found.status.status !== "pending" ? found : undefined
     }, 120_000)
-    // OpenCode 2.2.6 resolves `globalThis.fetch` once per process, on first use: a host that used fetch before the tap
+    // OpenCode resolves `globalThis.fetch` once per process, on first use: a host that used fetch before the tap
     // was installed would bypass it, and the capture would see nothing. Fail now rather than record nothing.
     if (watch.seen() === 0) throw new Error("capture-live: no MCP request passed through the capture's tap; run it in a fresh process, before anything loads OpenCode")
     if (first.status.status === "needs_auth") {
@@ -273,7 +273,7 @@ export async function capture(options: CaptureOptions): Promise<CaptureResult> {
     const init = watch.initialize()
     const fixture: LiveFixture = {
       evidence: "live-observed",
-      note: "Captured from OpenRouter's MCP server with a signed-in account by scripts/capture-live.ts. Descriptions are public tool metadata, recorded in full; results as types only. No key, token, account id, balance or result text is recorded. No billable or feedback tool was called.",
+      note: "Captured from OpenRouter's MCP server with a signed-in account by scripts/capture-live.ts. Descriptions are public tool metadata, recorded in full; results as types only. No key, token, account id, balance or result text is recorded. No spending or feedback tool was called.",
       retrieved: new Date().toISOString().slice(0, 10),
       endpoint: options.endpoint,
       host: { version: sdkVersion, via: "embedded @opencode/sdk" },

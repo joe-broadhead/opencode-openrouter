@@ -8,9 +8,8 @@ import "./isolate.js"
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Plugin } from "@opencode/plugin"
 import { SERVER_NAME } from "../../src/constants.js"
-import { IMAGE_TOOL } from "../../src/guard.js"
 import { nativeToolId } from "../../src/mcp.js"
-import { BILLABLE_TOOLS, CHANGE_TOOLS, READ_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
+import { SPEND_TOOLS, CHANGE_TOOLS, READ_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 import { IMAGE_PNG, NEW_TOOL } from "./fake-mcp.js"
 import { agentRules, attempt, cleanup, describeError, effect, HOST_VERSION, integration, pluginWith, serverRow, session, startHost, until, type Host, type Rule } from "./harness.js"
@@ -19,7 +18,7 @@ setDefaultTimeout(300_000)
 afterAll(cleanup)
 
 const BUILT_IN = ["build", "general", "explore", "compaction", "title", "summary", "plan"]
-const FEEDBACK = CHANGE_TOOLS.filter((name) => !BILLABLE_TOOLS.includes(name))
+const FEEDBACK = CHANGE_TOOLS.filter((name) => !SPEND_TOOLS.includes(name))
 const ALL_TOOLS = [...TOOL_NAMES, NEW_TOOL]
 /** A declined prompt: the host's error, wrapped by the plugin's executor, with the decline the session loop looks for. */
 const DECLINED = "Tool.Error:  [Permission.DeclinedError]"
@@ -100,10 +99,10 @@ describe(`access ask-changes on OpenCode ${HOST_VERSION}`, () => {
     expect(host.fake.calls.slice(before)).toEqual([...READ_TOOLS])
   })
 
-  test("billable inference, feedback and an unreviewed tool ask, and a declined prompt sends nothing", async () => {
+  test("spending inference, feedback and an unreviewed tool ask, and a declined prompt sends nothing", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
-    for (const tool of [...BILLABLE_TOOLS, ...FEEDBACK, NEW_TOOL]) {
+    for (const tool of [...SPEND_TOOLS, ...FEEDBACK, NEW_TOOL]) {
       expect({ tool, result: await attempt(host, build, "build", tool) }).toEqual({ tool, result: { asked: nativeToolId(tool), ok: false, error: DECLINED } })
     }
     expect(host.fake.calls.length).toBe(before)
@@ -116,15 +115,17 @@ describe(`access ask-changes on OpenCode ${HOST_VERSION}`, () => {
     expect(host.fake.calls.slice(before)).toEqual(["send-message"])
   })
 
-  test("generate-image is a direct tool, outside Code Mode, and its text and image block pass through the guard unchanged", async () => {
-    const image = (await listed(host)).find((tool) => tool.id === IMAGE_TOOL)!
-    expect(image.options).toEqual({ namespace: SERVER_NAME, codemode: false })
-    // Every other OpenRouter tool stays in Code Mode.
-    expect((await listed(host)).filter((tool) => tool.options?.codemode === false).map((tool) => tool.id)).toEqual([IMAGE_TOOL])
+  test("generate-image stays in Code Mode like every other tool, and its text and image block pass through the guard unchanged", async () => {
+    const image = nativeToolId("generate-image")
+    const listedImage = (await listed(host)).find((tool) => tool.id === image)!
+    expect(listedImage.options).toEqual({ namespace: SERVER_NAME, codemode: true })
+    // Nothing is pinned or forced out of Code Mode.
+    expect((await listed(host)).filter((tool) => tool.options?.codemode === false).map((tool) => tool.id)).toEqual([])
+    expect((await listed(host)).filter((tool) => tool.options?.pinned === true).map((tool) => tool.id)).toEqual([])
     const build = await session(host)
     const before = host.fake.calls.length
     const outcome = await attempt(host, build, "build", "generate-image", "once")
-    expect(outcome).toMatchObject({ asked: IMAGE_TOOL, ok: true })
+    expect(outcome).toMatchObject({ asked: image, ok: true })
     expect(host.fake.calls.slice(before)).toEqual(["generate-image"])
     expect((outcome as { result: unknown }).result).toEqual({
       output: "synthetic generate-image",
@@ -159,7 +160,7 @@ describe("access read-only", () => {
   })
   afterAll(() => host?.close())
 
-  test("denies a tool OpenRouter added later, billable inference and feedback, and sends nothing", async () => {
+  test("denies a tool OpenRouter added later, spending inference and feedback, and sends nothing", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     for (const tool of [NEW_TOOL, ...CHANGE_TOOLS]) {
@@ -186,7 +187,7 @@ describe("the default access, all", () => {
   })
   afterAll(() => host?.close())
 
-  test("allows every tool, billable inference, feedback and a tool OpenRouter added later included, with no prompt", async () => {
+  test("allows every tool, spending inference, feedback and a tool OpenRouter added later included, with no prompt", async () => {
     expect(host.state().options.access).toBe("all")
     expect((await agentRules(host)).get("build")!.slice(1, 1 + defaultRules("all").length)).toEqual(defaultRules("all"))
     const build = await session(host)
@@ -245,13 +246,13 @@ describe("the user's and the agent's configured rules", () => {
     expect(host.fake.calls.length).toBe(before)
   })
 
-  test("and the agent's own allow on billable inference the block asks for wins, reported as an explicit allow", async () => {
+  test("and the agent's own allow on spending inference the block asks for wins, reported as an explicit allow", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     expect(await attempt(host, build, "build", "send-message")).toMatchObject({ asked: undefined, ok: true })
     expect(host.fake.calls.slice(before)).toEqual(["send-message"])
-    // The other billable tool still asks.
-    expect(await attempt(host, build, "build", "generate-image")).toMatchObject({ asked: IMAGE_TOOL, ok: false })
+    // The other spending tool still asks.
+    expect(await attempt(host, build, "build", "generate-image")).toMatchObject({ asked: nativeToolId("generate-image"), ok: false })
     const coverage = await host.state().agentCoverage()
     expect(coverage.unguarded).toEqual([])
     expect(coverage.explicitlyAllowed).toContain("build")
@@ -267,7 +268,7 @@ describe("a later broad allow in the user's permissions", () => {
   })
   afterAll(() => host?.close())
 
-  test("runs billable inference with no prompt, and the agent is reported unguarded even though its block is present", async () => {
+  test("runs spending inference with no prompt, and the agent is reported unguarded even though its block is present", async () => {
     const rules = (await agentRules(host)).get("build")!
     expect(rules.slice(1, 1 + defaultRules("ask-changes").length)).toEqual(defaultRules("ask-changes"))
     const build = await session(host)
@@ -296,7 +297,7 @@ describe("a conflicting user openrouter entry", () => {
     await Bun.sleep(200)
     const rules = await agentRules(host)
     for (const id of BUILT_IN) expect({ id, rules: rules.get(id)!.filter((rule) => rule.action.startsWith(`${SERVER_NAME}_`)) }).toEqual({ id, rules: [] })
-    expect((await listed(host)).find((tool) => tool.id === IMAGE_TOOL)?.options).toEqual({ namespace: SERVER_NAME, codemode: true })
+    expect((await listed(host)).find((tool) => tool.id === nativeToolId("generate-image"))?.options).toEqual({ namespace: SERVER_NAME, codemode: true })
     expect(await host.state().agentCoverage()).toEqual({ unguarded: [], explicitlyAllowed: [] })
   })
 })

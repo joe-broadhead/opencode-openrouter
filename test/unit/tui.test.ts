@@ -8,7 +8,7 @@ import tui, { REFRESH_COMMAND_ID, setupView, STATUS_COMMAND_ID, TUI_ID, viewMess
 
 const status = (overrides: Partial<StatusFacts> = {}): Status =>
   buildStatus({
-    host: checkHost("2.2.3", false),
+    host: checkHost("2.4.1", false),
     access: "ask-changes",
     source: { type: "plugin" },
     server: { status: "connected" },

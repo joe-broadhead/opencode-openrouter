@@ -27,13 +27,17 @@ describe(`the tool registry of OpenCode ${HOST_VERSION}`, () => {
   afterAll(() => host?.close())
 
   test("a plugin's tool transform lists the MCP tools under their native ids, in the server's namespace", async () => {
-    let seen: { id: string; namespace?: string; codemode?: boolean }[] = []
+    // OpenCode 2.4 may express Code Mode as `true` or as its options object; both mean the tool is in Code Mode.
+    const inCodeMode = (codemode: unknown) => codemode !== false
+    let seen: { id: string; namespace?: string; codemode?: unknown }[] = []
     const registration = await host.probe().tool.transform((editor) => {
       seen = editor.list().filter((tool) => tool.id.startsWith(`${SERVER_NAME}_`)).map((tool) => ({ id: tool.id, namespace: tool.options?.namespace, codemode: tool.options?.codemode }))
     })
     try {
       await until("the transform has run", async () => seen.length > 0)
-      expect(seen.find((tool) => tool.id === "openrouter_send-message")).toEqual({ id: "openrouter_send-message", namespace: SERVER_NAME, codemode: true })
+      const send = seen.find((tool) => tool.id === "openrouter_send-message")!
+      expect(send).toMatchObject({ id: "openrouter_send-message", namespace: SERVER_NAME })
+      expect(inCodeMode(send.codemode)).toBe(true)
     } finally {
       await registration.dispose()
     }

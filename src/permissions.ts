@@ -31,7 +31,7 @@ export const BASELINE_ACTION = `${SERVER_NAME}_*`
  */
 export const changeEffect = (access: Access): Rule["effect"] => (access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny")
 
-/** A reviewed tool's effect under `access`: every read is allowed; billable inference and feedback follow the access. */
+/** A reviewed tool's effect under `access`: every read is allowed; spending calls and feedback follow the access. */
 export const effectOf = (tool: ReviewedTool, access: Access): Rule["effect"] => (tool.effect === "read" ? "allow" : changeEffect(access))
 
 /** The exact block for `access`: the baseline, then every reviewed tool in catalog order. */
@@ -121,7 +121,7 @@ export const lastMatch = (permissions: readonly Rule[], action: string) =>
 /** A tool name the catalog has never reviewed, used to probe how an agent treats OpenRouter's future tools. */
 const UNREVIEWED_PROBE = nativeToolId("unreviewed-tool")
 
-/** How the agents treat OpenRouter's changes: billable inference, image generation, feedback and unreviewed tools. */
+/** How the agents treat OpenRouter's changes: spending calls, image generation, feedback and unreviewed tools. */
 export interface AgentCoverage {
   /** Agents where such a call would run with no prompt because a broad `*` allow wins: the base allow with no block after it, or a later `* * allow`. Status gives each the exact block from `defaultRules`. */
   readonly unguarded: string[]

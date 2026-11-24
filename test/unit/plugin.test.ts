@@ -32,7 +32,7 @@ function context(options: { version?: string; options?: unknown; fail?: "mcp" | 
   const hooks = { count: 0 }
   const log: string[] = []
   const ctx = {
-    app: { version: options.version ?? "2.2.3" },
+    app: { version: options.version ?? "2.4.1" },
     options: options.options ?? {},
     mcp: {
       transform: (callback: (editor: McpEditor) => void) => {
@@ -255,12 +255,12 @@ describe("the plugin", () => {
     const { ctx } = context({ options: {} })
     const stop = await createOpenRouterPlugin({ endpoint: ENDPOINT, inspect: (value) => (state = value) }).setup(ctx)
     expect(state!.options).toEqual({ access: "all", allowUntestedHost: false })
-    expect(state!.host).toEqual({ version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true })
+    expect(state!.host).toEqual({ version: "2.4.1", range: ">=2.4.1 <2.5.0", tested: true })
     await (stop as () => Promise<void>)()
   })
 
   test("refuses bad options or an out-of-range host before registering anything", async () => {
-    for (const input of [{ options: { access: "everything" } }, { version: "2.4.0" }]) {
+    for (const input of [{ options: { access: "everything" } }, { version: "2.5.0" }]) {
       const { ctx, log } = context(input)
       await expect(createOpenRouterPlugin({ endpoint: ENDPOINT }).setup(ctx)).rejects.toThrow(/^(OPTIONS_INVALID|HOST_UNTESTED): /)
       expect(log).toEqual([])
