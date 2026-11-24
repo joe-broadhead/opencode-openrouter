@@ -5,8 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## 0.0.0 (unreleased)
 
-The first release under the new name and organization. It has no compatibility with
-`@joe-broadhead/opencode-openrouter`: install it as a new plugin.
+The first release under the new name and organization. It has no compatibility with any earlier release:
+install it as a new plugin.
 
 ### Added
 
