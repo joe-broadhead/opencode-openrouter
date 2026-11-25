@@ -42,5 +42,7 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run test:pack
-      - run: npx plugin-kit check
+      # The docs drift check is cheap and static, so it runs before the conformance gate; a known contract finding in
+      # that gate must not hide whether the generated sections are current.
       - run: npx plugin-kit docs --check
+      - run: npx plugin-kit check
