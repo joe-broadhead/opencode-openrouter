@@ -1,9 +1,9 @@
 # OpenRouter
 
 OpenRouter's hosted MCP server in OpenCode. The vendor's server owns the tools and the credentials; this plugin adds
-named accounts, the permission rules, `status`, `probe` and the documentation. It has no sources, no actions, no tools of
-its own and no bus events: all 31 tools are OpenRouter's, reached through each alias's own MCP server (`openrouter`,
-`openrouter-work`, …). It is built on
+named accounts, the permission rules, `status`, `probe` and the documentation. It has no sources, no actions, no bus
+events and no provider tools of its own; `status` and `probe` are its only agent tools. All 31 tools are OpenRouter's,
+reached through each alias's own MCP server (`openrouter`, `openrouter-work`, …). It is built on
 [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract) v0.
 
 Seven of them bill the account: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,

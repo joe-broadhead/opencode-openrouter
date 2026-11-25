@@ -9,8 +9,8 @@ silent, they decide.
 
 A tools-only connector on plugin-contract v0. OpenRouter's hosted MCP server at `https://mcp.openrouter.ai/mcp` owns the
 credentials and 31 tools. The plugin adds named accounts (one MCP server per alias, each with its own OAuth), `status`,
-`probe`, the permission rules and this documentation. It has no sources, no actions, no tools of its own and no bus
-events.
+`probe`, the permission rules and this documentation. It has no sources, no actions, no bus events and no provider
+tools of its own; `status` and `probe` are the plugin's only agent tools.
 
 ## Names
 
