@@ -1,7 +1,8 @@
 name: CI
 
 # One job, named ci: the org ruleset requires a check with that name. It runs the whole gate, so the required check
-# covers lint, typecheck, build, tests, the pack check, conformance, docs drift and the forbidden scan.
+# covers lint, typecheck, the committed bundle's freshness, tests, the pack check, conformance, docs drift and the
+# forbidden scan.
 #
 # It runs locally too: npm ci --ignore-scripts && npm run check
 #
@@ -38,9 +39,13 @@ jobs:
         # The contract is a public repository, and npm records its GitHub dependency over ssh. A runner has no key.
         run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
       - run: npm ci --ignore-scripts
+      - name: The committed bundle is current
+        # dist/index.js is committed, because a git dependency with a build script cannot be prepared inside OpenCode.
+        # Rebuild it here and fail when the committed file differs.
+        run: npm run bundle && git diff --exit-code dist/
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run build
+      - run: npm run bundle
       - run: npm test
       - run: npm run test:pack
       # The docs drift check is cheap and static, so it runs before the conformance gate; a known contract finding in

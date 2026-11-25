@@ -1,8 +1,9 @@
 name: Release
 
 # A tag v<package.json version> on a master commit whose CI passed creates the GitHub Release. Releases are not
-# published to npm: a consumer pins the tag, github:we-the-rebel-alliance/openrouter-plugin#v<version>, and dist/ is
-# built by this workflow. Only the owner decides a release; an agent never pushes a tag on its own.
+# published to npm: a consumer pins the tag, github:we-the-rebel-alliance/openrouter-plugin#v<version>, and the
+# committed dist/index.js is what npm installs. Only the owner decides a release; an agent never pushes a tag on its
+# own.
 
 on:
   push:

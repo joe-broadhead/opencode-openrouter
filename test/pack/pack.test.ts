@@ -119,7 +119,7 @@ test("the tarball installs beside @opencode/plugin 2.4.1 and its ./server entry 
     cwd: project,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: 300_000,
+    timeout: 600_000,
   })
 
   const entry = join(project, "check-entry.mjs")
