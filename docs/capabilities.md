@@ -85,5 +85,7 @@ None.
   class and in the docs instead of an `actions[].effect`.
 - **No bus events.** The plugin performs no write of its own, so it has no `changed` nudge to emit and declares `events:
   {}`.
-- **`status` and `probe`.** `status` takes no account and reports the version, host and every alias. `probe` answers
-  OpenCode's own MCP server identity for one alias; it reads no catalog content.
+- **`status` and `probe`.** `status` takes no account and reports the version, host and every alias. The contract
+  `status` shape is closed and has no `access` field: the access level is the `access` option and the generated
+  permission rules, and a missing rule shows as `unguardedAgents` and `nextStep`. `probe` answers OpenCode's own MCP
+  server identity for one alias; it reads no catalog content.

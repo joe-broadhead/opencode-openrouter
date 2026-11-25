@@ -47,7 +47,7 @@ src/accounts.ts           the mcp mechanism: one OpenRouter server per alias
 src/handlers/             one file per method the plugin owns: status and probe
 src/provider/mcp.ts       the endpoint, the per-alias server config and the live ctx.mcp.list() mapping
 src/manifest.ts           reads package.json capabilities and checks it with the contract
-src/skills.ts             reads skills/<name>/SKILL.md; setup registers them with ctx.skill.transform
+src/skills.ts             parses SKILL.md front matter as YAML; setup registers them with registerSkills
 test/unit/                manifest, accounts, provider mapping and probe
 test/fixture/             replays fixtures/conformance.json through the handlers
 test/pack/                the packed tarball and its ./server entry
@@ -86,9 +86,9 @@ dist/index.js             the committed server entry the `./server` export names
 11. **One provider endpoint**, named once in `src/provider/`.
 12. **Public OpenCode API only** (`@opencode/plugin` 2.4.1); the kit's forbidden list is final.
 13. **The plugin registers its own skills.** OpenCode does not load a package's `skills/` by itself: `src/skills.ts`
-    reads and parses each `skills/<name>/SKILL.md`, and `setup` calls `context.skill.transform(addPackagedSkills(skills))`.
-    A missing or malformed skill, or a description that is empty or a block indicator (`>`, `|`, `>-`), refuses setup
-    with the contract's `UNAVAILABLE`.
+    parses each `skills/<name>/SKILL.md` front matter as YAML, and `setup` calls `registerSkills(context, skills)`. Invalid
+    YAML, a missing field, a name that differs from the directory or a description that is empty or only a block marker
+    refuses setup with the contract's `SCHEMA_VIOLATION`.
 
 ## Changing a capability
 
@@ -110,11 +110,13 @@ dist/index.js             the committed server entry the `./server` export names
   step, account problems, unguarded agents and an unreadable server list.
 - `test/fixture/fixture.test.ts` replays `fixtures/conformance.json` through the handlers and checks the two account
   cases. The fixture is synthetic: there is no live account on the recording machine, and it says so.
-- `test/unit/skills.test.ts` proves the front-matter parser: one-line descriptions, quote stripping, and the
-  `UNAVAILABLE` refusal for an empty description or a block indicator (`>`, `|`, `>-`, `|+`).
+- `test/unit/skills.test.ts` proves the YAML front-matter parser: `>`, `|`, `>-`, `|-` fold or keep the text, invalid
+  YAML and marker-only or missing descriptions refuse `SCHEMA_VIOLATION`, and `registerSkills` adds every skill and
+  returns a disposer.
 - `test/host/skills.test.ts` loads the built `dist/index.js` in the embedded `@opencode/sdk` 2.4.1 host, with an empty
-  temporary project directory and an isolated `HOME`/`XDG_*`, activates the plugin and asserts the four skill ids and
-  their exact YAML-parsed descriptions. It fails when the skill registration or the description is broken.
+  temporary project directory and an isolated `HOME`/`XDG_*`, activates the plugin and asserts the four skill ids, names,
+  paths, bodies and exact YAML-parsed descriptions (not a marker). It fails when the skill registration or the
+  description parse is broken.
 - `test/host/mcp.test.ts` drives the built entry with an empty project and asserts the host lists `openrouter` by
   default and `openrouter-work`/`openrouter-personal` for two aliases, each at the vendor URL with `oauth: {}`. It fails
   when `registerOpenRouterAccounts` is removed.

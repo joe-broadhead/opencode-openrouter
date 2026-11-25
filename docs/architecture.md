@@ -9,7 +9,7 @@
 | Accounts | `src/accounts.ts` | one OpenRouter MCP server per alias, through the contract's `accounts` module |
 | Provider | `src/provider/mcp.ts` | the one MCP URL, the per-alias server config, and the live `ctx.mcp.list()` read |
 | Handlers | `src/handlers/` | one handler per method the plugin owns: `status` and `probe` |
-| Skills | `src/skills.ts` | reads and parses `skills/<name>/SKILL.md`; `setup` registers them through `ctx.skill.transform` |
+| Skills | `src/skills.ts` | parses `skills/<name>/SKILL.md` front matter as YAML; `setup` registers them with `registerSkills` |
 
 The entry is deliberately thin. `register` from the contract wires doors 1–3: one agent tool per non-MCP method in the
 `openrouter` namespace, the same methods in Code Mode, one RPC registration under `openrouter`, the permission gate for
@@ -30,19 +30,17 @@ its own methods, and the access rules inserted into every agent. This repository
 6. For `status`, the handler asks the call for the agents that no longer hold the generated rules and the provider for
    each alias's signal, then the contract's `statusAnswer` assembles the answer. For `probe`, the handler reads
    `ctx.mcp.list()`, finds the alias's server entry, and answers OpenCode's own connection identity for it.
-7. After `register`, `setup` passes the loaded skills to `context.skill.transform(addPackagedSkills(skills))`;
-   the cleanup disposes that registration first, then `register`'s. The contract's `register` does not touch skills.
+7. After `register`, `setup` reads the skills with `readSkills()` and registers them with
+   `registerSkills(context, skills)`; the cleanup disposes that registration first, then `register`'s. The contract's
+   `register` does not touch skills.
 
 ## Skills
 
-OpenCode does not load a plugin package's skills by itself. `src/skills.ts` reads every `skills/<name>/SKILL.md` (front
-matter `name` and `description`; the body is the content), and `setup` calls
-`context.skill.transform(addPackagedSkills(skills))`, which adds each with `editor.add(...)`. A skill id is its
-front-matter name, which must equal its directory. The description must be a one-line YAML scalar; matching quotes are
-stripped, and an empty value or a block indicator (`>`, `|`, `>-`) refuses. A missing or malformed skill is a broken
-install: setup refuses
-with the contract's `UNAVAILABLE` and a reinstall step, never a plugin-defined code. The skill registration is disposed
-before the `register` registration.
+OpenCode does not load a plugin package's skills by itself. `src/skills.ts` parses every `skills/<name>/SKILL.md`
+front matter as YAML, so a `>`/`|` block scalar and its chomping variants register the text the author wrote. The name
+must equal the directory, the description must be non-empty and not only a block marker, and the body is the content.
+`setup` calls `registerSkills(context, skills)`; invalid YAML, a missing field or a marker-only description refuses with
+the contract's `SCHEMA_VIOLATION`. The skill registration is disposed before the `register` registration.
 
 ## The provider
 

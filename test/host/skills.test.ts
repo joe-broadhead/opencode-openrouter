@@ -40,8 +40,7 @@ function packagedSkills(): ExpectedSkill[] {
       assert.equal(typeof parsed.description, "string", `${item.name}/SKILL.md must have a string description`)
       const description = parsed.description as string
       assert.ok(description.length > 0, `${item.name}/SKILL.md must have a non-empty description`)
-      assert.notEqual(description, ">", `${item.name}/SKILL.md has an unparsed folded-block description`)
-      assert.notEqual(description, "|", `${item.name}/SKILL.md has an unparsed literal-block description`)
+      for (const marker of [">", "|", ">-", "|-", ">+", "|+"]) assert.notEqual(description.trim(), marker, `${item.name}/SKILL.md has the block marker ${marker}`)
       return { name: item.name, description }
     })
     .sort((left, right) => left.name.localeCompare(right.name))
@@ -97,7 +96,7 @@ test("the plugin registers all four packaged skills in the real 2.4.1 host", asy
     assert.ok(active, "the plugin did not activate in the host within 30 seconds")
 
     const listed = await created.skill.list({ location: { directory: project } })
-    type RegisteredSkill = { readonly id: unknown; readonly name?: unknown; readonly description?: unknown }
+    type RegisteredSkill = { readonly id: unknown; readonly name?: unknown; readonly description?: unknown; readonly path?: unknown; readonly content?: unknown }
     const byId = new Map<string, RegisteredSkill>(
       (listed.data as readonly RegisteredSkill[]).map((item) => [String(item.id), item] as const),
     )
@@ -105,6 +104,8 @@ test("the plugin registers all four packaged skills in the real 2.4.1 host", asy
       const registered = byId.get(skill.name)
       assert.ok(registered !== undefined, `the host lists no skill ${skill.name}; it lists ${[...byId.keys()].join(", ")}`)
       assert.equal(String(registered.name), skill.name, `${skill.name} has the wrong name`)
+      assert.equal(String(registered.path), join(skillsDirectory, skill.name, "SKILL.md"), `${skill.name} has the wrong path`)
+      assert.ok(typeof registered.content === "string" && registered.content.trim().length > 0, `${skill.name} has no body`)
       assert.equal(registered.description, skill.description, `${skill.name} has the wrong description`)
     }
   } finally {
