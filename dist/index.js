@@ -12121,11 +12121,12 @@ function parseSkill(name, path, text2) {
   for (const line of front.split("\n")) {
     const colon = line.indexOf(":");
     if (colon <= 0) continue;
-    fields.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2"));
+    fields.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2").trim());
   }
   if (fields.get("name") !== name) throw broken(name, `does not name itself "${name}" in its front matter`);
   const description = fields.get("description");
   if (description === void 0 || description === "") throw broken(name, "has no description");
+  if (/^[>|][+-]?$/.test(description)) throw broken(name, `has an unparsed block-scalar description ("${description}")`);
   const content = body.trim();
   if (content === "") throw broken(name, "has no body");
   return { name, description, path, content };

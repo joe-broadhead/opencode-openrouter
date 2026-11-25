@@ -87,7 +87,8 @@ dist/index.js             the committed server entry the `./server` export names
 12. **Public OpenCode API only** (`@opencode/plugin` 2.4.1); the kit's forbidden list is final.
 13. **The plugin registers its own skills.** OpenCode does not load a package's `skills/` by itself: `src/skills.ts`
     reads and parses each `skills/<name>/SKILL.md`, and `setup` calls `context.skill.transform(addPackagedSkills(skills))`.
-    A missing or malformed skill refuses setup with the contract's `UNAVAILABLE`.
+    A missing or malformed skill, or a description that is empty or a block indicator (`>`, `|`, `>-`), refuses setup
+    with the contract's `UNAVAILABLE`.
 
 ## Changing a capability
 

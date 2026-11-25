@@ -38,11 +38,14 @@ export function parseSkill(name: string, path: string, text: string): PackagedSk
   for (const line of front.split("\n")) {
     const colon = line.indexOf(":")
     if (colon <= 0) continue
-    fields.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2"))
+    fields.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2").trim())
   }
   if (fields.get("name") !== name) throw broken(name, `does not name itself "${name}" in its front matter`)
   const description = fields.get("description")
   if (description === undefined || description === "") throw broken(name, "has no description")
+  // A block scalar the simple front-matter reader cannot fold is an indicator alone (`>`, `|`, `>-`, `|+`), never the
+  // skill's description. Registering it would make the skill invisible to agents.
+  if (/^[>|][+-]?$/.test(description)) throw broken(name, `has an unparsed block-scalar description ("${description}")`)
   const content = body.trim()
   if (content === "") throw broken(name, "has no body")
   return { name, description, path, content }

@@ -38,7 +38,9 @@ its own methods, and the access rules inserted into every agent. This repository
 OpenCode does not load a plugin package's skills by itself. `src/skills.ts` reads every `skills/<name>/SKILL.md` (front
 matter `name` and `description`; the body is the content), and `setup` calls
 `context.skill.transform(addPackagedSkills(skills))`, which adds each with `editor.add(...)`. A skill id is its
-front-matter name, which must equal its directory. A missing or malformed skill is a broken install: setup refuses
+front-matter name, which must equal its directory. The description must be a one-line YAML scalar; matching quotes are
+stripped, and an empty value or a block indicator (`>`, `|`, `>-`) refuses. A missing or malformed skill is a broken
+install: setup refuses
 with the contract's `UNAVAILABLE` and a reinstall step, never a plugin-defined code. The skill registration is disposed
 before the `register` registration.
 
