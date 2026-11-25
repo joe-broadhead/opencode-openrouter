@@ -1,286 +1,115 @@
-// The one status model: the state and next-step priority, the catalog counts, the scripting capability, the skills and
-// agent coverage, redaction, the report text, the plain JSON Schema RPC contract, and the command's synthetic message.
-// Built from local facts only: these tests hand it facts, and readStatus reads them from narrow fakes of the host lists.
-import { describe, expect, test } from "bun:test"
-import { CODES, PLUGIN_ID, SERVER_NAME, SUPPORTED_HOST } from "../../src/constants.js"
-import { checkHost } from "../../src/host-version.js"
-import type { ServerSource } from "../../src/mcp.js"
-import { NATIVE_ONLY, RPC_TOOLS, SPEND_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
-import { defaultRules } from "../../src/permissions.js"
-import { SKILL_NAMES } from "../../src/skills.js"
-import { buildStatus, formatStatus, LISTING_MS, readStatus, registerStatusCommand, registerStatusRpc, STATUS_COMMAND, StatusRpc, type StatusFacts, type StatusSource } from "../../src/status.js"
-import { VERSION } from "../../src/version.js"
+import assert from "node:assert/strict"
+import { test } from "node:test"
+import { STATUS_SCHEMA, statusAnswer } from "@we-the-rebel-alliance/plugin-contract/accounts"
+import { handlersFor } from "../../src/handlers/index.ts"
+import { entry, run, runtimeFor } from "../support/handlers.ts"
+import { manifest } from "../../src/manifest.ts"
 
-const PLUGIN: ServerSource = { type: "plugin" }
-const loaded = SKILL_NAMES.map((name) => ({ name, state: "loaded" as const, path: `skills/${name}/SKILL.md` }))
-const POLICY_FAILED =
-  "POLICY_UNAVAILABLE: OpenRouter's default permission rules could not be applied (boom), so the plugin blocks its tools before anything is sent. Next step: Restart OpenCode; if it fails again, run /plugins to see the error."
-const CONFLICT =
-  "SERVER_CONFLICT: Your OpenCode config's mcp.servers.openrouter points at another host (example.com); the plugin uses https://mcp.openrouter.ai/mcp. The plugin leaves it untouched and adds no rules, guard or label to it. Next step: Set mcp.servers.openrouter.url to exactly https://mcp.openrouter.ai/mcp, or rename or remove that entry so the plugin can add its own."
-
-const facts = (overrides: Partial<StatusFacts> = {}): StatusFacts => ({
-  host: checkHost("2.4.1", false),
-  access: "ask-changes",
-  source: PLUGIN,
-  server: { status: "connected" },
-  tools: [...TOOL_NAMES],
-  settling: false,
-  lastObservedAt: "2026-11-12T10:00:00.000Z",
-  policy: { installation: "ready", problems: [] },
-  coverage: { unguarded: [], explicitlyAllowed: [] },
-  skills: loaded,
-  problems: [],
-  ...overrides,
-})
-
-describe("the status model", () => {
-  test("a healthy connection: every family field, the catalog, the script capability, and nothing to do", () => {
-    const status = buildStatus(facts())
-    expect(status).toEqual({
-      version: VERSION,
-      host: { version: "2.4.1", range: SUPPORTED_HOST, tested: true },
-      state: "connected",
-      access: "ask-changes",
-      source: "plugin",
-      catalog: { state: "ready", observed: 31, reviewedPresent: 31, unknownCount: 0, unknown: [], missingReviewed: [], lastObservedAt: "2026-11-12T10:00:00.000Z" },
-      scripting: { reviewedMethodCount: 27, nativeOnly: ["get-current-key", "generate-image", "generate-speech", "generate-video"], liveVerifiedCount: 9 },
-      policy: { installation: "ready" },
-      skills: SKILL_NAMES.map((name) => ({ name, state: "loaded" })),
-      unguardedAgents: [],
-      explicitlyAllowedAgents: [],
-      problems: [],
-      nextStep: "Nothing to do.",
-    })
-    expect(status.scripting.reviewedMethodCount).toBe(RPC_TOOLS.length)
-    expect(status.scripting.nativeOnly).toEqual([...NATIVE_ONLY])
-  })
-
-  test("never invents a timestamp: no observation, no lastObservedAt", () => {
-    const { lastObservedAt: _omit, ...rest } = facts()
-    expect(buildStatus(rest).catalog).not.toHaveProperty("lastObservedAt")
-  })
-
-  test.each([
-    [{ server: { status: "pending" as const } }, "connecting", "pending"],
-    [{ server: { status: "needs_auth" as const } }, "sign_in_required", "unavailable"],
-    [{ server: { status: "failed" as const, error: "connect ECONNREFUSED" } }, "failed", "unavailable"],
-    [{ server: { status: "disabled" as const } }, "disabled", "unavailable"],
-    [{ source: { type: "disabled" } as ServerSource, server: { status: "disabled" as const } }, "disabled", "unavailable"],
-    [{ server: undefined }, "not_configured", "unavailable"],
-    [{ source: { type: "pending" } as ServerSource, server: undefined, tools: [] }, "connecting", "pending"],
-    [{ source: { type: "conflict", safeDescription: "x" } as ServerSource, problems: [CONFLICT] }, "conflict", "unavailable"],
-    [{ policy: { installation: "failed" as const, problems: [POLICY_FAILED] } }, "policy_unavailable", "ready"],
-  ])("maps %j to state %s with catalog %s", (overrides, state, catalog) => {
-    const status = buildStatus(facts(overrides as Partial<StatusFacts>))
-    expect({ state: status.state, catalog: status.catalog.state } as Record<string, string>).toEqual({ state, catalog })
-  })
-
-  test("a connected server that is still listing its tools is told apart from one that lists none", () => {
-    const listing = buildStatus(facts({ tools: [], settling: true }))
-    expect(listing.catalog).toMatchObject({ state: "pending", observed: 0 })
-    expect(listing.nextStep).toBe("OpenRouter is still listing its tools. Run /openrouter-status again in a few seconds.")
-    const empty = buildStatus(facts({ tools: [], settling: false }))
-    expect(empty.catalog).toMatchObject({ state: "ready", observed: 0, missingReviewed: [] })
-    expect(empty.nextStep).toBe("OpenRouter lists no tools for this sign-in. Sign in again from /connect → OpenRouter tools, then run /openrouter-status.")
-  })
-
-  test("counts unknown and missing tools, names at most 20 plain names, and never lists a conflicting server's tools", () => {
-    const unknown = Array.from({ length: 23 }, (_, index) => `new-tool-${index}`)
-    const status = buildStatus(facts({ tools: [...TOOL_NAMES.filter((name) => name !== "ping"), ...unknown, "Evil‮Name"] }))
-    expect(status.catalog).toMatchObject({ observed: 30 + 24, reviewedPresent: 30, unknownCount: 24, missingReviewed: ["ping"] })
-    expect(status.catalog.unknown).toEqual(unknown.slice(0, 20))
-    expect(formatStatus(status)).toContain("- Tools: 54 listed, 30 reviewed, 24 unknown: new-tool-0,")
-    expect(formatStatus(status)).toContain("and 4 more (asked about, never a script method); reviewed but not listed: ping; last seen 2026-11-12T10:00:00.000Z")
-    const conflict = buildStatus(facts({ source: { type: "conflict", safeDescription: "x" }, problems: [CONFLICT] }))
-    expect(conflict.catalog).toMatchObject({ state: "unavailable", observed: 0, unknown: [] })
-  })
-
-  test("the image tool is reported native-only and never counted as an unknown tool", () => {
-    const status = buildStatus(facts())
-    expect(status.scripting.nativeOnly).toEqual(["get-current-key", "generate-image", "generate-speech", "generate-video"])
-    for (const name of status.scripting.nativeOnly) expect(status.catalog.unknown).not.toContain(name)
-    expect(status.catalog.unknownCount).toBe(0)
-    expect(formatStatus(status)).toContain(
-      "- Scripts: 27 methods through openrouter.models.tools, 9 of 27 with output checked against OpenRouter's live server, the rest against its declared output or a test server; native only: generate-image, generate-speech and generate-video (media the script result drops); get-current-key (the signed-in key's own metadata)",
-    )
-  })
-
-  test("next-step priority: conflict, then a failed policy, then disabled, sign-in, connection, catalog, skills, agents", () => {
-    const steps = (overrides: Partial<StatusFacts>) => buildStatus(facts(overrides)).nextStep
-    const everything: Partial<StatusFacts> = {
-      skills: [{ name: "openrouter", state: "missing" }, ...loaded.slice(1)],
-      problems: ["SKILLS_INVALID: The \"openrouter\" skill was not loaded: skills/openrouter/SKILL.md is missing. Next step: Reinstall the plugin."],
-      coverage: { unguarded: ["reviewer"], explicitlyAllowed: [] },
-    }
-    expect(steps({ ...everything, source: { type: "conflict", safeDescription: "x" }, problems: [CONFLICT], policy: { installation: "failed", problems: [POLICY_FAILED] } })).toBe(
-      "Set mcp.servers.openrouter.url to exactly https://mcp.openrouter.ai/mcp, or rename or remove that entry so the plugin can add its own.",
-    )
-    expect(steps({ ...everything, policy: { installation: "failed", problems: [POLICY_FAILED] }, server: { status: "needs_auth" } })).toBe("Restart OpenCode; if it fails again, run /plugins to see the error.")
-    expect(steps({ ...everything, server: { status: "disabled" } })).toBe('Enable the openrouter server in /mcps, or remove "disabled": true from mcp.servers.openrouter in opencode.json.')
-    expect(steps({ ...everything, server: { status: "needs_auth" } })).toBe(
-      "Run /connect and choose OpenRouter tools, or /mcps and choose openrouter (in a terminal, run opencode mcp auth openrouter from the project folder where the plugin is installed); never paste an OpenRouter key into the chat.",
-    )
-    expect(steps({ ...everything, server: { status: "pending" } })).toBe("OpenRouter tools are still connecting. Run /openrouter-status again in a few seconds.")
-    expect(steps({ ...everything, tools: [], settling: true })).toBe("OpenRouter is still listing its tools. Run /openrouter-status again in a few seconds.")
-    expect(steps(everything)).toBe("Reinstall the plugin.")
-    expect(steps({ ...everything, skills: [{ name: "openrouter", state: "shadowed", path: "a", shadowedBy: "mine/SKILL.md" }, ...loaded.slice(1)], problems: [] })).toBe(
-      'Rename or move the "openrouter" skill at mine/SKILL.md, which OpenCode loads instead of the plugin\'s skill of the same name.',
-    )
-    expect(steps({ coverage: { unguarded: ["reviewer"], explicitlyAllowed: [] } })).toBe(
-      "Put the default rules shown by /openrouter-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your own rules for OpenRouter tools.",
-    )
-    // An explicit allow is the user's decision: shown, never a next step.
-    expect(steps({ coverage: { unguarded: [], explicitlyAllowed: ["build"] } })).toBe("Nothing to do.")
-  })
-
-  test("a failed connection of the user's own oauth-free entry points at its headers, never reading them", () => {
-    const status = buildStatus(facts({ source: { type: "adopted", signIn: "user-managed" }, server: { status: "failed", error: "401" } }))
-    expect(status.nextStep).toBe("Check the credential in the headers of your own mcp.servers.openrouter, then restart OpenCode.")
-  })
-
-  test("a failure's reason is one redacted line; a sign-in's text is never shown", () => {
-    const key = "sk-or-v1-0123456789abcdef0123456789abcdef"
-    const failed = buildStatus(facts({ server: { status: "failed", error: `refused\nBearer ${key} https://u:p@mcp.openrouter.ai/mcp?token=abc` } }))
-    expect(failed.error).toBe("refused Bearer [redacted] https://mcp.openrouter.ai/mcp")
-    const signIn = buildStatus(facts({ server: { status: "needs_auth", error: "https://auth.example/authorize?code=1" } }))
-    expect(signIn).not.toHaveProperty("error")
-    expect(JSON.stringify(signIn)).not.toContain("authorize")
-  })
-
-  test("problems keep their codes, from the entry, the skills and the policy", () => {
-    const status = buildStatus(facts({ problems: [CONFLICT], policy: { installation: "failed", problems: [POLICY_FAILED] } }))
-    expect(status.problems.map((problem) => problem.code)).toEqual(["SERVER_CONFLICT", "POLICY_UNAVAILABLE"])
-    for (const problem of status.problems) expect(Object.keys(CODES)).toContain(problem.code)
-  })
-})
-
-describe("the report", () => {
-  test("names each fact on its own row and the next step last", () => {
-    const text = formatStatus(buildStatus(facts({ coverage: { unguarded: ["reviewer"], explicitlyAllowed: ["build"] } })))
-    const rows = text.split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2).split(":")[0])
-    expect(rows).toEqual(["Connection", "Access", "Spend", "Default rules", "Tools", "Scripts", "Skills", "Agents without default rules", "Agents that allow OpenRouter changes with their own rule", "OpenCode", "Problems", "Next step"])
-    expect(text.split("\n")[0]).toBe("OpenRouter status")
-    expect(text).toContain("- Connection: connected (registered by this plugin)")
-    expect(text).toContain("- Access: ask-changes: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later ask first")
-    expect(text).toContain("- Default rules: applied")
-    expect(text).toContain("- Skills: 4 of 4 loaded")
-    // The exact block for the listed agent, one rule a line.
-    expect(text).toContain(`- Agents without default rules: reviewer\n  ${JSON.stringify(defaultRules("ask-changes")[0])},`)
-    expect(text).toContain("- Agents that allow OpenRouter changes with their own rule: build")
-    expect(text).toContain(`- OpenCode: 2.4.1 (tested; supported range ${SUPPORTED_HOST})`)
-  })
-
-  test("says read-only denies and all allows, and an untested host the user allowed", () => {
-    expect(formatStatus(buildStatus(facts({ access: "read-only" })))).toContain("- Access: read-only: reads run without asking; generate-image, generate-speech, generate-video, send-batch, send-decision, send-message, transcribe-audio, send-feedback and tools OpenRouter adds later are denied")
-    expect(formatStatus(buildStatus(facts({ access: "all" })))).toContain("- Access: all: every OpenRouter tool is allowed, spending calls and feedback included")
-    expect(formatStatus(buildStatus(facts({ host: checkHost("2.5.0", true) })))).toContain("- OpenCode: 2.5.0 (untested; supported range >=2.4.1 <2.5.0). It is outside the supported range;")
-  })
-
-  test("states the one spend classification and the posture every spending tool runs under", () => {
-    const postures = { all: "run without asking", "ask-changes": "ask first", "read-only": "are denied" } as const
-    for (const access of ["all", "ask-changes", "read-only"] as const) {
-      expect(formatStatus(buildStatus(facts({ access })))).toContain(
-        `- Spend: 7 tools spend the account's credit (${SPEND_TOOLS.join(", ")}): at ${access} they ${postures[access]}. send-feedback sends feedback and spends nothing.`,
-      )
-    }
-  })
-
-  test("never holds a key, an auth URL, a balance or an expiry", () => {
-    const text = formatStatus(buildStatus(facts()))
-    for (const word of ["sk-or", "authorize", "balance", "expires"]) expect(text.toLowerCase()).not.toContain(word)
-  })
-})
-
-/** A plugin state and host lists, as readStatus reads them; counts each list call. */
-function sources(overrides: { tools?: { id: string; options?: { namespace?: string } }[]; changedAt?: number } = {}) {
-  const calls: string[] = []
-  const state: StatusSource = {
-    host: checkHost("2.4.1", false),
-    options: { access: "ask-changes" },
-    server: () => ({ source: PLUGIN, problems: [] }),
-    policy: () => ({ installation: "ready", problems: [] }),
-    agentCoverage: async () => (calls.push("agents"), { unguarded: [], explicitlyAllowed: [] }),
-    skills: async () => (calls.push("skills"), loaded),
-    skillProblems: [],
-    lastObservedAt: () => undefined,
-    serverChangedAt: () => overrides.changedAt ?? 0,
-  }
-  const tools = overrides.tools ?? [...TOOL_NAMES.map((name) => ({ id: `openrouter_${name}`, options: { namespace: SERVER_NAME } })), { id: "openrouter_x_other", options: { namespace: "openrouter_x" } }, { id: "github_issue", options: { namespace: "github" } }]
-  const ctx = {
-    mcp: { list: async () => (calls.push("mcp"), { data: [{ name: "github", status: { status: "failed", error: "x" } }, { name: SERVER_NAME, status: { status: "connected" } }] }) },
-    tool: { list: async () => (calls.push("tools"), tools) },
-  }
-  return { ctx: ctx as unknown as Parameters<typeof readStatus>[0], state, calls }
+interface Answer {
+  readonly name: string
+  readonly version: string
+  readonly host: { readonly version: string; readonly range: string; readonly tested: readonly string[] }
+  readonly state: string
+  readonly accounts: readonly { readonly alias: string; readonly state: string; readonly reason?: string }[]
+  readonly unguardedAgents: readonly string[]
+  readonly nextStep: string | null
 }
 
-describe("readStatus", () => {
-  test("reads OpenCode's lists and the plugin's state once each, and counts only the openrouter namespace's tools", async () => {
-    const { ctx, state, calls } = sources()
-    const status = await readStatus(ctx, state)
-    expect(status.catalog).toMatchObject({ state: "ready", observed: 31, unknownCount: 0 })
-    expect(status).not.toHaveProperty("error")
-    expect(calls.sort()).toEqual(["agents", "mcp", "skills", "tools"])
-  })
+const status = async (runtime = runtimeFor(), options = {}): Promise<Answer> => (await run(runtime, "status", {}, "work", options)) as Answer
 
-  test("no tools moments after a status change is still listing; long after, it is an empty catalog", async () => {
-    const recent = sources({ tools: [], changedAt: Date.now() })
-    expect((await readStatus(recent.ctx, recent.state)).catalog.state).toBe("pending")
-    const old = sources({ tools: [], changedAt: Date.now() - LISTING_MS - 1 })
-    expect((await readStatus(old.ctx, old.state)).catalog.state).toBe("ready")
-  })
+test("status names the plugin, its host and both aliases, all ready", async () => {
+  const answer = await status()
+  assert.equal(answer.name, "openrouter")
+  assert.equal(answer.version, "0.0.0")
+  assert.deepEqual(answer.host, { version: "2.4.1", range: ">=2.4.1 <2.5.0", tested: ["2.4.1"] })
+  assert.equal(answer.state, "ready")
+  assert.deepEqual(
+    answer.accounts.map((account) => [account.alias, account.state]),
+    [
+      ["work", "ready"],
+      ["personal", "ready"],
+    ],
+  )
+  assert.deepEqual(answer.unguardedAgents, [])
+  assert.equal(answer.nextStep, null)
 })
 
-describe("the status RPC", () => {
-  test("is openrouter.models / status, a plain JSON Schema contract whose output every built status satisfies", () => {
-    expect(StatusRpc.id).toBe(PLUGIN_ID)
-    expect(Object.keys(StatusRpc.methods)).toEqual(["status"])
-    const schema = StatusRpc.methods.status.output
-    for (const status of [buildStatus(facts()), buildStatus(facts({ server: { status: "failed", error: "x" } })), buildStatus(facts({ policy: { installation: "failed", problems: [POLICY_FAILED] } }))]) {
-      for (const key of schema.required) expect(status).toHaveProperty(key)
-      for (const key of Object.keys(status)) expect(Object.keys(schema.properties)).toContain(key)
-      expect(schema.properties.state.enum).toContain(status.state)
-    }
-    expect(JSON.parse(JSON.stringify(StatusRpc))).toEqual(StatusRpc)
+test("status is the answer the contract's builder makes from the same inputs", async () => {
+  const answer = await status()
+  const built = statusAnswer({
+    manifest,
+    version: "0.0.0",
+    hostVersion: "2.4.1",
+    accounts: [
+      { alias: "work", state: "ready" },
+      { alias: "personal", state: "ready" },
+    ],
+    problems: [],
+    unguardedAgents: [],
   })
-
-  test("answers the status, or the declared error unavailable with a coded message and a next step", async () => {
-    let handler: ((input: unknown, context: { error: (type: string, message: string, data: unknown) => unknown }) => Promise<unknown>) | undefined
-    const rpc = { register: async (_definition: unknown, handlers: { status: typeof handler }) => ((handler = handlers.status), { dispose: async () => {} }) }
-    let fail = false
-    await registerStatusRpc(rpc as never, async () => {
-      if (fail) throw new Error("agents unavailable Bearer sk-or-v1-0123456789abcdef0123456789abcdef")
-      return buildStatus(facts())
-    })
-    const error = (type: string, message: string, data: unknown) => ({ type, message, data })
-    expect(await handler!({}, { error })).toMatchObject({ state: "connected" })
-    fail = true
-    expect(await handler!({}, { error })).toEqual({
-      type: "unavailable",
-      message: "STATUS_UNAVAILABLE: Could not read OpenRouter's status (agents unavailable Bearer [redacted]).",
-      data: { nextStep: "Restart OpenCode, then run /openrouter-status again." },
-    })
-  })
+  assert.deepEqual(answer, built)
 })
 
-describe("/openrouter-status", () => {
-  test("posts the report as a synthetic message with no model turn, or the coded failure", async () => {
-    let added: { name: string; execute: (input: { sessionID: string }) => Promise<void> } | undefined
-    const posted: unknown[] = []
-    const ctx = {
-      command: { transform: async (callback: (editor: { add: (command: typeof added) => void }) => void) => (callback({ add: (command) => void (added = command) }), { dispose: async () => {} }) },
-      session: { synthetic: async (input: unknown) => void posted.push(input) },
-    }
-    let fail = false
-    await registerStatusCommand(ctx as never, async () => {
-      if (fail) throw new Error("closed")
-      return buildStatus(facts())
-    })
-    expect(added!.name).toBe(STATUS_COMMAND)
-    expect(STATUS_COMMAND).toBe("openrouter-status")
-    await added!.execute({ sessionID: "ses_1" })
-    expect(posted).toEqual([{ sessionID: "ses_1", text: formatStatus(buildStatus(facts())), description: "OpenRouter status", resume: false }])
-    fail = true
-    await added!.execute({ sessionID: "ses_1" })
-    expect(posted.at(-1)).toMatchObject({ text: "STATUS_UNAVAILABLE: Could not read OpenRouter's status (closed). Next step: Restart OpenCode, then run /openrouter-status again.", resume: false })
+test("one alias needing a sign-in makes the plugin needs_sign_in, with the contract's next step", async () => {
+  const answer = await status(runtimeFor([entry("work"), entry("personal", "needs_auth", "expired at https://mcp.openrouter.ai/auth?code=abc123")]))
+  assert.equal(answer.state, "needs_sign_in")
+  assert.equal(answer.accounts[1]?.state, "needs_sign_in")
+  assert.equal(answer.accounts[1]?.reason, "expired at https://mcp.openrouter.ai/auth?code=…")
+  assert.equal(answer.nextStep, "Sign in to the account that needs it, then read status again.")
+})
+
+test("a failed alias is an error in its own entry, and the plugin itself stays ready", async () => {
+  const answer = await status(runtimeFor([entry("work", "failed", "the provider said Bearer abcdefghijklmnop"), entry("personal")]))
+  // The contract's builder reserves the plugin-level error for its own problems; an account's failure is its entry.
+  assert.equal(answer.state, "ready")
+  assert.equal(answer.accounts[0]?.state, "error")
+  assert.equal(answer.accounts[0]?.reason, "the provider said Bearer …")
+  assert.equal(answer.nextStep, null)
+})
+
+test("an account registration problem is an error before any account state", async () => {
+  const answer = await status(runtimeFor(undefined, { accountProblems: ["the openrouter-work server could not be added"] }))
+  assert.equal(answer.state, "error")
+  assert.equal(answer.nextStep, "the openrouter-work server could not be added")
+})
+
+test("an agent that no longer holds the generated rules is named, never patched", async () => {
+  const answer = await status(runtimeFor(), { unguardedAgents: async () => ["build"] })
+  assert.deepEqual(answer.unguardedAgents, ["build"])
+  assert.equal(answer.state, "ready")
+})
+
+test("an unreadable agent list is unknown, never zero: status says error with a redacted next step", async () => {
+  const answer = await status(runtimeFor(), {
+    unguardedAgents: async () => {
+      throw new Error("agent list failed at https://opencode.local/api/agent?token=abcd1234")
+    },
   })
+  assert.equal(answer.state, "error")
+  assert.equal(answer.nextStep, "agent list failed at https://opencode.local/api/agent?token=…")
+  assert.deepEqual(answer.unguardedAgents, [])
+})
+
+test("an unreadable MCP server list marks every alias error, not a silent ready", async () => {
+  const base = runtimeFor()
+  const runtime = {
+    ...base,
+    provider: {
+      ...base.provider,
+      signals: async () => {
+        throw new Error("mcp list failed")
+      },
+    },
+  }
+  const answer = await status(runtime)
+  assert.equal(answer.state, "error")
+  assert.equal(answer.accounts.every((account) => account.state === "error"), true)
+  assert.equal(answer.accounts[0]?.reason, "mcp list failed")
+  assert.equal(answer.nextStep, "mcp list failed")
+})
+
+test("status answers the contract's status schema, not a copied shape", () => {
+  const handler = handlersFor(runtimeFor()).status
+  assert.ok(handler !== undefined)
+  assert.deepEqual(handler.output, STATUS_SCHEMA)
 })

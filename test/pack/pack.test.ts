@@ -1,550 +1,138 @@
-// Pack, install and load the published shape. The tarball holds exactly the files whitelist and installs with
-// lifecycle scripts disabled. Installed alone, it loads in each stock OpenCode release it is tested on, which provides
-// @opencode/plugin, OpenTUI and Solid itself; next to those packages, both entry points also import under Bun.
-// OPENCODE_BIN_2_4_1 names a stock binary; otherwise each release in TESTED_HOSTS is installed with npm, once per run.
-// Every temp folder is a git repository under the system's temp folder, so OpenCode's upward search for `.opencode`
-// folders stops there. PACK_TARBALL names a tarball that was already packed to test it instead.
-// On each release a copy of the installed plugin is also pointed at a loopback fake of OpenRouter's MCP and sign-in
-// server, to check that the sign-in OpenCode starts is its own.
-import { afterAll, describe, expect, test } from "bun:test"
-import { spawn, spawnSync } from "node:child_process"
-import { createHash, randomUUID } from "node:crypto"
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
-import { createServer } from "node:net"
-import { arch, platform, tmpdir } from "node:os"
-import { basename, join, relative, resolve, sep } from "node:path"
+/**
+ * The pack test: what `npm pack` ships, and that the shipped server entry loads as an OpenCode plugin.
+ *
+ * It installs the tarball into a throwaway project beside `@opencode/plugin` 2.4.1 and imports the package's `./server`
+ * export, without running `setup`. `opencode plugin add <local path>` is not tested: OpenCode 2.4.1 refuses a local
+ * path, so an install is always a tag or a registry specifier.
+ */
+import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { after, test } from "node:test"
 import { fileURLToPath } from "node:url"
-import { DISPLAY_NAME, ENDPOINT, PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "../../src/constants.js"
-import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
-import { checkHost } from "../../src/host-version.js"
-import { NATIVE_ONLY, RPC_TOOLS, TOOL_NAMES } from "../../src/openrouter-tools.js"
-import { SKILL_NAMES } from "../../src/skills.js"
-import { buildStatus, formatStatus } from "../../src/status.js"
-import { REFRESH_COMMAND_ID, STATUS_COMMAND_ID, TUI_ID } from "../../src/tui.js"
-import { NEW_TOOL, startFakeMcp, type FakeMcp } from "../host/fake-mcp.js"
 
 const root = fileURLToPath(new URL("../..", import.meta.url))
-const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-  name: string
-  version: string
-  files: string[]
-  exports: Record<string, string>
-  devDependencies: Record<string, string>
-}
-// Outside the repository, so nothing resolves from the repository's own node_modules.
-const work = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), "openrouter-pack-")))
-// A repository root, where OpenCode's search for `.opencode` folders and project config stops.
-run("git", ["init", "--quiet", work], root)
-// Removing the installed packages and binaries can take longer than the default hook timeout.
-afterAll(() => rmSync(work, { recursive: true, force: true }), { timeout: 120_000 })
+const scratch = mkdtempSync(join(tmpdir(), "openrouter-pack-"))
 
-/**
- * The host's ID for a remote MCP server's integration, derived from its name and URL. Only this test computes it, to
- * check the host's value; the plugin reads it from the host.
- */
-const integrationID = (name: string, url: string) => `mcp_${createHash("sha1").update(`${name}\0${url}`).digest("hex").slice(0, 16)}`
+after(() => rmSync(scratch, { recursive: true, force: true }))
 
-const MAX_FILES = 30
-const MAX_PACKED_BYTES = 100 * 1024
-// The two self-contained entry bundles, and nothing else, in dist/.
-const DIST = ["dist/index.js", "dist/tui.js"]
-// Modules the host serves to plugins at runtime. Everything else must be inlined in the bundle.
-const SERVER_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/]
-const TUI_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/, /^@opentui\//, /^solid-js(?:\/|$)/]
-// The host packages the tested OpenCode release ships; the versions come from devDependencies.
-const HOST_PACKAGES = ["@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"]
-// Anything a stock host tries on the network goes to a closed port, except loopback.
-const OFFLINE = {
-  HTTP_PROXY: "http://127.0.0.1:9",
-  HTTPS_PROXY: "http://127.0.0.1:9",
-  http_proxy: "http://127.0.0.1:9",
-  https_proxy: "http://127.0.0.1:9",
-  NO_PROXY: "127.0.0.1,localhost",
-  no_proxy: "127.0.0.1,localhost",
-  OPENCODE_DISABLE_MODELS_FETCH: "true",
-  OPENCODE_DISABLE_AUTOUPDATE: "true",
-  OPENCODE_DISABLE_FREE_MODELS: "true",
+interface PackedFile {
+  readonly path: string
+  readonly size: number
+  readonly mode: number
 }
 
-type Packed = { filename: string; size: number; entryCount: number; files: { path: string }[] }
+interface Packed {
+  readonly name: string
+  readonly version: string
+  readonly filename: string
+  readonly files: readonly PackedFile[]
+  readonly bundled: readonly string[]
+}
 
-let packed: Packed | undefined
-function pack(): Packed {
-  if (packed) return packed
-  const given = process.env.PACK_TARBALL
-  if (given) {
-    const tarball = resolve(given)
-    copyFileSync(tarball, join(work, basename(tarball)))
-    const files = run("tar", ["-tzf", tarball], root).trim().split("\n").filter((path) => !path.endsWith("/")).map((path) => ({ path: path.replace(/^package\//, "") }))
-    packed = { filename: basename(tarball), size: statSync(tarball).size, entryCount: files.length, files }
-    return packed
+let cache: Packed | undefined
+
+/** Pack the repository once and return npm's report. */
+function packed(): Packed {
+  if (cache !== undefined) return cache
+  const output = execFileSync("npm", ["pack", "--json", "--pack-destination", scratch], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+  const reports = JSON.parse(output) as Packed[]
+  assert.equal(reports.length, 1)
+  cache = reports[0]!
+  return cache
+}
+
+test("the tarball ships the built entry, the skills, the assets and the licence, and no source or test", () => {
+  const report = packed()
+  assert.equal(report.name, "@we-the-rebel-alliance/openrouter-plugin")
+  assert.equal(report.version, "0.0.0")
+  const paths = report.files.map((file) => file.path)
+  for (const path of [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "dist/index.js",
+    "skills/openrouter/SKILL.md",
+    "skills/openrouter-evaluate/SKILL.md",
+    "skills/openrouter-images/SKILL.md",
+    "skills/openrouter-troubleshoot/SKILL.md",
+    "assets/icon.svg",
+    "assets/icon-128.png",
+    "assets/icon-256.png",
+  ]) {
+    assert.ok(paths.includes(path), `${path} is missing from the tarball`)
   }
-  // Build first, explicitly: the package has no prepare or prepack hook, and a stale dist/ must never be packed.
-  run("node", [join(root, "scripts", "check.mjs"), "build"], root)
-  const result = run("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", work], root)
-  packed = (JSON.parse(result) as Packed[])[0]!
-  return packed
-}
-
-/** An empty project with its own package.json, so npm never walks up to another one. */
-function project(name: string): string {
-  const dir = join(work, name)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: `openrouter-pack-${name}`, private: true, type: "module" }))
-  return dir
-}
-
-const installs = new Map<string, string>()
-/** The tarball installed with scripts disabled, alone or next to the host packages. */
-function install(withHostPackages: boolean): string {
-  const name = withHostPackages ? "with-host-packages" : "alone"
-  const existing = installs.get(name)
-  if (existing) return existing
-  const dir = project(name)
-  const hosts = withHostPackages ? HOST_PACKAGES.map((item) => `${item}@${pkg.devDependencies[item]}`) : []
-  run("npm", ["install", join(work, pack().filename), ...hosts, "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], dir)
-  installs.set(name, dir)
-  return dir
-}
-
-const installedPackage = (withHostPackages: boolean) => join(install(withHostPackages), "node_modules", ...pkg.name.split("/"))
-
-/** A home, OpenCode's test home, XDG folders and a temp folder, all inside `base`. */
-function isolated(base: string) {
-  const home = join(base, "home")
-  const env = {
-    HOME: home,
-    OPENCODE_TEST_HOME: home,
-    XDG_CONFIG_HOME: join(home, ".config"),
-    XDG_DATA_HOME: join(home, ".local", "share"),
-    XDG_CACHE_HOME: join(home, ".cache"),
-    XDG_STATE_HOME: join(home, ".local", "state"),
-    TMPDIR: join(base, "tmp"),
+  for (const path of paths) {
+    assert.equal(path.startsWith("src/") || path.startsWith("test/") || path.startsWith("docs/") || path.startsWith("fixtures/") || path.startsWith("scripts/"), false, `${path} must not ship`)
   }
-  for (const dir of Object.values(env)) mkdirSync(dir, { recursive: true })
-  return env
-}
-
-describe("package tarball", () => {
-  test("lists exactly the files whitelist, under the size and file limits", () => {
-    const { files, entryCount, size } = pack()
-    const paths = files.map((file) => file.path).sort()
-    const expected = ["package.json", ...pkg.files.flatMap((entry) => whitelisted(entry))].sort()
-    expect(paths).toEqual(expected)
-    expect(entryCount).toBeLessThan(MAX_FILES)
-    expect(size).toBeLessThanOrEqual(MAX_PACKED_BYTES)
-    expect(paths.filter((path) => path.includes("node_modules/") || /\.(?:tsx|jsx)$/.test(path))).toEqual([])
-    for (const target of Object.values(pkg.exports)) expect(paths).toContain(target.replace(/^\.\//, ""))
-    expect(paths.filter((path) => path.endsWith(".d.ts"))).toEqual([])
-    // The four skills, each one file, and nothing else under skills/.
-    expect(paths.filter((path) => path.startsWith("skills/"))).toEqual(SKILL_NAMES.map((name) => `skills/${name}/SKILL.md`).sort())
-  }, 120_000)
-
-  test("installs with scripts disabled and loads both entry points under Bun, next to the host packages", () => {
-    const consumer = install(true)
-    const probe = join(consumer, "probe.mjs")
-    writeFileSync(probe, [
-      "const out = {}",
-      `for (const [part, specifier] of [["server", ${JSON.stringify(pkg.name)}], ["tui", ${JSON.stringify(`${pkg.name}/tui`)}]]) {`,
-      "  const plugin = (await import(specifier)).default",
-      "  out[part] = { id: plugin?.id, setup: typeof plugin?.setup }",
-      "}",
-      "console.log(JSON.stringify(out))",
-    ].join("\n"))
-    const output = run(process.execPath, [probe], consumer, { PATH: process.env.PATH, ...isolated(join(work, "bun-probe")) })
-    expect(JSON.parse(output.trim().split("\n").at(-1)!)).toEqual({
-      server: { id: PLUGIN_ID, setup: "function" },
-      tui: { id: TUI_ID, setup: "function" },
-    })
-  }, 300_000)
-
-  // The installed TUI bundle, not the source: its dialog sets up against a fake TUI context, opens with the status the
-  // server part's RPC returns, shows the same report /openrouter-status posts, refreshes only while open, and cleans up.
-  test("the installed TUI entry opens the status dialog from the status RPC, and its cleanup closes it", () => {
-    const consumer = install(true)
-    const status = buildStatus({
-      host: checkHost("2.4.1", false),
-      access: "ask-changes",
-      source: { type: "plugin" },
-      server: { status: "connected" },
-      tools: [...TOOL_NAMES],
-      settling: false,
-      policy: { installation: "ready", problems: [] },
-      coverage: { unguarded: [], explicitlyAllowed: [] },
-      skills: SKILL_NAMES.map((name) => ({ name, state: "loaded" as const })),
-      problems: [],
-    })
-    const probe = join(consumer, "tui-probe.mjs")
-    writeFileSync(probe, [
-      `const plugin = (await import(${JSON.stringify(`${pkg.name}/tui`)})).default`,
-      `const status = ${JSON.stringify(status)}`,
-      "const out = { rpc: [], alerts: [], sizes: [], cleared: 0, listeners: 0 }",
-      "let layer",
-      "const listeners = new Set()",
-      "const context = {",
-      "  location: { directory: 'project' },",
-      "  client: { rpc: (definition) => ({ status: async (input, request) => (out.rpc.push({ id: definition.id, input, request }), status) }) },",
-      "  data: { on: (type, handler) => { const entry = { type, handler }; listeners.add(entry); return () => listeners.delete(entry) } },",
-      "  ui: { dialog: { alert: (alert) => (out.alerts.push(alert), new Promise(() => {})), set: (value) => void out.sizes.push(value), clear: () => void out.cleared++ } },",
-      "  keymap: { layer: (factory) => void (layer = factory()) },",
-      "}",
-      "const stop = plugin.setup(context)",
-      "out.id = plugin.id",
-      "out.commands = layer.commands.map(({ id, slash, palette, bind }) => ({ id, slash, palette, bind }))",
-      "const [open, refresh] = layer.commands",
-      "out.refreshBeforeOpen = refresh.enabled()",
-      "await open.run()",
-      "out.refreshWhileOpen = refresh.enabled()",
-      "out.listeners = listeners.size",
-      "stop()",
-      "out.listenersAfterStop = listeners.size",
-      "console.log(JSON.stringify(out))",
-    ].join("\n"))
-    const output = JSON.parse(run(process.execPath, [probe], consumer, { PATH: process.env.PATH, ...isolated(join(work, "tui-probe")) }).trim().split("\n").at(-1)!)
-    expect(output).toMatchObject({
-      id: TUI_ID,
-      commands: [
-        { id: STATUS_COMMAND_ID, slash: { name: "openrouter" }, palette: true },
-        { id: REFRESH_COMMAND_ID, bind: "r" },
-      ],
-      rpc: [{ id: PLUGIN_ID, input: {}, request: { location: { directory: "project" } } }],
-      sizes: [{ size: "large" }],
-      refreshBeforeOpen: false,
-      refreshWhileOpen: true,
-      listeners: 6,
-      listenersAfterStop: 0,
-      cleared: 1,
-    })
-    expect(output.alerts).toEqual([{ title: "OpenRouter status", message: `${formatStatus(status).split("\n").slice(1).join("\n")}\n\nr refresh · esc close` }])
-  }, 300_000)
-
-  // OpenCode reloads a plugin in place and reuses the module records it holds for unchanged paths, so an entry that
-  // imported a sibling module could get an older cached copy of it. Each entry must stand alone.
-  test("dist holds only the two entry bundles, and they import no sibling module", () => {
-    const dist = join(installedPackage(true), "dist")
-    expect(tree(relative(root, dist), dist).sort()).toEqual(["index.js", "tui.js"])
-    for (const file of ["index.js", "tui.js"]) expect(relativeImports(readFileSync(join(dist, file), "utf8"))).toEqual([])
-  }, 300_000)
-
-  test("dist imports only modules the host provides, and names the endpoint exactly once", () => {
-    const dist = join(installedPackage(true), "dist")
-    expect(foreign(join(dist, "index.js"), SERVER_HOST_MODULES)).toEqual([])
-    expect(foreign(join(dist, "tui.js"), TUI_HOST_MODULES)).toEqual([])
-    expect(readFileSync(join(dist, "index.js"), "utf8").split(JSON.stringify(ENDPOINT)).length - 1).toBe(1)
-  }, 300_000)
+  assert.deepEqual(report.bundled, [])
 })
 
-describe.each(TESTED_HOSTS)("installed alone, in stock OpenCode %s", (version) => {
-  test("is active, registers openrouter at the endpoint, and names only its own /connect entry OpenRouter tools", async () => {
-    const installed = installedPackage(false)
-    const host = await serve(version, installed)
-    try {
-      const plugin = await host.until("the plugin finishes loading", async () => {
-        const { data } = await host.api<{ data: { id: string; state: { status: string } }[] }>("GET", "/api/plugin")
-        const found = data.find((item) => item.id === PLUGIN_ID)
-        return found && found.state.status !== "loading" ? found : undefined
-      })
-      expect(plugin.state).toEqual({ status: "active" })
-
-      const server = await host.until("the openrouter server is registered", async () => {
-        const { data } = await host.api<{ data: { name: string; integrationID?: string }[] }>("GET", "/api/mcp")
-        return data.find((item) => item.name === SERVER_NAME)
-      })
-      // The ID OpenCode keys the sign-in by: the same name and URL as a sign-in made before the plugin was installed.
-      expect(server.integrationID).toBe(integrationID(SERVER_NAME, ENDPOINT))
-      type Listed = { id: string; name: string; metadata?: { source?: string } }
-      const listed = await host.until("/connect lists the server as OpenRouter tools", async () => {
-        const { data } = await host.api<{ data: Listed[] }>("GET", "/api/integration")
-        const found = data.find((item) => item.id === server.integrationID)
-        return found?.name === DISPLAY_NAME ? found : undefined
-      })
-      expect(listed.metadata?.source).toBe("mcp")
-      // The built-in model provider's integration is a different entry, and keeps its own name.
-      const { data: all } = await host.api<{ data: Listed[] }>("GET", "/api/integration")
-      expect(all.find((item) => item.id === "openrouter")).toMatchObject({ id: "openrouter", name: "OpenRouter" })
-      expect(all.filter((item) => item.name === DISPLAY_NAME).map((item) => item.id)).toEqual([server.integrationID!])
-      // The four packaged skills load from the installed package, not from this repository.
-      const { data: skills } = await host.api<{ data: { id: string; path: string }[] }>("GET", "/api/skill")
-      const own = skills.filter((skill) => SKILL_NAMES.includes(skill.id)).map(({ id, path }) => ({ id, path }))
-      expect(own.sort((a, b) => a.id.localeCompare(b.id))).toEqual([...SKILL_NAMES].sort().map((id) => ({ id, path: join(installed, "skills", id, "SKILL.md") })))
-    } catch (error) {
-      throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host.log().slice(-3000)}`)
-    } finally {
-      await host.close()
-    }
-  }, 600_000)
-
-  test("pointed at a fake that needs a sign-in, reports needs_auth and OpenCode starts its own sign-in", async () => {
-    const fake = await startFakeMcp({ challenge: true })
-    const installed = pointedAt(fake.url, version)
-    const host = await serve(version, installed, { name: `pointed-${version}` })
-    try {
-      const id = integrationID(SERVER_NAME, fake.url)
-      const server = await host.until("the server needs a sign-in", async () => {
-        const { data } = await host.api<{ data: { name: string; integrationID?: string; status: { status: string } }[] }>("GET", "/api/mcp")
-        const found = data.find((item) => item.name === SERVER_NAME)
-        return found?.status.status === "needs_auth" ? found : undefined
-      })
-      expect(server.integrationID).toBe(id)
-      const integration = await host.until("the entry is named OpenRouter tools", async () => {
-        const { data } = await host.api<{ data: { name: string; methods: { id: string }[] } }>("GET", `/api/integration/${id}`)
-        return data.name === DISPLAY_NAME ? data : undefined
-      })
-      const started = await host.api<Record<string, any>>("POST", `/api/integration/${id}/connect/oauth`, { methodID: integration.methods[0]!.id })
-      const attempt = (started.data ?? started) as { attemptID: string; url: string }
-      try {
-        const url = new URL(attempt.url)
-        expect(`${url.origin}${url.pathname}`).toBe(`${fake.origin}/oauth/authorize`)
-        expect(url.searchParams.get("code_challenge_method")).toBe("S256")
-        expect(url.searchParams.get("client_id")).toBe("fake-client-1")
-        expect(fake.registrations).toHaveLength(1)
-        expect(fake.tokens).toHaveLength(0)
-        expect(fake.calls).toEqual([])
-      } finally {
-        await host.request("DELETE", `/api/integration/${id}/connect/oauth/${attempt.attemptID}`)
-      }
-    } catch (error) {
-      throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host.log().slice(-3000)}`)
-    } finally {
-      await host.close()
-      await fake.close()
-    }
-  }, 600_000)
+test("every shipped file is a plain readable file, and the entry is not executable", () => {
+  const report = packed()
+  for (const file of report.files) {
+    assert.equal(file.mode, 420, `${file.path} has mode ${file.mode.toString(8)}`)
+    assert.ok(file.size > 0, `${file.path} is empty`)
+  }
 })
 
-// The `/openrouter` dialog is a `ui.dialog.alert`. Its `r` key is live only until the alert's promise resolves, so the
-// stock TUI must resolve it on every way the dialog can close. Each release's own code shows that it does: an alert
-// resolves on its dialog's `onClose`, and every path that removes a dialog (replace, which another dialog opening uses,
-// clear, which a click outside uses, Escape and Ctrl+C) calls `onClose` first. A release whose code differs fails here,
-// and needs the dialog's close paths checked again. Ported from the family's other status dialogs.
-describe.each(TESTED_HOSTS)("the stock TUI of OpenCode %s", (version) => {
-  test("resolves a plugin's alert on every path that closes it, replacement by another dialog included", () => {
-    const code = readFileSync(stockBinary(version)).toString("latin1")
-    const facts = {
-      "show passes onClose to replace": /show\((\w),(\w)\)\{\w\.replace\(\(\)=>\w\(\1\),\2\)\}/,
-      "alert resolves on onClose": /alert\((\w)\)\{return new Promise\(\((\w)\)=>\{let (\w)=\w+\(\2\);\w\.show\(\(\)=>[^]{1,200}?onConfirm:\3\}\),\3\)\}\)\}/,
-      "replace closes every dialog it removes": /replace\((\w),(\w),(\w)\)\{if\(\w\.stack\.length===0\)[^;]{1,80};for\(let (\w) of \w\.stack\)if\(\4\.onClose\)\4\.onClose\(\);/,
-      "clear closes every dialog": /clear\(\)\{for\(let (\w) of \w\.stack\)if\(\1\.onClose\)\1\.onClose\(\);/,
-    }
-    expect(Object.fromEntries(Object.entries(facts).map(([fact, pattern]) => [fact, pattern.test(code)]))).toEqual(Object.fromEntries(Object.keys(facts).map((fact) => [fact, true])))
-    // Escape and Ctrl+C each close the top dialog through its onClose.
-    expect(code.match(/\.stack\.at\(-1\)\?\.onClose\?\.\(\),\w\("stack",\w\.stack\.slice\(0,-1\)\)/g)).toHaveLength(2)
-  }, 600_000)
+test("the packed package has no runtime dependency and no lifecycle script", () => {
+  const report = packed()
+  assert.notEqual(report.filename, "")
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as Record<string, unknown>
+  assert.equal(pkg["dependencies"], undefined)
+  assert.equal(pkg["peerDependencies"], undefined)
+  const scripts = pkg["scripts"] as Record<string, string>
+  for (const lifecycle of ["preinstall", "install", "postinstall", "prepare", "prepack", "postpack", "prepublishOnly"]) {
+    assert.equal(scripts[lifecycle], undefined, lifecycle)
+  }
 })
 
-// The installed package on stock `opencode serve`, pointed at the loopback fake (which needs no sign-in here): the status
-// RPC and /openrouter-status read local state only, and the tools RPC gives a script the native path's decision, with
-// the image route absent. Counted against the fake's actual tools/call requests.
-describe.each(TESTED_HOSTS)("status and the tools RPC on stock OpenCode %s", (version) => {
-  let fake: FakeMcp
-  let host: Awaited<ReturnType<typeof serve>>
-  const rule = (action: string, effect: "allow" | "ask" | "deny") => ({ action, resource: "*", effect })
-
-  /** A tools RPC call: its output, or the error's `{ type, code, next, message }`. */
-  async function script(method: string, input: unknown): Promise<Record<string, any>> {
-    const response = await host.request("POST", `/api/rpc/${TOOLS_RPC_ID}/${method}`, { input })
-    const body = response.body as Record<string, any>
-    if (response.ok) return { value: body.output }
-    const error = (body?.error ?? body) as Record<string, any>
-    return { status: response.status, type: error?.type ?? error?._tag, code: error?.data?.code, next: error?.data?.next, message: String(error?.message ?? response.text) }
-  }
-  const status = async () => (await host.api<{ output: Record<string, any> }>("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })).output
-  const create = async (body: Record<string, unknown>) => {
-    const created = await host.api<Record<string, any>>("POST", "/api/session", { ...body, location: { directory: host.directory } })
-    return (created.id ?? created.data?.id) as string
-  }
-
-  test("status sees the catalog, and a script gets the native decision: at the default access a read and a paid call run, ask and deny refused, no image route", async () => {
-    fake = await startFakeMcp()
-    host = await serve(version, pointedAt(fake.url, `rpc-${version}`), { name: `rpc-${version}` })
-    try {
-      const seen = await host.until("status sees the connected catalog", async () => {
-        const output = await status()
-        return output.state === "connected" && output.catalog.observed === TOOL_NAMES.length + 1 ? output : undefined
-      })
-      expect(seen).toMatchObject({ source: "plugin", catalog: { reviewedPresent: TOOL_NAMES.length, unknown: [NEW_TOOL] }, scripting: { reviewedMethodCount: RPC_TOOLS.length, nativeOnly: [...NATIVE_ONLY] }, nextStep: "Nothing to do." })
-      expect(fake.calls).toEqual([])
-
-      const { value: described } = await script("describe", {})
-      expect(described.methods.map((method: { name: string }) => method.name)).toEqual([...RPC_TOOLS])
-      expect(described.unclassified).toEqual([...NATIVE_ONLY, NEW_TOOL].sort())
-
-      const build = await create({ agent: "build" })
-      expect((await script("ping", { sessionID: build, input: {} })).value).toMatchObject({ text: "synthetic ping" })
-      expect(fake.calls).toEqual(["ping"])
-      // Under the default access, all, a paid call runs once with no extra rule.
-      expect((await script("send-message", { sessionID: build, input: { query: "q" } })).value).toMatchObject({ text: "synthetic send-message" })
-      // A session rule that asks is refused at once, with no prompt left waiting and nothing sent.
-      const asking = await create({ agent: "build", permissions: [rule("openrouter_send-message", "ask")] })
-      const asked = await script("send-message", { sessionID: asking, input: { query: "q" } })
-      expect(asked).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-      expect(asked.message).toContain("would ask")
-      const { data: pending } = await host.api<{ data: unknown[] }>("GET", "/api/permission/request")
-      expect(pending.filter((request) => JSON.stringify(request).includes(asking))).toEqual([])
-      // A session's own deny refuses a read.
-      const denied = await create({ agent: "build", permissions: [rule("openrouter_ping", "deny")] })
-      expect(await script("ping", { sessionID: denied, input: {} })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-      // The image route does not exist.
-      expect(await script("generate-image", { sessionID: build, input: { query: "q" } })).toMatchObject({ type: "rpc.method_not_found" })
-      expect(fake.calls).toEqual(["ping", "send-message"])
-    } catch (error) {
-      throw new Error(`${(error as Error).message}\n--- opencode ${version} log ---\n${host?.log().slice(-3000)}`)
-    } finally {
-      await host?.close()
-      await fake?.close()
-    }
-  }, 600_000)
-})
-
-/** A copy of the installed package whose endpoint points at `url`. */
-function pointedAt(url: string, name: string) {
-  const copy = join(work, "pointed", name)
-  cpSync(installedPackage(false), copy, { recursive: true })
-  const entry = join(copy, "dist", "index.js")
-  const text = readFileSync(entry, "utf8")
-  const quoted = JSON.stringify(ENDPOINT)
-  expect(text.split(quoted).length - 1).toBe(1)
-  writeFileSync(entry, text.replace(quoted, JSON.stringify(url)))
-  return copy
-}
-
-/**
- * OPENCODE_BIN_<version>, or the unmodified npm release with its platform binary, installed with scripts disabled.
- * Installed once per version: several tests serve the same release.
- */
-const ran = new Set<string>()
-const binaries = new Map<string, string>()
-function stockBinary(version: string): string {
-  ran.add(version)
-  const given = process.env[`OPENCODE_BIN_${version.replaceAll(".", "_")}`]
-  if (given) return given
-  const cached = binaries.get(version)
-  if (cached) return cached
-  const binary = `@opencode/cli-${platform()}-${arch()}`
-  const dir = project(`opencode-${version}`)
-  // Only this platform's binary: each one is a few hundred megabytes.
-  run("npm", ["install", `@opencode/cli@${version}`, `${binary}@${version}`, "--omit=optional", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], dir)
-  const path = join(dir, "node_modules", binary, "bin", "opencode")
-  binaries.set(version, path)
-  return path
-}
-
-async function freePort(): Promise<number> {
-  const server = createServer()
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done))
-  const { port } = server.address() as { port: number }
-  await new Promise((done) => server.close(done))
-  return port
-}
-
-/**
- * `opencode serve` on its own port and password, in an environment that holds only its temp root and is offline, with
- * a project that loads the installed package.
- */
-async function serve(version: string, installed: string, options: { readonly name?: string } = {}) {
-  const binary = stockBinary(version)
-  const base = join(work, options.name ?? `stock-${version}`)
-  const directory = join(base, "project")
-  // Keep the built-in local providers from probing their default ports.
-  const providers = { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } }
-  mkdirSync(directory, { recursive: true })
-  writeFileSync(join(directory, "opencode.json"), JSON.stringify({ plugins: [installed], providers }))
-  const password = randomUUID()
-  const env = { ...isolated(base), ...OFFLINE, PATH: "/usr/bin:/bin", LANG: "en_US.UTF-8", OPENCODE_PASSWORD: password }
-
-  expect(run(binary, ["--version"], directory, env).trim()).toBe(`opencode v${version}`)
-  // OpenCode resolves every global path from this environment; none may leave the temp root.
-  const paths = run(binary, ["debug", "paths"], directory, env).trim().split("\n").map((line) => line.trim().split(/\s+/))
-  expect(paths.length).toBeGreaterThan(5)
-  expect(paths.filter(([, path]) => !path?.startsWith(base + sep))).toEqual([])
-
-  const port = await freePort()
-  let log = ""
-  const server = spawn(binary, ["serve", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: directory, env, stdio: ["ignore", "pipe", "pipe"] })
-  server.stdout.on("data", (chunk) => void (log += chunk))
-  server.stderr.on("data", (chunk) => void (log += chunk))
-  const exited = new Promise((done) => server.once("exit", done))
-
-  const authorization = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
-  /** The response's status and parsed body, whatever the status. */
-  const request = async (method: string, path: string, body?: unknown) => {
-    const url = new URL(path, `http://127.0.0.1:${port}`)
-    url.searchParams.set("location[directory]", directory)
-    const response = await fetch(url, { method, headers: { authorization, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
-    const text = await response.text()
-    let parsed: unknown = text
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      // Not JSON: keep the text.
-    }
-    return { status: response.status, ok: response.ok, text, body: parsed }
-  }
-  const api = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
-    const response = await request(method, path, body)
-    if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${response.text.slice(0, 500)}`)
-    return response.body as T
-  }
-  /** Polls until `read` returns a value. The server answers before plugins finish loading, more slowly when busy. */
-  const until = async <T>(what: string, read: () => Promise<T | false | undefined>, ms = 180_000): Promise<T> => {
-    for (const deadline = Date.now() + ms; ; await Bun.sleep(500)) {
-      const value = await read().catch((error: unknown) => (Date.now() > deadline ? Promise.reject(error) : undefined))
-      if (value) return value
-      if (server.exitCode !== null) throw new Error(`opencode ${version} exited before ${what}`)
-      if (Date.now() > deadline) throw new Error(`timed out waiting until ${what}`)
-    }
-  }
-  const close = async () => {
-    if (server.exitCode !== null || server.signalCode !== null) return
-    server.kill("SIGTERM")
-    const timer = setTimeout(() => server.kill("SIGKILL"), 10_000)
-    await exited
-    clearTimeout(timer)
-  }
-  return { api, request, until, close, directory, log: () => log }
-}
-
-// The files a `files` entry should put in the tarball. dist/ must hold exactly the two bundles, so stale or foreign
-// build output fails the comparison, and so does a missing whitelisted file.
-function whitelisted(entry: string): string[] {
-  if (entry === "dist") return DIST
-  const path = join(root, entry)
-  if (!existsSync(path)) return [`${entry} (missing)`]
-  return statSync(path).isDirectory() ? tree(entry) : [entry]
-}
-
-/** Every file under `dir`, as paths relative to `base` (the repository root by default). */
-function tree(dir: string, base = root): string[] {
-  return readdirSync(join(root, dir), { recursive: true, withFileTypes: true })
-    .filter((item) => item.isFile() && item.name !== ".DS_Store")
-    .map((item) => relative(base, join(item.parentPath, item.name)).split(sep).join("/"))
-}
-
-/** Every module specifier in a file: static imports and re-exports, dynamic `import()` and `require()`. */
-const specifiers = (source: string) =>
-  [...source.matchAll(/(?:^|[\s;}])(?:import|export)\s*(?:[^'"`;]*?\sfrom\s*)?["']([^"']+)["']|\b(?:import|require)\s*\(\s*["'`]?([^"'`)]*)["'`]?\s*\)/g)].map((match) => (match[1] ?? match[2])!)
-
-/** Relative imports, and every dynamic `import()` or `require()` call: a self-contained bundle has none. */
-const relativeImports = (source: string) => [
-  ...specifiers(source).filter((specifier) => specifier.startsWith(".")),
-  ...[...source.matchAll(/(?<![\w$.])(?:import|require)\s*\(/g)].map((match) => match[0]),
-]
-
-/** The bare specifiers of one bundle that the allowed list does not cover. */
-const foreign = (file: string, allowed: RegExp[]) =>
-  [...new Set(specifiers(readFileSync(file, "utf8")).filter((specifier) => !allowed.some((pattern) => pattern.test(specifier))))].sort()
-
-function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = { ...process.env, npm_config_update_notifier: "false" }): string {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", env })
-  if (result.error) throw result.error
-  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed (${result.status}):\n${result.stderr}\n${result.stdout}`)
-  return result.stdout
-}
-
-// A release that did not run is a failure, never a silent skip: every tested release must have loaded a stock binary,
-// so a suite that quietly tested only one of them cannot pass.
-describe("the tested releases", () => {
-  test("every release in TESTED_HOSTS ran the stock binary in this run", () => {
-    expect([...ran].sort()).toEqual([...TESTED_HOSTS].sort())
+test("the tarball installs beside @opencode/plugin 2.4.1 and its ./server entry is a Plugin.define value", () => {
+  const report = packed()
+  const project = join(scratch, "project")
+  mkdirSync(project, { recursive: true })
+  writeFileSync(
+    join(project, "package.json"),
+    `${JSON.stringify(
+      {
+        name: "openrouter-pack-check",
+        private: true,
+        type: "module",
+        dependencies: {
+          "@we-the-rebel-alliance/openrouter-plugin": `file:${join(scratch, report.filename)}`,
+          "@opencode/plugin": "2.4.1",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"], {
+    cwd: project,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 300_000,
   })
+
+  const entry = join(project, "check-entry.mjs")
+  writeFileSync(
+    entry,
+    [
+      'import plugin from "@we-the-rebel-alliance/openrouter-plugin/server"',
+      'console.log(JSON.stringify({ id: plugin.id, setup: typeof plugin.setup, keys: Object.keys(plugin).sort() }))',
+      "",
+    ].join("\n"),
+  )
+  const output = execFileSync(process.execPath, [entry], { cwd: project, encoding: "utf8", timeout: 60_000 })
+  const value = JSON.parse(output) as { id: string; setup: string; keys: string[] }
+  assert.equal(value.id, "openrouter")
+  assert.equal(value.setup, "function")
+  assert.deepEqual(value.keys, ["id", "setup"])
+
+  const installed = JSON.parse(readFileSync(join(project, "node_modules", "@we-the-rebel-alliance", "openrouter-plugin", "package.json"), "utf8")) as Record<string, unknown>
+  assert.equal(installed["dependencies"], undefined)
+  assert.equal(installed["capabilities"] === undefined, false)
 })
