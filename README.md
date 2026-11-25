@@ -37,12 +37,19 @@ field.
 
 ## Call with an account
 
-Configure the aliases you want in `opencode.json`:
+Configure the plugin entry and the aliases in `opencode.json`:
 
 ```json
 {
-  "access": "ask-changes",
-  "accounts": { "work": {}, "personal": {} }
+  "plugins": [
+    {
+      "package": "github:we-the-rebel-alliance/openrouter-plugin#v0.0.0",
+      "options": {
+        "access": "ask-changes",
+        "accounts": { "work": {}, "personal": {} }
+      }
+    }
+  ]
 }
 ```
 

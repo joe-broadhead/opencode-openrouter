@@ -16,9 +16,16 @@ Two aliases, with changes asking first:
 
 ```json
 {
-  "access": "ask-changes",
-  "accounts": { "work": {}, "personal": {} },
-  "allowUntestedHost": false
+  "plugins": [
+    {
+      "package": "github:we-the-rebel-alliance/openrouter-plugin#v0.0.0",
+      "options": {
+        "access": "ask-changes",
+        "accounts": { "work": {}, "personal": {} },
+        "allowUntestedHost": false
+      }
+    }
+  ]
 }
 ```
 
