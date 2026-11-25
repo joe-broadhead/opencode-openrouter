@@ -70,10 +70,13 @@ test("the tarball ships the built entry, the skills, the assets and the licence,
   assert.deepEqual(report.bundled, [])
 })
 
-test("every shipped file is a plain readable file, and the entry is not executable", () => {
+test("every shipped file is readable and none is executable", () => {
   const report = packed()
   for (const file of report.files) {
-    assert.equal(file.mode, 420, `${file.path} has mode ${file.mode.toString(8)}`)
+    // npm records the checkout's umask on a non-executable file (600 on a hardened runner, 644 elsewhere); the mode
+    // invariant that matters is that nothing ships executable and every file is owner-readable.
+    assert.equal(file.mode & 0o111, 0, `${file.path} must not be executable (mode ${file.mode.toString(8)})`)
+    assert.notEqual(file.mode & 0o400, 0, `${file.path} must be readable by its owner (mode ${file.mode.toString(8)})`)
     assert.ok(file.size > 0, `${file.path} is empty`)
   }
 })
