@@ -110,9 +110,14 @@ dist/index.js             the committed server entry the `./server` export names
   step, account problems, unguarded agents and an unreadable server list.
 - `test/fixture/fixture.test.ts` replays `fixtures/conformance.json` through the handlers and checks the two account
   cases. The fixture is synthetic: there is no live account on the recording machine, and it says so.
+- `test/unit/skills.test.ts` proves the front-matter parser: one-line descriptions, quote stripping, and the
+  `UNAVAILABLE` refusal for an empty description or a block indicator (`>`, `|`, `>-`, `|+`).
 - `test/host/skills.test.ts` loads the built `dist/index.js` in the embedded `@opencode/sdk` 2.4.1 host, with an empty
-  temporary project directory and an isolated `HOME`/`XDG_*`, activates the plugin and asserts the four skill ids the
-  host lists. It fails when the plugin's skill registration is removed.
+  temporary project directory and an isolated `HOME`/`XDG_*`, activates the plugin and asserts the four skill ids and
+  their exact YAML-parsed descriptions. It fails when the skill registration or the description is broken.
+- `test/host/mcp.test.ts` drives the built entry with an empty project and asserts the host lists `openrouter` by
+  default and `openrouter-work`/`openrouter-personal` for two aliases, each at the vendor URL with `oauth: {}`. It fails
+  when `registerOpenRouterAccounts` is removed.
 - `test/pack/pack.test.ts` proves the tarball's file list, its modes, no runtime dependency, no lifecycle script, that
   `./server` is a `Plugin.define` value, and that `dist/index.js` calls `context.skill.transform` directly.
 - `npx plugin-kit check` proves T0, T1 on 2.4.1, the unsupported-host refusal, the accounts cases against the real host,

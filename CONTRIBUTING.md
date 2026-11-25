@@ -22,7 +22,7 @@ npm run check
 | `npm run lint` | `@biomejs/biome` finds no lint problem |
 | `npm run typecheck` | the sources and tests typecheck under strict settings |
 | `npm run bundle` | `dist/index.js` is rebuilt from `src/index.ts` with esbuild; the result is committed |
-| `npm test` | the manifest, accounts, provider, probe, fixture and real-host skills tests pass |
+| `npm test` | the manifest, accounts, provider, probe, fixture and real-host skills, parity and MCP tests pass |
 | `npm run test:pack` | the tarball's contents, and that its `./server` entry loads beside `@opencode/plugin` 2.4.1 |
 | `plugin-kit check` | conformance T0 and T1, the doc file set, the forbidden patterns and no bundled kit |
 | `plugin-kit docs --check` | every generated doc section matches the manifest |
