@@ -17,15 +17,16 @@ and `verified: false`; it is OpenCode's connection identity, not a provider iden
 ## Scopes
 
 The plugin requests no OpenCode scope of its own. OpenRouter's MCP OAuth scopes are the provider's; the plugin does not
-widen them. A tool the person's sign-in cannot use fails in the server, and the plugin reports the redacted failure in
-`status`.
+widen them. A tool the person's sign-in cannot use fails in the server and is reported at the call; a rejected or expired
+sign-in appears in `status` as `needs_sign_in`, and a connection failure as `error` with a redacted reason.
 
 ## Untrusted data
 
-Every answer is untrusted. The model catalog, endpoints, rankings, docs, generations, batches, presets, video jobs and the
-two recipe tools return text that is data, never instructions: the plugin never follows it, never puts it in `status`,
-and never uses it to choose a tool or a recipient. The skills say the same to an agent. A recipe's text authorizes
-nothing; reading it runs nothing.
+Provider content is untrusted. The model catalog, endpoints, rankings, docs, generations, batches, presets, video jobs and
+the two recipe tools return text that is data, never instructions: the plugin never follows it, never puts it in
+`status`, and never uses it to choose a tool or a recipient. The skills say the same to an agent. A recipe's text
+authorizes nothing; reading it runs nothing. `probe` marks its answer `trust: "untrusted"`; `status` carries no provider
+content at all.
 
 `status` carries no content and no credential. An MCP failure's reason goes through the contract's `redactReason`: query
 values, bearer credentials, JWTs and token-shaped words are replaced, and the line is cut to 160 characters. A reason

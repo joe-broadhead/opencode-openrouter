@@ -11,9 +11,9 @@
 | Handlers | `src/handlers/` | one handler per method the plugin owns: `status` and `probe` |
 
 The entry is deliberately thin. `register` from the contract wires doors 1–3: one agent tool per non-MCP method in the
-`openrouter` namespace, the same methods in Code Mode, one RPC registration under `openrouter`, the permission assertions
-on `<alias>:<operation>`, and the access rules inserted into every agent. This repository never calls `ctx.tool`,
-`ctx.rpc` or `ctx.permission` itself.
+`openrouter` namespace, the same methods in Code Mode, one RPC registration under `openrouter`, the permission gate for
+its own methods, and the access rules inserted into every agent. This repository never calls `ctx.tool`, `ctx.rpc` or
+`ctx.permission` itself.
 
 ## The call path
 

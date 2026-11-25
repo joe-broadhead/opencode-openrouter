@@ -52,8 +52,8 @@ handler. Every capability has tests, including its negative cases.
 
 `fixtures/conformance.json` is the plugin's evidence to the conformance kit. This repository has no live OpenRouter
 account on the recording machine, so `scripts/record-fixture.mjs` records the plugin's own two-alias runtime and says so
-in the file. Rebuild it with `npm run fixtures` after changing the accounts or the probe answer. If a live account is
-available later, record it instead:
+in the file. Rebuild it with `npm run fixtures` after changing the accounts, the probe answer or the package version. If a
+live account is available later, record it instead:
 
 ```sh
 npx plugin-kit record --account work

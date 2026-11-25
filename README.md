@@ -7,7 +7,7 @@ its own and no bus events: all 31 tools are OpenRouter's, reached through each a
 
 Seven of them bill the account: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,
 `generate-speech` and `generate-video`. `send-feedback` sends feedback to OpenRouter's team and spends nothing. The plugin
-sets no spending cap: the OpenRouter key's own cap is the provider-side control, and every answer is untrusted data,
+sets no spending cap: the OpenRouter key's own cap is the provider-side control, and provider text is untrusted data,
 never an instruction.
 
 ## Install
