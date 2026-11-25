@@ -60,7 +60,8 @@ None.
 
 - **31 pass-through tools.** Each `mcp:<tool>` row is one tool OpenRouter's hosted server owns. The plugin registers no
   handler for them and never proxies a call: OpenCode talks to the server it signed in to, and the plugin only declares
-  each tool's class and access rule. The MCP tool's own permission is `<server>_<tool>`, so a rule for `openrouter-work`
+  each tool's class and access rule. The tools take no `account`: the alias is the server, so `work` is
+  `tools["openrouter-work"]["<tool>"]`. The MCP tool's own permission is `<server>_<tool>`, so a rule for `openrouter-work`
   never reaches `openrouter-personal`.
 - **Reads.** Twenty-one tools read public catalog data, the account's own batches, credits, key metadata, generations,
   presets and video jobs, or the docs. `get-session-cost` reports published per-session costs in coding harnesses, not

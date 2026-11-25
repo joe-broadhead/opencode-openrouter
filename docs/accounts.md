@@ -19,8 +19,12 @@ The plugin stores no credential and has no per-alias setting. The alias is the a
 
 ## Picking an account
 
-Pass `account: "<alias>"` on a method that takes one. With two aliases and no account, the call is refused with
-`ACCOUNT_REQUIRED`, whose next step lists the aliases. An alias the plugin does not serve is `ACCOUNT_UNKNOWN`.
+Only `probe` takes an `account`; `status` takes none, and OpenRouter's pass-through tools never take one: the alias is a
+separate MCP server, so `default` is `tools["openrouter"]["<tool>"]` and `work` is
+`tools["openrouter-work"]["<tool>"]`.
+
+Pass `account: "<alias>"` to `probe`. With two aliases and no account it is refused with `ACCOUNT_REQUIRED`, whose next
+step lists the aliases; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`.
 
 Pass-through MCP tools keep their own permission action per alias, `<server>_<tool>`: a rule for `openrouter-work` never
 reaches a tool on `openrouter-personal`.

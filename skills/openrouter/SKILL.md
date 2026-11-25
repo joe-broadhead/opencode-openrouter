@@ -10,9 +10,12 @@ says now; finish with a recommendation or concrete integration guidance.
 
 ## Pick an account
 
-Every tool takes `account: "<alias>"` when the plugin serves more than one alias. The plugin's servers are `openrouter`
-for `default` and `openrouter-<alias>` for every other alias, each with its own sign-in. With two aliases and no account,
-a call is refused with `ACCOUNT_REQUIRED`; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`.
+The alias is a separate OpenRouter MCP server, not an argument to OpenRouter's tools: `openrouter` for `default` and
+`openrouter-<alias>` for every other alias, each with its own sign-in. Call a tool as
+`tools["openrouter"]["<tool>"]` or `tools["openrouter-work"]["<tool>"]`.
+
+The plugin's own `probe` is the only method that takes `account`: with two aliases and no account it is refused with
+`ACCOUNT_REQUIRED`, and an alias the plugin does not serve is `ACCOUNT_UNKNOWN`. `status` takes no account.
 
 ## Call a tool
 
@@ -57,8 +60,8 @@ than filling it in. Recommend a bounded test only when the metadata cannot settl
 
 ## Errors
 
-- `ACCOUNT_REQUIRED` — pass `account` with one of the aliases.
-- `ACCOUNT_UNKNOWN` — use an alias the plugin serves.
+- `ACCOUNT_REQUIRED` — `probe` needs `account`; pass one of the aliases.
+- `ACCOUNT_UNKNOWN` — `probe` names an alias the plugin does not serve.
 - `NEEDS_SIGN_IN` — sign in to that alias's MCP server through OpenCode.
 - `UNAVAILABLE` — the server did not answer; check `status`, then try again once.
 - `HOST_UNTESTED` — OpenCode is outside `>=2.4.1 <2.5.0`; install a tested release.

@@ -45,8 +45,12 @@ Configure the aliases you want in `opencode.json`:
 }
 ```
 
-Every method that takes an account accepts `account: "work"` or `account: "personal"`. With two aliases and no account,
-the call is refused with `ACCOUNT_REQUIRED`; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`.
+`probe` is the plugin's only method that takes an `account`: pass `account: "work"` or `account: "personal"`. With two
+aliases and no account, `probe` is refused with `ACCOUNT_REQUIRED`; an alias the plugin does not serve is
+`ACCOUNT_UNKNOWN`. `status` takes no account.
+
+OpenRouter's own tools never take an account: the alias is a separate MCP server, so call them as
+`tools["openrouter"]["<tool>"]` for `default` and `tools["openrouter-work"]["<tool>"]` for `work`.
 
 ## Options
 
@@ -164,7 +168,8 @@ None.
 - **The OpenRouter tools are absent**: `status` should list every alias, and the tools appear under each alias's MCP
   server (`openrouter`, `openrouter-work`, …). If a tool is missing, check that OpenCode lists the server and that the
   access level has not turned a write or send off.
-- **A call is refused**: `ACCOUNT_REQUIRED` means pass `account`; `ACCOUNT_UNKNOWN` means use one of the aliases;
+- **A call is refused**: for `probe`, `ACCOUNT_REQUIRED` means pass `account` and `ACCOUNT_UNKNOWN` means use one of the
+  aliases; OpenRouter's tools take no account, so use the alias's server (`tools["openrouter-work"]["<tool>"]`).
   `PERMISSION_DENIED` means the access level or an ask refused it; `NEEDS_SIGN_IN` means sign in again; `UNAVAILABLE`
   means the MCP server did not answer. `probe` shows which server an alias uses.
 

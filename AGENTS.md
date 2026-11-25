@@ -64,8 +64,9 @@ dist/index.js             the committed server entry the `./server` export names
 1. **The manifest is the source of truth.** Add or change a method in `package.json` `capabilities` first, then its
    handler (only for the plugin's own methods), then its tests. Never register a tool by hand: `contract.register` does
    it.
-2. **A pass-through tool has no handler.** OpenRouter owns it. Declare it as `mcp:<tool>` for its class, its account and
-   its operations, and leave the call to the vendor's server. `register` refuses a handler for an `mcp:` row.
+2. **A pass-through tool has no handler.** OpenRouter owns it. Declare it as `mcp:<tool>` for its class and its
+   operations; its `accounts: optional` row is the per-alias access scope, not an argument the tool takes (the alias is
+   a separate server). `register` refuses a handler for an `mcp:` row.
 3. **Classify every tool truthfully.** A `send_*` name is class `send`; a tool that creates media is a write. If in doubt,
    choose the stricter class. A tool OpenRouter adds later is `mcp:*` class `write` until it is reviewed.
 4. **A billing tool is never a read.** `send-message`, `send-batch`, `send-decision`, `transcribe-audio`,
