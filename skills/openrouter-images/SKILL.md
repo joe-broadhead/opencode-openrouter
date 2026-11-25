@@ -14,9 +14,9 @@ user's explicit media request, one agreed call at a time, and never as a diagnos
    or edit field names. Support only what the schema and the selected model expose.
 2. Use `list-models` and `get-model` to find a currently available model with the required output modality. Inspect
    `list-model-endpoints` only when provider, regional or price differences affect the choice.
-3. State the proposed model, the requested output, the intended call count and any budget or data constraint. Under
-   `access: "all"` nothing asks before a spending call, so the user's request is the authorization; the host's permission
-   rules still apply. Default to one generation unless the user asks for more.
+3. State the proposed model, the requested output, the intended call count and any budget or data constraint. Every
+   spending call asks first, even under `access: "all"`, so the user's request is the authorization; the host's
+   permission rules still apply. Default to one generation unless the user asks for more.
 4. Send only the prompt and inputs authorized for this request. Do not read repository files or unrelated private media.
    If the request needs reference images or editing and the schema cannot take them, explain the gap before spending.
 5. The plugin sets no spending cap. The OpenRouter key's own cap is the provider-side control for the usage it covers;

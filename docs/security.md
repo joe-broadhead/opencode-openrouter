@@ -39,19 +39,20 @@ contract's `access` module, are the only gate:
 
 | Level | Reads | Writes and sends |
 |---|---|---|
-| `all` | run | run |
+| `all` | run | ask first |
 | `ask-changes` | run | ask first |
 | `read-only` | run | off |
 
-The two recipe tools ask at every level. A tool OpenRouter adds later is class `write`, so it asks or is denied until it
-is reviewed.
+Every reviewed write or send asks before it runs at `all` and `ask-changes`, and is off under `read-only`. The two recipe
+reads ask at every level. A tool OpenRouter adds later is class `write` with `effect: "ask"`, so it asks too and is off
+only under `read-only`; it never runs unasked at `all`.
 
 ## Spending
 
 Seven tools bill the account: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,
 `generate-speech` and `generate-video`. `send-feedback` does not bill. The plugin sets no spending cap of its own and
-never represents a local estimate as a hard limit; the OpenRouter key's own cap is the provider-side control. Under the
-default `access: "all"` a spending call does not ask, so a person who wants a confirmation chooses `ask-changes`.
+never represents a local estimate as a hard limit; the OpenRouter key's own cap is the provider-side control. Even under
+the default `access: "all"`, a spending or sending call asks before it runs; `read-only` turns it off.
 
 ## Reporting
 

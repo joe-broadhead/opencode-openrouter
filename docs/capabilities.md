@@ -69,13 +69,15 @@ None.
 - **Recipes ask.** `install-ori-harness` and `spawn-ori-eval` return instructions and run nothing, but their names say
   install and spawn, so both carry `effect: "ask"` and ask under every access level.
 - **Writes bill.** `generate-image`, `generate-speech`, `generate-video` and `transcribe-audio` create new media or text
-  and spend the account's credit. `write` asks under `ask-changes` and is off under `read-only`.
+  and spend the account's credit. Each carries `effect: "ask"`, so it asks at `all` and `ask-changes` and is off under
+  `read-only`.
 - **Sends bill or reach someone.** `send-message`, `send-batch` and `send-decision` run inference on the account's credit;
   `send-feedback` sends feedback about a generation to OpenRouter's team and spends nothing. All four are class `send`, as
-  contract §16 requires for a `send_*` name.
-- **`mcp:*` is a write.** A tool OpenRouter adds later is unreviewed: class `write` makes it ask under `ask-changes` and
-  stay off under `read-only`. The specific rows above carry the reviewed classes and are emitted after the wildcard, so a
-  known read keeps running at `read-only`.
+  contract §16 requires for a `send_*` name, and all four carry `effect: "ask"`: they ask at `all` and `ask-changes` and
+  are off under `read-only`.
+- **`mcp:*` is a write.** A tool OpenRouter adds later is unreviewed: class `write` with `effect: "ask"` makes it ask at
+  `all` and `ask-changes` and stay off under `read-only`, so it never runs unasked. The specific rows above carry the
+  reviewed classes and are emitted after the wildcard, so a known read keeps running at `read-only`.
 - **No sources.** The plugin cannot read OpenRouter's tool stream as a feed with a cursor, so it declares none and adds
   no `events_list`.
 - **No actions.** An action needs a preview method and a separate commit method, and OpenRouter's tools write on the

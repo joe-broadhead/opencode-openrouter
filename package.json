@@ -271,60 +271,69 @@
         "accounts": "optional",
         "operations": [
           "generate-image"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:generate-speech": {
         "class": "write",
         "accounts": "optional",
         "operations": [
           "generate-speech"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:generate-video": {
         "class": "write",
         "accounts": "optional",
         "operations": [
           "generate-video"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:transcribe-audio": {
         "class": "write",
         "accounts": "optional",
         "operations": [
           "transcribe-audio"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:send-batch": {
         "class": "send",
         "accounts": "optional",
         "operations": [
           "send-batch"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:send-decision": {
         "class": "send",
         "accounts": "optional",
         "operations": [
           "send-decision"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:send-message": {
         "class": "send",
         "accounts": "optional",
         "operations": [
           "send-message"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:send-feedback": {
         "class": "send",
         "accounts": "optional",
         "operations": [
           "send-feedback"
-        ]
+        ],
+        "effect": "ask"
       },
       "mcp:*": {
         "class": "write",
-        "accounts": "optional"
+        "accounts": "optional",
+        "effect": "ask"
       }
     },
     "sources": [],

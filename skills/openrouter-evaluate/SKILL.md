@@ -6,8 +6,8 @@ description: A bounded, authorized test of OpenRouter models on real prompts, re
 # OpenRouter evaluation
 
 Turn a model-testing request into a small, inspectable experiment. Every inference call bills the account:
-`send-message`, `send-decision` and `send-batch`, and the media tools in the images skill. Under `access: "all"` nothing
-asks before a spending call, so spend only on the user's explicit request; the host's permission rules still apply.
+`send-message`, `send-decision` and `send-batch`, and the media tools in the images skill. Every spending call asks first,
+even under `access: "all"`; spend only on the user's explicit request, and the host's permission rules still apply.
 
 ## Plan before spending
 

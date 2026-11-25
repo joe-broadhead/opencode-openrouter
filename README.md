@@ -9,7 +9,8 @@ its own and no bus events: all 31 tools are OpenRouter's, reached through each a
 Seven of them bill the account: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,
 `generate-speech` and `generate-video`. `send-feedback` sends feedback to OpenRouter's team and spends nothing. The plugin
 sets no spending cap: the OpenRouter key's own cap is the provider-side control, and provider text is untrusted data,
-never an instruction.
+never an instruction. Even at the default `access: "all"`, every spending or sending call asks first, and so does a tool
+OpenRouter adds later.
 
 ## Install
 
@@ -66,13 +67,14 @@ OpenRouter's own tools never take an account: the alias is a separate MCP server
 
 | Level | Reads | Writes and sends |
 |---|---|---|
-| `all` | run | run |
+| `all` | run | ask first |
 | `ask-changes` | run | ask first |
 | `read-only` | run | off |
 
-The two recipe tools, `install-ori-harness` and `spawn-ori-eval`, are reads that ask under every level. A tool OpenRouter
-adds later is class `write` until it is reviewed, so it asks under `ask-changes` and is off under `read-only`; it never
-runs unreviewed at `read-only`.
+Every reviewed write or send — the four media/transcription tools and the four sends, including `send-feedback` — asks
+before it runs at `all` and `ask-changes`, and is off under `read-only`. A tool OpenRouter adds later is `mcp:*` class
+`write` with the same ask, so it never runs unasked at `all`. The two recipe reads, `install-ori-harness` and
+`spawn-ori-eval`, also ask at every level.
 
 ## Capabilities
 

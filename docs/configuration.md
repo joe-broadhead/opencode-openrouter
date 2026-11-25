@@ -22,8 +22,8 @@ Two aliases, with changes asking first:
 }
 ```
 
-- `access` is the ceiling: `all` runs every method, `ask-changes` asks before a write or a send, and `read-only` turns
-  them off. Reads run at every level; the two recipe tools ask at every level.
+- `access` is the ceiling: reads run at every level; every reviewed write or send asks before it runs at `all` and
+  `ask-changes` and is off under `read-only`; the two recipe reads ask at every level.
 - `accounts` is one empty profile per alias. There is no per-alias setting: the alias is the whole account, and its
   profile must stay `{}`. The alias names the OpenCode MCP server, `openrouter` for `default` and `openrouter-<alias>`
   otherwise.
@@ -33,5 +33,5 @@ Two aliases, with changes asking first:
 ## Spending
 
 The plugin has no budget option and sets no spending cap. Seven tools bill the account's OpenRouter credit, and the
-OpenRouter key's own cap is the provider-side control for the usage it covers. Under the default `access: "all"` nothing
-asks before a spending call, so use `ask-changes` or `read-only` when a person should confirm or prevent one.
+OpenRouter key's own cap is the provider-side control for the usage it covers. Even under the default `access: "all"`,
+every spending or sending call asks first; `read-only` turns them off.

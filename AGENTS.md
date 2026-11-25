@@ -68,10 +68,12 @@ dist/index.js             the committed server entry the `./server` export names
    operations; its `accounts: optional` row is the per-alias access scope, not an argument the tool takes (the alias is
    a separate server). `register` refuses a handler for an `mcp:` row.
 3. **Classify every tool truthfully.** A `send_*` name is class `send`; a tool that creates media is a write. If in doubt,
-   choose the stricter class. A tool OpenRouter adds later is `mcp:*` class `write` until it is reviewed.
+   choose the stricter class. A tool OpenRouter adds later is `mcp:*` class `write` with `effect: "ask"` until it is
+   reviewed.
 4. **A billing tool is never a read.** `send-message`, `send-batch`, `send-decision`, `transcribe-audio`,
-   `generate-image`, `generate-speech` and `generate-video` spend the account's credit; `send-feedback` does not. State
-   the cost in the docs and in the skills. The plugin sets no spending cap.
+   `generate-image`, `generate-speech` and `generate-video` spend the account's credit; `send-feedback` does not. Every
+   one of them, and `send-feedback`, carries `effect: "ask"`, so it asks even at `all`. State the cost in the docs and in
+   the skills. The plugin sets no spending cap.
 5. **Every account is an alias.** One MCP server per alias, named by the contract's rule. Never assume `default`; resolve
    with the contract's `accounts` module.
 6. **Errors** read `CODE: What happened. Next step: What to do.` Use the contract's codes.

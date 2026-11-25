@@ -110,7 +110,7 @@ test("the methods table is status, probe, 31 reviewed MCP tools and the mcp:* de
   assert.deepEqual([...MCP_ROWS].map((method) => method.slice("mcp:".length)).sort(), [...READS, ...RECIPES, ...WRITES, ...SENDS].sort())
   assert.deepEqual(manifest.methods.status, { class: "read", accounts: "none" })
   assert.deepEqual(manifest.methods.probe, { class: "read", accounts: "optional" })
-  assert.deepEqual(manifest.methods["mcp:*"], { class: "write", accounts: "optional" })
+  assert.deepEqual(manifest.methods["mcp:*"], { class: "write", accounts: "optional", effect: "ask" })
 })
 
 test("every reviewed MCP row names its own tool and takes an account, and none is pinned or eval-hidden", () => {
@@ -126,22 +126,29 @@ test("every reviewed MCP row names its own tool and takes an account, and none i
   }
 })
 
-test("every read is class read, every recipe asks first, and every send is class send", () => {
+test("every read is class read, every recipe asks first, and every non-read asks before it runs", () => {
   for (const tool of READS) assert.equal(manifest.methods[`mcp:${tool}`]?.class, "read", tool)
   for (const tool of RECIPES) {
     assert.equal(manifest.methods[`mcp:${tool}`]?.class, "read", tool)
     assert.equal(manifest.methods[`mcp:${tool}`]?.effect, "ask", tool)
   }
-  for (const tool of WRITES) assert.equal(manifest.methods[`mcp:${tool}`]?.class, "write", tool)
-  for (const tool of SENDS) assert.equal(manifest.methods[`mcp:${tool}`]?.class, "send", tool)
-  assert.equal(manifest.methods["mcp:send-feedback"]?.effect, undefined)
+  for (const tool of WRITES) {
+    assert.equal(manifest.methods[`mcp:${tool}`]?.class, "write", tool)
+    assert.equal(manifest.methods[`mcp:${tool}`]?.effect, "ask", tool)
+  }
+  for (const tool of SENDS) {
+    assert.equal(manifest.methods[`mcp:${tool}`]?.class, "send", tool)
+    assert.equal(manifest.methods[`mcp:${tool}`]?.effect, "ask", tool)
+  }
+  assert.equal(manifest.methods["mcp:*"]?.effect, "ask")
 })
 
-test("no billing tool is class read: a call that spends is a change at every access level", () => {
+test("no billing tool is class read: a call that spends is a change that asks before it runs", () => {
   for (const tool of BILLING) {
     const item = manifest.methods[`mcp:${tool}`]
     assert.ok(item !== undefined, tool)
     assert.notEqual(item.class, "read", tool)
+    assert.equal(item.effect, "ask", tool)
   }
 })
 
