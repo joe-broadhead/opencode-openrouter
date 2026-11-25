@@ -44,11 +44,11 @@ test("probe refuses an alias whose server OpenCode does not list, with a next st
 
 test("probe takes no input and answers a closed shape with no source", () => {
   assert.deepEqual(EMPTY, { type: "object", properties: {}, additionalProperties: false })
-  assert.equal(PROBE_ANSWER["additionalProperties"], false)
-  assert.deepEqual(Object.keys((PROBE_ANSWER["properties"] as Record<string, unknown>) ?? {}).sort(), ["account", "owner", "trust"])
-  assert.deepEqual(PROBE_ANSWER["required"], ["account", "owner", "trust"])
-  const owner = (PROBE_ANSWER["properties"] as Record<string, Record<string, unknown>>)["owner"]
+  assert.equal(PROBE_ANSWER.additionalProperties, false)
+  assert.deepEqual(Object.keys((PROBE_ANSWER.properties as Record<string, unknown>) ?? {}).sort(), ["account", "owner", "trust"])
+  assert.deepEqual(PROBE_ANSWER.required, ["account", "owner", "trust"])
+  const owner = (PROBE_ANSWER.properties as Record<string, Record<string, unknown>>).owner
   assert.ok(owner !== undefined)
-  assert.deepEqual(Object.keys((owner["properties"] as Record<string, unknown>) ?? {}).sort(), ["id", "label", "verified"])
-  assert.equal(owner["additionalProperties"], false)
+  assert.deepEqual(Object.keys((owner.properties as Record<string, unknown>) ?? {}).sort(), ["id", "label", "verified"])
+  assert.equal(owner.additionalProperties, false)
 })

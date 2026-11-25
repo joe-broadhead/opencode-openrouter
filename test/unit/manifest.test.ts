@@ -80,18 +80,18 @@ test("an account is an alias with an empty profile, held by the vendor's MCP ser
   })
   const properties = (manifest.options as { readonly properties: Record<string, unknown> }).properties
   assert.deepEqual(Object.keys(properties).sort(), ["access", "accounts", "allowUntestedHost"])
-  assert.deepEqual(properties["accounts"], {
+  assert.deepEqual(properties.accounts, {
     type: "object",
     description: "One empty profile per account alias; the alias is the setting.",
     additionalProperties: { type: "object", properties: {}, additionalProperties: false },
   })
-  assert.deepEqual(properties["access"], {
+  assert.deepEqual(properties.access, {
     type: "string",
     enum: ["all", "ask-changes", "read-only"],
     default: "all",
     description: "How much the plugin's methods may do.",
   })
-  assert.deepEqual(properties["allowUntestedHost"], { type: "boolean", default: false, description: "Start outside the tested OpenCode range." })
+  assert.deepEqual(properties.allowUntestedHost, { type: "boolean", default: false, description: "Start outside the tested OpenCode range." })
 })
 
 test("two aliases resolve to the two MCP servers OpenCode signs in to", () => {
@@ -108,8 +108,8 @@ test("the methods table is status, probe, 31 reviewed MCP tools and the mcp:* de
   assert.equal(MCP_ROWS.length, 31)
   assert.equal(Object.keys(manifest.methods).length, 34)
   assert.deepEqual([...MCP_ROWS].map((method) => method.slice("mcp:".length)).sort(), [...READS, ...RECIPES, ...WRITES, ...SENDS].sort())
-  assert.deepEqual(manifest.methods["status"], { class: "read", accounts: "none" })
-  assert.deepEqual(manifest.methods["probe"], { class: "read", accounts: "optional" })
+  assert.deepEqual(manifest.methods.status, { class: "read", accounts: "none" })
+  assert.deepEqual(manifest.methods.probe, { class: "read", accounts: "optional" })
   assert.deepEqual(manifest.methods["mcp:*"], { class: "write", accounts: "optional" })
 })
 
@@ -120,7 +120,7 @@ test("every reviewed MCP row names its own tool and takes an account, and none i
     assert.deepEqual(row.operations, [tool], tool)
     assert.equal(row.accounts, "optional", tool)
     assert.equal(row.pinned, undefined, tool)
-    assert.equal((row as unknown as Record<string, unknown>)["agent"], undefined, tool)
+    assert.equal((row as unknown as Record<string, unknown>).agent, undefined, tool)
     assert.equal(row.plans, undefined, tool)
     assert.equal(row.commits, undefined, tool)
   }
@@ -168,12 +168,14 @@ test("the manifest and the handler table declare the same methods, and no MCP ro
 test("the package has only the manifest's own keys and a dev-only dependency set", () => {
   const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as Record<string, unknown>
   assert.deepEqual(Object.keys(pkg).sort(), [
+    "bugs",
     "capabilities",
     "description",
     "devDependencies",
     "engines",
     "exports",
     "files",
+    "homepage",
     "license",
     "name",
     "repository",
@@ -184,7 +186,7 @@ test("the package has only the manifest's own keys and a dev-only dependency set
   for (const key of ["dependencies", "peerDependencies", "optionalDependencies", "bundleDependencies"]) {
     assert.equal(pkg[key], undefined, key)
   }
-  const scripts = pkg["scripts"] as Record<string, string>
+  const scripts = pkg.scripts as Record<string, string>
   for (const lifecycle of ["preinstall", "install", "postinstall", "prepare", "prepack", "postpack", "prepublishOnly"]) {
     assert.equal(scripts[lifecycle], undefined, lifecycle)
   }

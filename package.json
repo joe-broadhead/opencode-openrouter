@@ -1,12 +1,16 @@
 {
   "name": "@we-the-rebel-alliance/openrouter-plugin",
   "version": "0.0.0",
-  "description": "OpenRouter's hosted MCP tools in OpenCode: models, endpoints, prices, credit, presets, generations, batches, media and feedback, with one account per alias.",
+  "description": "OpenRouter's hosted MCP tools for an OpenCode agent: models, pricing, credit, generations, media and feedback.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/we-the-rebel-alliance/openrouter-plugin.git"
+  },
+  "homepage": "https://github.com/we-the-rebel-alliance/openrouter-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/we-the-rebel-alliance/openrouter-plugin/issues"
   },
   "engines": {
     "node": ">=24"
@@ -330,14 +334,16 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
     "test": "node --test \"test/unit/**/*.test.ts\" \"test/fixture/**/*.test.ts\"",
     "test:pack": "node --test \"test/pack/**/*.test.ts\"",
     "fixtures": "node scripts/record-fixture.mjs",
     "docs": "plugin-kit docs",
     "docs:check": "plugin-kit docs --check",
-    "check": "npm run typecheck && npm run build && npm run test && npm run test:pack && plugin-kit check && plugin-kit docs --check"
+    "check": "npm run lint && npm run typecheck && npm run build && npm run test && npm run test:pack && plugin-kit check && plugin-kit docs --check"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.9",
     "@opencode/plugin": "2.4.1",
     "@opencode/sdk": "2.4.1",
     "@types/node": "24.19.2",

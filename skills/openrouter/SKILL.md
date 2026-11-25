@@ -61,4 +61,4 @@ than filling it in. Recommend a bounded test only when the metadata cannot settl
 - `ACCOUNT_UNKNOWN` — use an alias the plugin serves.
 - `NEEDS_SIGN_IN` — sign in to that alias's MCP server through OpenCode.
 - `UNAVAILABLE` — the server did not answer; check `status`, then try again once.
-- `HOST_UNTESTED` — OpenCode is outside `>=2.4.1 <2.5.0`; install a tested release or set `allowUntestedHost`.
+- `HOST_UNTESTED` — OpenCode is outside `>=2.4.1 <2.5.0`; install a tested release.

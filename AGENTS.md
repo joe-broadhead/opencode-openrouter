@@ -26,7 +26,8 @@ events.
 | Command | Does |
 |---|---|
 | `npm ci --ignore-scripts` | installs the dev tooling; there are no runtime dependencies |
-| `npm run check` | typecheck, build, the unit and fixture tests, the pack test, `plugin-kit check` and `plugin-kit docs --check` |
+| `npm run check` | lint, typecheck, build, the unit and fixture tests, the pack test, `plugin-kit check` and `plugin-kit docs --check` |
+| `npm run lint` | `biome check .`, the repository's lint gate |
 | `npx plugin-kit check` | the conformance gate: T0, T1, docs, forbidden patterns, no bundled kit |
 | `npm run docs` | regenerates the generated doc sections from the manifest |
 | `npm run fixtures` | rewrites the synthetic two-alias conformance fixture |

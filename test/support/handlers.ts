@@ -77,5 +77,7 @@ export async function run(
   account = "work",
   options: CallOptions = {},
 ): Promise<unknown> {
-  return handlersFor(runtime)[method]!.run(input, callFor(account, options))
+  const handler = handlersFor(runtime)[method]
+  if (handler === undefined) throw new Error(`the ${method} handler is missing from the table`)
+  return handler.run(input, callFor(account, options))
 }

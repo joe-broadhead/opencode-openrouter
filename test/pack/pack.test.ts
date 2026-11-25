@@ -40,7 +40,9 @@ function packed(): Packed {
   const output = execFileSync("npm", ["pack", "--json", "--pack-destination", scratch], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
   const reports = JSON.parse(output) as Packed[]
   assert.equal(reports.length, 1)
-  cache = reports[0]!
+  const [report] = reports
+  assert.ok(report !== undefined)
+  cache = report
   return cache
 }
 
@@ -85,9 +87,9 @@ test("the packed package has no runtime dependency and no lifecycle script", () 
   const report = packed()
   assert.notEqual(report.filename, "")
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as Record<string, unknown>
-  assert.equal(pkg["dependencies"], undefined)
-  assert.equal(pkg["peerDependencies"], undefined)
-  const scripts = pkg["scripts"] as Record<string, string>
+  assert.equal(pkg.dependencies, undefined)
+  assert.equal(pkg.peerDependencies, undefined)
+  const scripts = pkg.scripts as Record<string, string>
   for (const lifecycle of ["preinstall", "install", "postinstall", "prepare", "prepack", "postpack", "prepublishOnly"]) {
     assert.equal(scripts[lifecycle], undefined, lifecycle)
   }
@@ -136,6 +138,6 @@ test("the tarball installs beside @opencode/plugin 2.4.1 and its ./server entry 
   assert.deepEqual(value.keys, ["id", "setup"])
 
   const installed = JSON.parse(readFileSync(join(project, "node_modules", "@we-the-rebel-alliance", "openrouter-plugin", "package.json"), "utf8")) as Record<string, unknown>
-  assert.equal(installed["dependencies"], undefined)
-  assert.equal(installed["capabilities"] === undefined, false)
+  assert.equal(installed.dependencies, undefined)
+  assert.equal(installed.capabilities === undefined, false)
 })

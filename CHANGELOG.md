@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.0 (unreleased)
+## 0.0.0 (2026-11-25)
 
 - The plugin is rebuilt on plugin-contract v0: `Plugin.define`, `assertHost`, one `register` call and the `mcp` account
   mechanism with `work` and `personal`, each an OpenRouter MCP server of its own.

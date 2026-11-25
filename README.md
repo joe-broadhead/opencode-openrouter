@@ -3,7 +3,8 @@
 OpenRouter's hosted MCP server in OpenCode. The vendor's server owns the tools and the credentials; this plugin adds
 named accounts, the permission rules, `status`, `probe` and the documentation. It has no sources, no actions, no tools of
 its own and no bus events: all 31 tools are OpenRouter's, reached through each alias's own MCP server (`openrouter`,
-`openrouter-work`, …).
+`openrouter-work`, …). It is built on
+[plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract) v0.
 
 Seven of them bill the account: `send-message`, `send-batch`, `send-decision`, `transcribe-audio`, `generate-image`,
 `generate-speech` and `generate-video`. `send-feedback` sends feedback to OpenRouter's team and spends nothing. The plugin
@@ -12,14 +13,9 @@ never an instruction.
 
 ## Install
 
-No release of this rewrite exists yet. The maintainer cuts a new `v0.0.0` after the merge, and the install is then:
-
 ```sh
-opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v<version>
+opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v0.0.0
 ```
-
-The repository's existing `v0.0.0`–`v0.0.7` tags name the previous package, not this plugin, and do not contain this
-entry.
 
 ## Sign in
 
@@ -51,6 +47,14 @@ Configure the aliases you want in `opencode.json`:
 
 Every method that takes an account accepts `account: "work"` or `account: "personal"`. With two aliases and no account,
 the call is refused with `ACCOUNT_REQUIRED`; an alias the plugin does not serve is `ACCOUNT_UNKNOWN`.
+
+## Options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `access` | `"all"` | How much the plugin's methods may do: `all`, `ask-changes` or `read-only`. |
+| `accounts` | one `default` account | A map of alias to an empty profile, `{}`; the alias is the account. |
+| `allowUntestedHost` | `false` | Start outside the tested OpenCode range. With the default, OpenCode outside `>=2.4.1 <2.5.0` is refused with `HOST_UNTESTED`. |
 
 ## Access
 
@@ -150,6 +154,20 @@ None.
 | `UNAVAILABLE` | the provider could not be reached |
 <!-- /generated:errors -->
 
+## Troubleshooting
+
+- **`status` says `needs_sign_in`** for an alias: sign in to that alias's MCP server in OpenCode, `openrouter` for
+  `default` and `openrouter-<alias>` otherwise, then read `status` again.
+- **`status` says `error`**: read the alias's reason. "the server is disabled" means enable the server in OpenCode; "the
+  server is still connecting" means wait and re-read; "OpenCode lists no such server" means reload OpenCode so the plugin
+  registers it; a failed connection keeps OpenCode's reason, already redacted.
+- **The OpenRouter tools are absent**: `status` should list every alias, and the tools appear under each alias's MCP
+  server (`openrouter`, `openrouter-work`, …). If a tool is missing, check that OpenCode lists the server and that the
+  access level has not turned a write or send off.
+- **A call is refused**: `ACCOUNT_REQUIRED` means pass `account`; `ACCOUNT_UNKNOWN` means use one of the aliases;
+  `PERMISSION_DENIED` means the access level or an ask refused it; `NEEDS_SIGN_IN` means sign in again; `UNAVAILABLE`
+  means the MCP server did not answer. `probe` shows which server an alias uses.
+
 ## Docs
 
 - [Capabilities](docs/capabilities.md)
@@ -158,3 +176,4 @@ None.
 - [Automations](docs/automations.md)
 - [Architecture](docs/architecture.md)
 - [Security](docs/security.md)
+- [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract)

@@ -19,6 +19,7 @@ npm run check
 
 | Step | What it proves |
 |---|---|
+| `npm run lint` | `@biomejs/biome` finds no lint problem |
 | `npm run typecheck` | the sources and tests typecheck under strict settings |
 | `npm run build` | `dist/index.js` is built from `src/index.ts` with esbuild |
 | `npm test` | the manifest, accounts, provider, probe and fixture tests pass |

@@ -42,15 +42,15 @@ test("each alias reads its own server, so one account's failure never colours an
   const entries = [entry("work", "failed", "timeout"), entry("personal")]
   const signals = await providerFor(entries).signals(["work", "personal"])
   assert.deepEqual(Object.keys(signals), ["work", "personal"])
-  assert.equal(signals["work"]?.state, "error")
-  assert.equal(signals["work"]?.reason, "timeout")
-  assert.equal(signals["personal"]?.state, "ready")
+  assert.equal(signals.work?.state, "error")
+  assert.equal(signals.work?.reason, "timeout")
+  assert.equal(signals.personal?.state, "ready")
 })
 
 test("an alias whose server is absent is an error beside the aliases that are ready", async () => {
   const signals = await providerFor([entry("work")]).signals(["work", "personal"])
-  assert.equal(signals["work"]?.state, "ready")
-  assert.deepEqual(signals["personal"], { state: "error", reason: "OpenCode lists no such server" })
+  assert.equal(signals.work?.state, "ready")
+  assert.deepEqual(signals.personal, { state: "error", reason: "OpenCode lists no such server" })
 })
 
 test("the provider finds one server by name and answers nothing for an unlisted name", async () => {
