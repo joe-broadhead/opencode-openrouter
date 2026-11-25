@@ -91,7 +91,7 @@ scripts/record-fixture.mjs rewrites the synthetic fixture
 
 - `test/unit/manifest.test.ts` proves the package name, the manifest's shape, all 31 MCP rows and their classes, the
   spend classes, and that no legacy key or runtime dependency survives.
-- `test/unit/accounts.test.ts` proves one MCP server per alias, the default server, the labels and the refusals.
+- `test/unit/accounts.test.ts` proves one MCP server per alias, the default server, the server names and the refusals.
 - `test/unit/provider.test.ts` proves every MCP status maps to the contract's signal, with a redacted reason.
 - `test/unit/probe.test.ts` proves the owner, `verified: false`, `trust`, and the refusal for an unlisted server.
 - `test/unit/status.test.ts` proves the status answer through the contract's builder: every MCP state, a redacted next

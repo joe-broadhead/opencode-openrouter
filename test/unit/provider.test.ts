@@ -60,15 +60,14 @@ test("the provider finds one server by name and answers nothing for an unlisted 
   assert.equal((await provider.servers()).length, 2)
 })
 
-test("the server name and label follow the contract's one naming rule", () => {
+test("the server name and the probe label follow the contract's one naming rule", () => {
   assert.equal(serverName("default"), "openrouter")
   assert.equal(serverName("work"), "openrouter-work")
   assert.equal(serverLabel("default"), "OpenRouter")
   assert.equal(serverLabel("work"), "OpenRouter (work)")
 })
 
-test("every alias signs in to the one hosted MCP URL, with its own OAuth and its own label", () => {
-  assert.deepEqual(serverConfig("default"), { type: "remote", url: MCP_URL, oauth: {}, title: "OpenRouter" })
-  assert.deepEqual(serverConfig("personal"), { type: "remote", url: MCP_URL, oauth: {}, title: "OpenRouter (personal)" })
+test("every alias signs in to the one hosted MCP URL with its own OAuth, and the config carries no display field", () => {
+  assert.deepEqual(serverConfig(), { type: "remote", url: MCP_URL, oauth: {} })
   assert.equal(MCP_URL, "https://mcp.openrouter.ai/mcp")
 })

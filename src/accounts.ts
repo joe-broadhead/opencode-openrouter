@@ -19,6 +19,6 @@ export function registerOpenRouterAccounts(context: AccountsContext, manifest: M
   return registerAccounts(context, {
     manifest,
     options,
-    server: (account) => serverConfig(account.alias),
+    server: () => serverConfig(),
   })
 }

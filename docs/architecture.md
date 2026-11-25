@@ -20,7 +20,8 @@ its own methods, and the access rules inserted into every agent. This repository
 1. OpenCode loads `dist/index.js` through the package's `./server` export and calls `setup(ctx)`.
 2. `assertHost` refuses an OpenCode release outside `>=2.4.1 <2.5.0`, unless `allowUntestedHost` is set.
 3. `src/accounts.ts` adds one MCP server per alias through `ctx.mcp.transform`, named `openrouter` or
-   `openrouter-<alias>`, each with its own OAuth and the label a person reads.
+   `openrouter-<alias>`, each with its own OAuth. The server config carries no display field: OpenCode's MCP config has
+   none, so `probe` supplies the label.
 4. `register` checks the handler table against `capabilities.methods`, resolves the accounts from the options, generates
    the access rules into every agent, and registers the plugin's own methods.
 5. OpenRouter's 31 tools are not registered here at all. The manifest declares each as an `mcp:<tool>` row so the access
@@ -34,7 +35,8 @@ its own methods, and the access rules inserted into every agent. This repository
 `src/provider/mcp.ts` is the only file that names the vendor URL. It holds:
 
 - `MCP_URL`, the one endpoint, used by `src/accounts.ts` and nowhere else;
-- `serverName` / `serverLabel` / `serverConfig`, the contract's one naming rule and the per-alias server config;
+- `serverName` / `serverLabel` / `serverConfig`, the contract's one naming rule, the label `probe` answers and the
+  per-alias server config;
 - `signalOf`, the one mapping from OpenCode's MCP status to a contract signal, and `createMcpProvider`, the live read
   over `ctx.mcp.list()`.
 

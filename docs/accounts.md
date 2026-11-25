@@ -37,9 +37,10 @@ reaches a tool on `openrouter-personal`.
 }
 ```
 
-The owner id is the OpenCode MCP server name, not a provider account id, and `verified` is always `false`: the plugin
-does not ask OpenRouter who the account is. `probe` reads no catalog content and returns no credential. If OpenCode lists
-no server for the alias, it refuses with `UNAVAILABLE` and a next step.
+The owner id is the OpenCode MCP server name, not a provider account id. The `label` is the plugin's own answer, built
+from the alias: OpenCode's MCP config has no display field and its server list shows only the name. `verified` is always
+`false`: the plugin does not ask OpenRouter who the account is. `probe` reads no catalog content and returns no
+credential. If OpenCode lists no server for the alias, it refuses with `UNAVAILABLE` and a next step.
 
 ## Status
 

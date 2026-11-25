@@ -23,7 +23,7 @@ function context() {
   return { fake, servers }
 }
 
-test("the mcp mechanism registers one server per alias, named and labelled for the account", async () => {
+test("the mcp mechanism registers one server per alias, named for the account", async () => {
   const { fake, servers } = context()
   const registration = await registerOpenRouterAccounts(fake, manifest, { accounts: { work: {}, personal: {} } })
   assert.equal(registration.mechanism, "mcp")
@@ -32,13 +32,11 @@ test("the mcp mechanism registers one server per alias, named and labelled for t
     type: "remote",
     url: MCP_URL,
     oauth: {},
-    title: "OpenRouter (work)",
   })
   assert.deepEqual(servers.get("openrouter-personal"), {
     type: "remote",
     url: MCP_URL,
     oauth: {},
-    title: "OpenRouter (personal)",
   })
   assert.deepEqual(registration.problems, [])
 })
@@ -47,7 +45,7 @@ test("with no accounts option the plugin has one default server, named for the p
   const { fake, servers } = context()
   const registration = await registerOpenRouterAccounts(fake, manifest, {})
   assert.deepEqual(registration.accounts.map((account) => account.name), ["openrouter"])
-  assert.deepEqual(servers.get("openrouter"), { type: "remote", url: "https://mcp.openrouter.ai/mcp", oauth: {}, title: "OpenRouter" })
+  assert.deepEqual(servers.get("openrouter"), { type: "remote", url: "https://mcp.openrouter.ai/mcp", oauth: {} })
 })
 
 test("the server URL is the vendor's one hosted MCP endpoint", () => {

@@ -12,25 +12,31 @@ never an instruction.
 
 ## Install
 
-This rewrite is prepared for `v0.0.0`; no tag of it exists yet, so nothing here claims a tag installs it today. The
-maintainer cuts the tag after the merge, and the install is then:
+No release of this rewrite exists yet. The maintainer cuts a new `v0.0.0` after the merge, and the install is then:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v0.0.0
+opencode plugin add github:we-the-rebel-alliance/openrouter-plugin#v<version>
 ```
+
+The repository's existing `v0.0.0`–`v0.0.7` tags name the previous package, not this plugin, and do not contain this
+entry.
 
 ## Sign in
 
 The `mcp` mechanism means OpenCode holds the credentials. One OpenRouter MCP server is registered per account alias:
 
-| Alias | MCP server | Label |
-|---|---|---|
-| `default` | `openrouter` | OpenRouter |
-| `work` | `openrouter-work` | OpenRouter (work) |
-| `personal` | `openrouter-personal` | OpenRouter (personal) |
+| Alias | MCP server |
+|---|---|
+| `default` | `openrouter` |
+| `work` | `openrouter-work` |
+| `personal` | `openrouter-personal` |
 
 Every server points at `https://mcp.openrouter.ai/mcp` and has its own OAuth, so two aliases are two independent
 sign-ins. Sign in once per alias through OpenCode's MCP sign-in. The plugin never sees or stores a token.
+
+`probe` reports a label for the account, `OpenRouter` for `default` and `OpenRouter (<alias>)` for the others. That label
+is the plugin's own answer; OpenCode's server list has only the server name, and the MCP server config carries no display
+field.
 
 ## Call with an account
 

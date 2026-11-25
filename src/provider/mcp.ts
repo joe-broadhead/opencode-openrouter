@@ -36,14 +36,14 @@ export function serverName(alias: string): string {
   return accountName(manifest.plugin.name, alias)
 }
 
-/** The label a person reads in OpenCode's server list: `OpenRouter` or `OpenRouter (<alias>)`. */
+/** The label `probe` answers for an account: `OpenRouter` or `OpenRouter (<alias>)`. It is the plugin's own answer, not a field OpenCode stores. */
 export function serverLabel(alias: string): string {
   return accountLabel(manifest.plugin.title, alias)
 }
 
-/** The vendor server one alias signs in to. Each alias is its own server, so each has its own OAuth. */
-export function serverConfig(alias: string): Readonly<Record<string, unknown>> {
-  return { type: "remote", url: MCP_URL, oauth: {}, title: serverLabel(alias) }
+/** The vendor server every alias signs in to. Each alias is its own server, so each has its own OAuth. */
+export function serverConfig(): Readonly<Record<string, unknown>> {
+  return { type: "remote", url: MCP_URL, oauth: {} }
 }
 
 /** The contract's signal for one server entry, or for an alias OpenCode does not list. */
