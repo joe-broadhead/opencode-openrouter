@@ -183,6 +183,7 @@ test("the package has only the manifest's own keys and a dev-only dependency set
     "exports",
     "files",
     "homepage",
+    "keywords",
     "license",
     "name",
     "repository",
