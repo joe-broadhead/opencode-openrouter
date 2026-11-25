@@ -45,7 +45,7 @@ test("status is the answer the contract's builder makes from the same inputs", a
       { alias: "personal", state: "ready" },
     ],
     problems: [],
-    unguardedAgents: [],
+    unguardedAgents: { ok: true, agents: [] },
   })
   assert.deepEqual(answer, built)
 })
@@ -74,19 +74,17 @@ test("an account registration problem is an error before any account state", asy
 })
 
 test("an agent that no longer holds the generated rules is named, never patched", async () => {
-  const answer = await status(runtimeFor(), { unguardedAgents: async () => ["build"] })
+  const answer = await status(runtimeFor(), { unguardedAgents: async () => ({ ok: true, agents: ["build"] }) })
   assert.deepEqual(answer.unguardedAgents, ["build"])
   assert.equal(answer.state, "ready")
 })
 
 test("an unreadable agent list is unknown, never zero: status says error with a redacted next step", async () => {
   const answer = await status(runtimeFor(), {
-    unguardedAgents: async () => {
-      throw new Error("agent list failed at https://opencode.local/api/agent?token=abcd1234")
-    },
+    unguardedAgents: async () => ({ ok: false, error: "agent list failed at https://opencode.local/api/agent?code=abcd1234" }),
   })
   assert.equal(answer.state, "error")
-  assert.equal(answer.nextStep, "agent list failed at https://opencode.local/api/agent?token=…")
+  assert.equal(answer.nextStep, "agent list failed at https://opencode.local/api/agent?code=…")
   assert.deepEqual(answer.unguardedAgents, [])
 })
 

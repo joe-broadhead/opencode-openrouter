@@ -6,7 +6,7 @@
  * sends; the real host itself is proven by `plugin-kit check`'s T1 run.
  */
 import { accountsOf, type AccountProfile } from "@we-the-rebel-alliance/plugin-contract/accounts"
-import type { AccessRegistration } from "@we-the-rebel-alliance/plugin-contract/access"
+import type { UnguardedAgentsResult } from "@we-the-rebel-alliance/plugin-contract/access"
 import type { Bus } from "@we-the-rebel-alliance/plugin-contract/bus"
 import type { MethodCall } from "@we-the-rebel-alliance/plugin-contract/register"
 import { handlersFor, type HandlerRuntime } from "../../src/handlers/index.ts"
@@ -48,21 +48,13 @@ export function runtimeFor(entries: readonly McpServerEntry[] = connected(), ove
 
 /** What a test may change about the call: the one piece `register` would fill from the host. */
 export interface CallOptions {
-  /** The agents whose rules no longer match; a throwing function models an unreadable agent list. */
-  readonly unguardedAgents?: () => Promise<readonly string[]>
+  /** The agents whose rules no longer match; `{ ok: false, error }` models an unreadable agent list. */
+  readonly unguardedAgents?: () => Promise<UnguardedAgentsResult>
 }
 
-/** The call context a handler sees, as `register` builds it. The bus and access are register-owned and unused here. */
+/** The call context a handler sees, as `register` builds it. The bus is register-owned and unused by these handlers. */
 function callFor(account: string, options: CallOptions = {}): MethodCall {
-  const accounts = aliases()
   const bus: Bus = { name: manifest.plugin.name, emit: async () => ({ ok: true }) }
-  const access: AccessRegistration = {
-    level: "all",
-    aliases: accounts.map((profile) => profile.alias),
-    rules: [],
-    problems: [],
-    dispose: async () => undefined,
-  }
   return {
     sessionID: "ses_test",
     agent: "build",
@@ -72,8 +64,7 @@ function callFor(account: string, options: CallOptions = {}): MethodCall {
     progress: async () => undefined,
     account,
     bus,
-    access,
-    unguardedAgents: options.unguardedAgents ?? (async () => []),
+    unguardedAgents: options.unguardedAgents ?? (async () => ({ ok: true, agents: [] })),
     door: "tool",
   }
 }

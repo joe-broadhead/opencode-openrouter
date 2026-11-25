@@ -31,10 +31,9 @@ test and `plugin-kit check`. To run `npm run test:pack` on its own, run `npm run
 
 ## The contract pin
 
-`package.json` pins the contract to
-`github:we-the-rebel-alliance/plugin-contract#79da83cfa1668c30a673e6bb392d3122155e6dc1` while the contract is unreleased.
-A released plugin pins the release tag instead, `github:we-the-rebel-alliance/plugin-contract#v0.0.0`, and moves the pin
-with the contract's release. Never copy a contract module into this repository.
+`package.json` pins the contract to its release tag,
+`github:we-the-rebel-alliance/plugin-contract#v0.0.0`, and moves the pin with the contract's release. Never copy a
+contract module into this repository.
 
 The committed `package-lock.json` records the contract's repository over `git+https`, so a fresh `npm ci` needs no SSH
 key. Keep it that way; CI also rewrites an `ssh://git@github.com/` URL to HTTPS for an older lockfile.
