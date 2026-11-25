@@ -47,7 +47,7 @@ src/accounts.ts           the mcp mechanism: one OpenRouter server per alias
 src/handlers/             one file per method the plugin owns: status and probe
 src/provider/mcp.ts       the endpoint, the per-alias server config and the live ctx.mcp.list() mapping
 src/manifest.ts           reads package.json capabilities and checks it with the contract
-src/skills.ts             reads skills/<name>/SKILL.md and registers each with ctx.skill.transform
+src/skills.ts             reads skills/<name>/SKILL.md; setup registers them with ctx.skill.transform
 test/unit/                manifest, accounts, provider mapping and probe
 test/fixture/             replays fixtures/conformance.json through the handlers
 test/pack/                the packed tarball and its ./server entry
@@ -86,8 +86,8 @@ dist/index.js             the committed server entry the `./server` export names
 11. **One provider endpoint**, named once in `src/provider/`.
 12. **Public OpenCode API only** (`@opencode/plugin` 2.4.1); the kit's forbidden list is final.
 13. **The plugin registers its own skills.** OpenCode does not load a package's `skills/` by itself: `src/skills.ts`
-    registers each `skills/<name>/SKILL.md` through `ctx.skill.transform` in `setup`. A missing or malformed skill
-    refuses setup with the contract's `UNAVAILABLE`.
+    reads and parses each `skills/<name>/SKILL.md`, and `setup` calls `context.skill.transform(addPackagedSkills(skills))`.
+    A missing or malformed skill refuses setup with the contract's `UNAVAILABLE`.
 
 ## Changing a capability
 
@@ -112,8 +112,8 @@ dist/index.js             the committed server entry the `./server` export names
 - `test/host/skills.test.ts` loads the built `dist/index.js` in the embedded `@opencode/sdk` 2.4.1 host, with an empty
   temporary project directory and an isolated `HOME`/`XDG_*`, activates the plugin and asserts the four skill ids the
   host lists. It fails when the plugin's skill registration is removed.
-- `test/pack/pack.test.ts` proves the tarball's file list, its modes, no runtime dependency, no lifecycle script, and that
-  `./server` is a `Plugin.define` value.
+- `test/pack/pack.test.ts` proves the tarball's file list, its modes, no runtime dependency, no lifecycle script, that
+  `./server` is a `Plugin.define` value, and that `dist/index.js` calls `context.skill.transform` directly.
 - `npx plugin-kit check` proves T0, T1 on 2.4.1, the unsupported-host refusal, the accounts cases against the real host,
   the doc set and the forbidden scan.
 

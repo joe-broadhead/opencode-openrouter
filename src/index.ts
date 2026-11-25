@@ -12,7 +12,7 @@ import { registerOpenRouterAccounts } from "./accounts.ts"
 import { handlersFor } from "./handlers/index.ts"
 import { manifest, version } from "./manifest.ts"
 import { createMcpProvider } from "./provider/mcp.ts"
-import { registerPackagedSkills } from "./skills.ts"
+import { addPackagedSkills, loadSkills } from "./skills.ts"
 
 export default Plugin.define({
   id: manifest.plugin.name,
@@ -39,7 +39,8 @@ export default Plugin.define({
 
     // The contract's register does not touch skills; this plugin registers its own four, and disposes them first.
     try {
-      const skillRegistration = await registerPackagedSkills(context.skill)
+      const skills = await loadSkills()
+      const skillRegistration = await context.skill.transform(addPackagedSkills(skills))
       return async () => {
         await skillRegistration.dispose()
         await registration.dispose()

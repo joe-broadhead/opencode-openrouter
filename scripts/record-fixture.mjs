@@ -31,9 +31,11 @@ if (status.state !== "ready") throw new Error(`the synthetic runtime must record
 
 const fixture = {
   $comment:
-    "Recorded from the plugin's own two-alias runtime, not a live OpenRouter account: no signed-in account was available. " +
-    "The 31 OpenRouter MCP tools are declared as mcp:<tool> rows and have no handler. accounts.cursors is empty because " +
-    "this tools-only plugin has no cursor-bearing read, so there is no honest cross-account cursor case to record.",
+    "Recorded from the plugin's own two-alias runtime: the provider answers are synthetic (no live OpenRouter account was " +
+    "available on the recording machine). accounts.real: true makes T1 run the two-account cases against the real 2.4.1 " +
+    "host (plugin-contract docs/conformance.md), not a live provider recording. The 31 OpenRouter MCP tools are declared " +
+    "as mcp:<tool> rows and have no handler. accounts.cursors is empty because this tools-only plugin has no " +
+    "cursor-bearing read, so there is no honest cross-account cursor case to record.",
   plugin: packageName,
   namespace: manifest.plugin.summary,
   accounts: {

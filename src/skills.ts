@@ -77,9 +77,15 @@ export async function loadSkills(directory: string = SKILLS_DIR): Promise<readon
   return skills
 }
 
-/** Register the loaded skills; the returned registration is disposed with the plugin's cleanup. */
-export function registerSkills(skill: Pick<Plugin.Context["skill"], "transform">, skills: readonly PackagedSkill[]) {
-  return skill.transform((editor) => {
+/** The editor `context.skill.transform` hands its callback. */
+type SkillEditor = Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]
+
+/**
+ * The editor callback `setup` passes to `context.skill.transform`. It is exported separately so the direct
+ * `context.skill.transform(...)` call stays visible in the built entry.
+ */
+export function addPackagedSkills(skills: readonly PackagedSkill[]) {
+  return (editor: SkillEditor): void => {
     for (const info of skills) {
       editor.add({
         id: Skill.ID.make(info.name),
@@ -89,10 +95,5 @@ export function registerSkills(skill: Pick<Plugin.Context["skill"], "transform">
         content: info.content,
       })
     }
-  })
-}
-
-/** Read and register every packaged skill. */
-export async function registerPackagedSkills(skill: Pick<Plugin.Context["skill"], "transform">, directory: string = SKILLS_DIR) {
-  return registerSkills(skill, await loadSkills(directory))
+  }
 }

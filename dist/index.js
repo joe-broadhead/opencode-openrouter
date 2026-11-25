@@ -12153,8 +12153,8 @@ async function loadSkills(directory = SKILLS_DIR) {
   }
   return skills;
 }
-function registerSkills(skill, skills) {
-  return skill.transform((editor) => {
+function addPackagedSkills(skills) {
+  return (editor) => {
     for (const info of skills) {
       editor.add({
         id: Skill.ID.make(info.name),
@@ -12164,10 +12164,7 @@ function registerSkills(skill, skills) {
         content: info.content
       });
     }
-  });
-}
-async function registerPackagedSkills(skill, directory = SKILLS_DIR) {
-  return registerSkills(skill, await loadSkills(directory));
+  };
 }
 
 // src/index.ts
@@ -12189,7 +12186,8 @@ var src_default = Plugin.define({
     });
     const registration = await register(context, manifest, handlers);
     try {
-      const skillRegistration = await registerPackagedSkills(context.skill);
+      const skills = await loadSkills();
+      const skillRegistration = await context.skill.transform(addPackagedSkills(skills));
       return async () => {
         await skillRegistration.dispose();
         await registration.dispose();

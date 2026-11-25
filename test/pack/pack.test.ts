@@ -83,6 +83,11 @@ test("every shipped file is readable and none is executable", () => {
   }
 })
 
+test("the built entry calls context.skill.transform directly, so the packaged skills load", () => {
+  const entry = readFileSync(join(root, "dist", "index.js"), "utf8")
+  assert.ok(entry.includes(".skill.transform"), "dist/index.js must call context.skill.transform; the packaged skills would not load")
+})
+
 test("the packed package has no runtime dependency and no lifecycle script", () => {
   const report = packed()
   assert.notEqual(report.filename, "")
