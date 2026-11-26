@@ -1,87 +1,120 @@
-// The four packaged skills on a real host: the host lists them from the repository's skills/ folder, a skill of the same
-// name that the user already has wins and is reported shadowed, and a missing skill file leaves the plugin and the
-// server working. Each describe owns one host.
-import "./isolate.js"
-import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdirSync, writeFileSync } from "node:fs"
+/**
+ * The packaged skills must load in the real OpenCode 2.4.1 host.
+ *
+ * OpenCode discovers `<project>/skills/` by itself, so this test uses an empty temporary project directory and an
+ * isolated `HOME`/`XDG_*`: a skill listed there can only come from the plugin's own `ctx.skill.transform` call. The
+ * `@opencode/sdk` import is dynamic, after the environment is isolated.
+ *
+ * The expected front matter is parsed with the `yaml` package, so an invalid scalar (a `description: >` block, an
+ * unquoted `: `, an empty value) fails here rather than registering a skill agents cannot read.
+ */
+import assert from "node:assert/strict"
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
-import { PLUGIN_ID } from "../../src/constants.js"
-import { SKILL_NAMES } from "../../src/skills.js"
-import { cleanup, HOST_VERSION, serverRow, startHost, type Host } from "./harness.js"
-import { ROOT } from "./isolate.js"
+import { test } from "node:test"
+import { fileURLToPath, pathToFileURL } from "node:url"
+import type { OpenCode } from "@opencode/sdk"
+import type { Plugin } from "@opencode/plugin"
+import { parse as parseYaml } from "yaml"
 
-setDefaultTimeout(300_000)
-afterAll(cleanup)
+const root = fileURLToPath(new URL("../..", import.meta.url))
+const entry = join(root, "dist", "index.js")
+const skillsDirectory = join(root, "skills")
 
-const SKILLS = fileURLToPath(new URL("../../skills/", import.meta.url))
-const packaged = (name: string) => join(SKILLS, name, "SKILL.md")
-
-/** The skills OpenCode lists for the host's location whose id belongs to this plugin or the test. */
-const listed = async (host: Host) => (await host.client.skill.list({ location: host.location })).data.map((skill) => ({ id: skill.id as string, path: skill.path as string, description: skill.description as string | undefined }))
-
-// The temp root is shared by the files of this stage and each file's cleanup removes it, so folders are made in
-// beforeAll, never while a file is being collected.
-/** A folder holding one skill for the host's config to scan: the user's own. */
-function userSkills(name: string, description: string) {
-  const directory = join(ROOT, "user-skills")
-  mkdirSync(join(directory, name), { recursive: true })
-  writeFileSync(join(directory, name, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\n\nMy own instructions.\n`)
-  return directory
+/** One skill file's YAML front matter, checked against its directory. */
+interface ExpectedSkill {
+  readonly name: string
+  readonly description: string
 }
 
-describe(`the packaged skills on OpenCode ${HOST_VERSION}`, () => {
-  let host: Host
-  beforeAll(async () => {
-    host = await startHost()
-  })
-  afterAll(() => host?.close())
+/** Parse every `skills/<name>/SKILL.md` front matter with YAML and check the name and description. */
+function packagedSkills(): ExpectedSkill[] {
+  return readdirSync(skillsDirectory, { withFileTypes: true })
+    .filter((item) => item.isDirectory())
+    .map((item) => {
+      const text = readFileSync(join(skillsDirectory, item.name, "SKILL.md"), "utf8")
+      const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)
+      const parsed = parseYaml(front?.[1] ?? "") as { readonly name?: unknown; readonly description?: unknown }
+      assert.equal(parsed.name, item.name, `${item.name}/SKILL.md must name itself in its front matter`)
+      assert.equal(typeof parsed.description, "string", `${item.name}/SKILL.md must have a string description`)
+      const description = parsed.description as string
+      assert.ok(description.length > 0, `${item.name}/SKILL.md must have a non-empty description`)
+      for (const marker of [">", "|", ">-", "|-", ">+", "|+"]) assert.notEqual(description.trim(), marker, `${item.name}/SKILL.md has the block marker ${marker}`)
+      return { name: item.name, description }
+    })
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
 
-  test("OpenCode lists the four skills from their packaged paths, and the plugin reports them loaded", async () => {
-    const skills = (await listed(host)).filter((skill) => SKILL_NAMES.includes(skill.id)).sort((a, b) => a.id.localeCompare(b.id))
-    expect(skills.map((skill) => ({ id: skill.id, path: skill.path }))).toEqual(SKILL_NAMES.map((id) => ({ id, path: packaged(id) })).sort((a, b) => a.id.localeCompare(b.id)))
-    for (const skill of skills) expect(skill.description?.length).toBeGreaterThan(40)
-    expect(await host.state().skills()).toEqual(SKILL_NAMES.map((name) => ({ name, state: "loaded", path: packaged(name) })))
-    expect(host.state().skillProblems).toEqual([])
-  })
-})
+/** Poll with a bound; the SDK activates a plugin after the first prompt. */
+async function until(check: () => Promise<boolean>, timeoutMs = 30_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await check().catch(() => false)) return true
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  return false
+}
 
-describe(`a skill of the same name that the user has, on OpenCode ${HOST_VERSION}`, () => {
-  let host: Host
-  let own = ""
-  beforeAll(async () => {
-    own = userSkills("openrouter", "The user's own OpenRouter skill, kept as it is.")
-    host = await startHost({ config: () => ({ skills: [own] }) })
-  })
-  afterAll(() => host?.close())
+test("the plugin registers all four packaged skills in the real 2.4.1 host", async () => {
+  const expected = packagedSkills()
+  assert.deepEqual(
+    expected.map((skill) => skill.name),
+    ["openrouter", "openrouter-evaluate", "openrouter-images", "openrouter-troubleshoot"],
+  )
 
-  test("wins (the host lists it), and the plugin reports its own as shadowed with the user's path", async () => {
-    const skills = await listed(host)
-    const mine = join(own, "openrouter", "SKILL.md")
-    expect(skills.filter((skill) => skill.id === "openrouter")).toEqual([{ id: "openrouter", path: mine, description: "The user's own OpenRouter skill, kept as it is." }])
-    for (const name of SKILL_NAMES.filter((name) => name !== "openrouter")) expect(skills.find((skill) => skill.id === name)?.path).toBe(packaged(name))
-    expect(await host.state().skills()).toEqual(
-      SKILL_NAMES.map((name) => (name === "openrouter" ? { name, state: "shadowed", path: packaged(name), shadowedBy: mine } : { name, state: "loaded", path: packaged(name) })),
+  const project = mkdtempSync(join(tmpdir(), "openrouter-skills-"))
+  const environment = ["HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"] as const
+  const saved = new Map(environment.map((key) => [key, process.env[key]]))
+  process.env.HOME = project
+  process.env.XDG_CONFIG_HOME = join(project, "c")
+  process.env.XDG_CACHE_HOME = join(project, "k")
+  process.env.XDG_DATA_HOME = join(project, "d")
+  process.env.XDG_STATE_HOME = join(project, "s")
+
+  let host: OpenCode.Interface | undefined
+  try {
+    const loaded = (await import(pathToFileURL(entry).href)) as { default?: Plugin.Plugin }
+    const plugin = loaded.default
+    assert.ok(plugin !== undefined, `${entry} exports no Plugin.define value`)
+    const sdk = await import("@opencode/sdk")
+    const created = await sdk.OpenCode.create({
+      plugins: [plugin],
+      config: { directory: project },
+      app: { name: "opencode", version: "2.4.1" },
+      log: { level: "error", emit: () => undefined },
+    })
+    host = created
+
+    // A prompt is what makes the host acquire the location's plugin instance.
+    const session = await created.sessions.create({ location: { directory: project }, agent: "build", permissions: [] })
+    await created.sessions.prompt({ sessionID: session.id, text: "activate the skills test", delivery: "queue" }).catch(() => undefined)
+    const active = await until(async () => {
+      const list = await created.plugin.list({ location: { directory: project } })
+      return list.data.some((item: { id: string }) => item.id === "openrouter")
+    })
+    assert.ok(active, "the plugin did not activate in the host within 30 seconds")
+
+    const listed = await created.skill.list({ location: { directory: project } })
+    type RegisteredSkill = { readonly id: unknown; readonly name?: unknown; readonly description?: unknown; readonly path?: unknown; readonly content?: unknown }
+    const byId = new Map<string, RegisteredSkill>(
+      (listed.data as readonly RegisteredSkill[]).map((item) => [String(item.id), item] as const),
     )
-    expect(host.state().skillProblems).toEqual([])
-  })
-})
-
-describe(`a missing skill file, on OpenCode ${HOST_VERSION}`, () => {
-  let host: Host
-  beforeAll(async () => {
-    const empty = join(ROOT, "no-skills")
-    mkdirSync(empty, { recursive: true })
-    host = await startHost({ skillsDir: empty })
-  })
-  afterAll(() => host?.close())
-
-  test("registers no skill and records SKILLS_INVALID, while the plugin stays active and the server connects", async () => {
-    const { data: plugins } = await host.client.plugin.list({ location: host.location })
-    expect(plugins.find((plugin) => plugin.id === PLUGIN_ID)?.state).toEqual({ status: "active" })
-    expect((await serverRow(host))?.status).toEqual({ status: "connected" })
-    expect((await listed(host)).filter((skill) => SKILL_NAMES.includes(skill.id))).toEqual([])
-    expect(await host.state().skills()).toEqual(SKILL_NAMES.map((name) => ({ name, state: "missing" })))
-    expect(host.state().skillProblems).toEqual(SKILL_NAMES.map((name) => `SKILLS_INVALID: The "${name}" skill was not loaded: skills/${name}/SKILL.md is missing. Next step: Reinstall the plugin.`))
-  })
+    for (const skill of expected) {
+      const registered = byId.get(skill.name)
+      assert.ok(registered !== undefined, `the host lists no skill ${skill.name}; it lists ${[...byId.keys()].join(", ")}`)
+      assert.equal(String(registered.name), skill.name, `${skill.name} has the wrong name`)
+      assert.equal(String(registered.path), join(skillsDirectory, skill.name, "SKILL.md"), `${skill.name} has the wrong path`)
+      assert.ok(typeof registered.content === "string" && registered.content.trim().length > 0, `${skill.name} has no body`)
+      assert.equal(registered.description, skill.description, `${skill.name} has the wrong description`)
+    }
+  } finally {
+    if (host !== undefined) await host.close().catch(() => undefined)
+    for (const key of environment) {
+      const value = saved.get(key)
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    rmSync(project, { recursive: true, force: true })
+  }
 })

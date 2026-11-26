@@ -1,115 +1,118 @@
-// The packaged skills: read and validated once in setup, outside every transform, then registered with
-// `ctx.skill.transform`. A missing or malformed skill file never stops the plugin: the server and the rules still work,
-// so the loss is recorded for status. A skill the user already has under the same name is kept, never replaced.
-import { readFile } from "node:fs/promises"
+/**
+ * The plugin's skills, read from `skills/<name>/SKILL.md` and registered with the host.
+ *
+ * OpenCode does not discover a plugin's `skills/` directory: the installed package sits under the host's cache, outside
+ * the directories it scans. A plugin adds its skills through `ctx.skill.transform`, so setup reads every file, checks
+ * its frontmatter and registers the body under the directory's name.
+ */
+import { readdirSync, readFileSync, type Dirent } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Skill, type Plugin } from "@opencode/plugin"
-import { errorText, pluginError } from "./constants.js"
-import { reasonOf } from "./redact.js"
+import { parse as parseYaml } from "yaml"
 
-/** `skills/` at the package root, next to `dist/` (and next to `src/` in the repository). */
-export const SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url))
-
-/** The skills the plugin ships, in the order the legacy declaration lists them. */
-export const SKILL_NAMES: readonly string[] = ["openrouter", "openrouter-evaluate", "openrouter-images", "openrouter-troubleshoot"]
-
-/** What became of one packaged skill. `shadowed` means a skill with the same name, at `shadowedBy`, is the one in use. */
-export type SkillState = "loaded" | "missing" | "invalid" | "shadowed"
-
-export interface SkillStatus {
+/** One checked skill, ready to register. */
+export interface SkillFile {
+  /** The skill id: the directory name, and the frontmatter name. */
+  readonly id: string
   readonly name: string
-  readonly state: SkillState
-  /** The packaged file, when it was read. */
-  readonly path?: string
-  /** The path of the user's skill that is used instead, for `shadowed`. */
-  readonly shadowedBy?: string
+  readonly description: string
+  /** The absolute path of the SKILL.md file. */
+  readonly path: string
+  /** The Markdown body below the frontmatter, with no frontmatter. */
+  readonly content: string
 }
 
-const notLoaded = (name: string, problem: string) => `The "${name}" skill was not loaded: skills/${name}/SKILL.md ${problem}.`
-const REINSTALL = "Reinstall the plugin."
+/** The installed package's `skills/` directory, from `src/skills.ts` and from the bundled `dist/index.js`. */
+const SKILLS = fileURLToPath(new URL("../skills/", import.meta.url))
+
+/** A failure the contract can read: the code, what happened and the next step. */
+function invalid(file: string, what: string): Error {
+  return new Error(`SCHEMA_VIOLATION: ${file} ${what}. Next step: fix the skill file, then reload the plugin.`)
+}
+
+interface Frontmatter {
+  readonly name: string | undefined
+  readonly description: string | undefined
+  readonly content: string
+}
 
 /**
- * Parses `---` frontmatter with `name` and `description`; the body after it is the skill's content. CRLF is read as LF.
- * Throws a `SKILLS_INVALID` error when the file is not a skill named `name`.
+ * The frontmatter fields this plugin checks and the Markdown body. The frontmatter is parsed as YAML, so `>`, `|`
+ * and their chomping variants fold or keep the description exactly as the skill author wrote it; a parser that reads
+ * only the first line would register `>` as the description.
  */
-export function parseSkill(name: string, path: string, text: string): Skill.Info {
-  const fail = (problem: string) => pluginError("SKILLS_INVALID", notLoaded(name, problem), REINSTALL)
-  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text.replace(/\r\n/g, "\n"))
-  if (!match) throw fail("has no frontmatter")
-  const fields = new Map<string, string>()
-  for (const line of match[1]!.split("\n")) {
-    const colon = line.indexOf(":")
-    if (colon > 0) fields.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim().replace(/^(["'])(.*)\1$/, "$2"))
+function frontmatter(text: string, file: string): Frontmatter {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
+  if (match === null) throw invalid(file, "has no frontmatter")
+  let data: unknown
+  try {
+    data = parseYaml(match[1] ?? "")
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message.split("\n")[0] : String(cause)
+    throw invalid(file, `has frontmatter that is not valid YAML: ${message}`)
   }
-  if (fields.get("name") !== name) throw fail(`must be named "${name}" in its frontmatter`)
-  const description = fields.get("description")
-  if (!description) throw fail("has no description")
-  const content = match[2]!.trim()
-  if (!content) throw fail("has no body")
-  return { id: Skill.ID.make(name), name: Skill.Name.make(name), description, path: Skill.Info.fields.path.make(path), content }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) throw invalid(file, "has frontmatter that is not a mapping")
+  const fields = data as Record<string, unknown>
+  if (fields.name !== undefined && typeof fields.name !== "string") throw invalid(file, "has a frontmatter name that is not text")
+  if (fields.description !== undefined && typeof fields.description !== "string") throw invalid(file, "has a frontmatter description that is not text")
+  return {
+    name: fields.name,
+    description: fields.description,
+    content: text.slice(match[0].length).trim(),
+  }
 }
 
-export interface LoadedSkills {
-  /** The skills that parsed, ready to register. */
-  readonly skills: readonly Skill.Info[]
-  /** One `SKILLS_INVALID` line per skill that is missing or invalid, for status. */
-  readonly problems: readonly string[]
-  /** The state of every packaged skill, `loaded`, `missing` or `invalid` at this point. */
-  readonly status: readonly SkillStatus[]
-}
-
-/** Reads every packaged skill from `directory`. Never throws: a problem becomes a line in `problems`. */
-export async function loadSkills(directory = SKILLS_DIR): Promise<LoadedSkills> {
-  const skills: Skill.Info[] = []
-  const problems: string[] = []
-  const status: SkillStatus[] = []
-  for (const name of SKILL_NAMES) {
-    const path = join(directory, name, "SKILL.md")
+/** Read and check every `skills/<name>/SKILL.md` below `directory`, sorted by id. */
+export function readSkills(directory = SKILLS): SkillFile[] {
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(directory, { withFileTypes: true })
+  } catch {
+    throw invalid("skills/", "is missing")
+  }
+  const names = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+  if (names.length === 0) throw invalid("skills/", "holds no <name>/SKILL.md")
+  return names.map((name) => {
+    const file = `skills/${name}/SKILL.md`
+    let text: string
     try {
-      skills.push(parseSkill(name, path, await readFile(path, "utf8")))
-      status.push({ name, state: "loaded", path })
-    } catch (error) {
-      const code = (error as { code?: unknown }).code
-      const missing = code === "ENOENT"
-      problems.push(
-        code === "SKILLS_INVALID"
-          ? (error as Error).message
-          : errorText("SKILLS_INVALID", notLoaded(name, missing ? "is missing" : `cannot be read (${typeof code === "string" ? code : reasonOf(error)})`), REINSTALL),
-      )
-      status.push({ name, state: missing ? "missing" : "invalid" })
+      text = readFileSync(join(directory, name, "SKILL.md"), "utf8")
+    } catch {
+      throw invalid(file, "is missing")
     }
-  }
-  return { skills, problems, status }
-}
-
-/**
- * Registers the loaded skills. A skill already present under the same name at another path is the user's, and is left
- * as it is. The callback is synchronous and never throws. The host adds a user's skills after the plugin's transforms
- * run, so the transform often cannot see them: {@link observeSkills} is what finds a shadowed skill.
- */
-export function registerSkills(skill: Pick<Plugin.Context["skill"], "transform">, skills: readonly Skill.Info[]) {
-  return skill.transform((editor) => {
-    for (const info of skills) {
-      const existing = editor.get(info.id)
-      if (!existing || existing.path === info.path) editor.add(info)
+    const parsed = frontmatter(text, file)
+    if (parsed.name === undefined || parsed.name === "") throw invalid(file, "has no frontmatter name")
+    if (parsed.name !== name) throw invalid(file, `names "${parsed.name}", not its directory "${name}"`)
+    if (parsed.description === undefined || parsed.description.trim() === "") throw invalid(file, "has no frontmatter description")
+    if (parsed.description.trim() === ">" || parsed.description.trim() === "|" || parsed.description.trim() === ">-" || parsed.description.trim() === "|-") {
+      throw invalid(file, `has the frontmatter description "${parsed.description.trim()}", which is only a block marker; indent the text below it`)
     }
+    if (parsed.content === "") throw invalid(file, "has no content below its frontmatter")
+    return { id: name, name: parsed.name, description: parsed.description, path: join(directory, name, "SKILL.md"), content: parsed.content }
   })
 }
 
 /**
- * The state of each packaged skill as OpenCode lists them now: a loaded skill that OpenCode lists from another file, such
- * as one the user wrote under the same name, is `shadowed`, with that file's path. A failed list is advice lost, not an
- * error: the loaded states are returned unchanged.
+ * Register the checked skills with the host. The transform's `dispose` is the setup cleanup, like every other
+ * registration. A plugin that adds a skill directory calls this once, from `setup`.
  */
-export async function observeSkills(skill: Pick<Plugin.Context["skill"], "list">, status: readonly SkillStatus[]): Promise<readonly SkillStatus[]> {
-  const listed = await skill.list().then(
-    (result) => result.data,
-    () => undefined,
-  )
-  if (!listed) return status
-  return status.map((entry) => {
-    const other = entry.state === "loaded" ? listed.find((item) => item.id === entry.name) : undefined
-    return other && other.path !== entry.path ? { name: entry.name, state: "shadowed" as const, ...(entry.path ? { path: entry.path } : {}), shadowedBy: other.path } : entry
+export async function registerSkills(
+  context: Plugin.Context,
+  skills: readonly SkillFile[] = readSkills(),
+): Promise<Awaited<ReturnType<Plugin.Context["skill"]["transform"]>>> {
+  return context.skill.transform((editor) => {
+    for (const skill of skills) {
+      editor.add({
+        id: Skill.ID.make(skill.id),
+        name: Skill.Name.make(skill.name),
+        description: skill.description,
+        path: skill.path as Skill.Info["path"],
+        content: skill.content,
+      })
+    }
   })
 }

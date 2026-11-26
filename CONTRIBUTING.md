@@ -1,60 +1,87 @@
 # Contributing
 
-Thanks for helping. This repository is an unofficial OpenCode plugin for OpenRouter's hosted MCP server. Read
-[AGENTS.md](AGENTS.md) before changing code: it lists the layout, the rules and the one check command.
+This repository is an OpenCode plugin on [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract) v0.
+The contract is [docs/contract.md](https://github.com/we-the-rebel-alliance/plugin-contract/blob/master/docs/contract.md),
+the bar for every plugin repository is
+[docs/plugin-standard.md](https://github.com/we-the-rebel-alliance/plugin-contract/blob/master/docs/plugin-standard.md),
+and [AGENTS.md](AGENTS.md) is the working guide.
 
-## Setup
+## Set up and check
+
+You need Node 24.
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm run check
 ```
 
-Node 24 and [Bun](https://bun.sh) 1.4 are needed. `npm run check` is the whole check: typecheck, unit tests, build,
-icons, the host suite on OpenCode 2.4.1, pack, forbidden references, the copied-kit check, the release-kit tests, an
-`actionlint` pass when it is installed, and the package whitelist.
+`npm run check` runs the whole gate:
 
-## Checks and tests
+| Step | What it proves |
+|---|---|
+| `npm run lint` | `@biomejs/biome` finds no lint problem |
+| `npm run typecheck` | the sources and tests typecheck under strict settings |
+| `npm run bundle` | `dist/index.js` is rebuilt from `src/index.ts` with esbuild; the result is committed |
+| `npm test` | the manifest, accounts, provider, probe, fixture and real-host skills, parity and MCP tests pass |
+| `npm run test:pack` | the tarball's contents, and that its `./server` entry loads beside `@opencode/plugin` 2.4.1 |
+| `plugin-kit check` | conformance T0 and T1, the doc file set, the forbidden patterns and no bundled kit |
+| `plugin-kit docs --check` | every generated doc section matches the manifest |
 
-| Stage | What it runs |
-| --- | --- |
-| `typecheck` | `tsc --noEmit` over `src/`, `test/` and `scripts/` |
-| `unit` | `bun test ./test/unit` |
-| `build` | one self-contained esbuild bundle per entry in `dist/` |
-| `icons` | the family's icon contract (revision 2) |
-| `host` | the plugin on the embedded `@opencode/sdk` 2.4.1 against a loopback fake |
-| `pack` | builds, packs and installs the tarball, imports both entries, and loads it in stock OpenCode 2.4.1 |
-| `forbidden` | the API and wording rules in [AGENTS.md](AGENTS.md) |
-| `copies` | the shared files every plugin carries, byte for byte |
-| `release-kit` | the release kit's own tests |
-| `lint:actions` | `actionlint`, when it is on `PATH` |
-| `whitelist` | the package's files, exports, dev pins and `dist/` |
+CI runs the same steps in one job named `ci`. `dist/index.js` is committed: `npm run bundle` rebuilds it, and CI runs
+`npm run bundle && git diff --exit-code dist/` to fail when the committed bundle is stale. To run `npm run test:pack` or
+the host skills test on its own, run `npm run bundle` first, because both read `dist/`.
 
-`HOST_SDK_DIR=/path/to/an/sdk` points the host suite at another released SDK. `OPENCODE_BIN_2_4_1=/path/to/opencode`
-skips the download in the pack stage. A check never signs in to OpenRouter or calls its API: everything is a loopback
-fake with synthetic names, tokens and accounts.
+## The contract pin
 
-## Style
+`package.json` pins the contract to its release tag,
+`github:we-the-rebel-alliance/plugin-contract#v0.0.0`, and moves the pin with the contract's release. Never copy a
+contract module into this repository.
 
-- Public APIs only. TypeScript, `.js` in relative imports, `import type` for types.
-- Docs and model-facing text describe what the code does now: no process narrative, machine-local paths, secrets or
-  personal data. Never claim an unpublished tag can be installed.
-- Keep the fixed-context budget: the Code Mode namespace line is at most 400 characters, each skill description at most
-  300, nothing is pinned, and there is no per-request hook.
+The committed `package-lock.json` records the contract's repository over `git+https`, so a fresh `npm ci` needs no SSH
+key. Keep it that way; CI also rewrites an `ssh://git@github.com/` URL to HTTPS for an older lockfile.
 
-## Commits and pull requests
+## Pull requests
 
-Use conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). Open a pull request against `master`; the `ci` job must
-pass. Never push to `master`, never push a tag or a `release/*` branch, and never change repository settings from a pull
-request.
+One change per pull request, based on `master`, with a conventional commit (`feat:`, `fix:`, `docs:`, `chore:`). The
+pull request says what changed and why, the contract section it implements, and the exact `npm run check` result.
 
-## Releasing
+A new method starts in `package.json` `capabilities`, then its handler if the plugin owns it, then its tests, then
+`npx plugin-kit docs`, then `npx plugin-kit check`. An OpenRouter tool is declared as an `mcp:<tool>` row and has no
+handler. Every capability has tests, including its negative cases.
 
-Releases are made only by the owner from `.github/workflows/release.yml`, after a version-preparation pull request is on
-`master` and its CI passed. The workflow builds `dist/`, makes the release commit on a temporary `release/v<version>`
-branch, checks and stages everything, waits for approval of the `release` environment, and only then creates the tag
-`v<version>` and the GitHub Release. Agents never approve or publish a release.
+## Contract decisions for a pass-through plugin
 
-## Security
+OpenRouter's 31 tools are pass-through `mcp:` methods. The plugin performs no write of its own, so there is no plugin
+write to emit a `changed` nudge for; `capabilities.events` is `{}` (task item 8 / standard §4.7).
 
-Do not open a public issue for a security problem; see [SECURITY.md](SECURITY.md).
+A pass-through `mcp:` method has no handler — the contract's `register` refuses one — and takes no `account` input, so it
+cannot be a `sources` read or an `actions` preview/commit. `capabilities.sources` and `capabilities.actions` are
+therefore `[]`; spend is expressed in each billed row's class and `effect: "ask"`, plus the docs and skills.
+
+The recorded decisions are [Lead decisions requested (4b)](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7179966441),
+[Resolutions (4b): 34 methods](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7170504331)
+and [plugin-contract#74](https://github.com/we-the-rebel-alliance/plugin-contract/issues/74).
+
+## Fixtures
+
+`fixtures/conformance.json` is the plugin's evidence to the conformance kit. This repository has no live OpenRouter
+account on the recording machine, so `scripts/record-fixture.mjs` records the plugin's own two-alias runtime and says so
+in the file. Rebuild it with `npm run fixtures` after changing the accounts, the probe answer or the package version. If a
+live account is available later, record it instead:
+
+```sh
+npx plugin-kit record --account work
+npx plugin-kit record --account personal
+```
+
+`npx plugin-kit record` redacts credentials, emails, phone numbers and home directories before it writes.
+
+The plugin has no cursor-bearing read, so the fixture records no cross-account cursor case. The kit reports that as
+`accounts.cursors`; it is a known contract issue, not a case to invent.
+
+## Releases
+
+Releases are tags, not npm packages. A release is prepared in one pull request,
+`chore(release): prepare vX.Y.Z`: the version in `package.json` and `package-lock.json`, the `CHANGELOG.md` section, and
+`npx plugin-kit docs` if the manifest changed. The owner pushes the tag after `master`'s CI passed; the release workflow
+checks the tag, builds, and creates the GitHub release with the packed tarball, the conformance report and `SHA256SUMS`.

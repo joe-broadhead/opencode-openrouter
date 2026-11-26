@@ -1,176 +1,126 @@
-// The skill loader: frontmatter parsing (LF and CRLF), the problems a bad or missing file becomes, registration that
-// keeps a user's skill of the same name, and the shadowing status read from the host's list.
-import { afterAll, describe, expect, test } from "bun:test"
+import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { test } from "node:test"
 import type { Plugin } from "@opencode/plugin"
-import { loadSkills, observeSkills, parseSkill, registerSkills, SKILL_NAMES, SKILLS_DIR, type SkillStatus } from "../../src/skills.js"
-import { transforms } from "./fake.js"
+import { fileURLToPath } from "node:url"
+import { readSkills, registerSkills } from "../../src/skills.ts"
 
-type SkillEditor = Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]
+const root = fileURLToPath(new URL("../..", import.meta.url))
 
-const root = mkdtempSync(join(tmpdir(), "openrouter-skills-"))
-afterAll(() => rmSync(root, { recursive: true, force: true }))
-
-function skills(files: Record<string, string>) {
-  const directory = mkdtempSync(join(root, "skills-"))
+/** A temporary `skills/` directory holding one file per entry. */
+function fixture(files: Readonly<Record<string, string>>): string {
+  const directory = mkdtempSync(join(tmpdir(), "plugin-skills-"))
   for (const [name, text] of Object.entries(files)) {
-    mkdirSync(join(directory, name))
+    mkdirSync(join(directory, name), { recursive: true })
     writeFileSync(join(directory, name, "SKILL.md"), text)
   }
   return directory
 }
 
-const ok = (name: string) => `---\nname: ${name}\ndescription: ${name} skill\n---\nBody\n`
-const everySkill = () => skills(Object.fromEntries(SKILL_NAMES.map((name) => [name, ok(name)])))
-
-describe("skill loading", () => {
-  test("the four skills, read from skills/ at the package root", () => {
-    expect([...SKILL_NAMES]).toEqual(["openrouter", "openrouter-evaluate", "openrouter-images", "openrouter-troubleshoot"])
-    expect(SKILLS_DIR.replaceAll("\\", "/").endsWith("/skills/")).toBe(true)
-  })
-
-  test("parses LF and CRLF frontmatter into a skill with the body kept apart and the real path", () => {
-    for (const newline of ["\n", "\r\n"]) {
-      const text = ["---", "name: openrouter", 'description: "Use OpenRouter: find models."', "---", "", "# OpenRouter", "Body."].join(newline)
-      expect(parseSkill("openrouter", "/pkg/skills/openrouter/SKILL.md", text)).toEqual({
-        id: "openrouter",
-        name: "openrouter",
-        description: "Use OpenRouter: find models.",
-        path: "/pkg/skills/openrouter/SKILL.md",
-        content: "# OpenRouter\nBody.",
-      } as never)
-    }
-  })
-
-  test.each([
-    ["no frontmatter", "# OpenRouter", "skills/openrouter/SKILL.md has no frontmatter"],
-    ["an unclosed frontmatter", "---\nname: openrouter\ndescription: d\n# OpenRouter", "skills/openrouter/SKILL.md has no frontmatter"],
-    ["the wrong name", "---\nname: other\ndescription: d\n---\nBody", 'skills/openrouter/SKILL.md must be named "openrouter" in its frontmatter'],
-    ["no name", "---\ndescription: d\n---\nBody", 'skills/openrouter/SKILL.md must be named "openrouter" in its frontmatter'],
-    ["no description", "---\nname: openrouter\n---\nBody", "skills/openrouter/SKILL.md has no description"],
-    ["an empty description", "---\nname: openrouter\ndescription:\n---\nBody", "skills/openrouter/SKILL.md has no description"],
-    ["no body", "---\nname: openrouter\ndescription: d\n---\n\n", "skills/openrouter/SKILL.md has no body"],
-  ])("rejects a skill with %s", (_, text, message) => {
-    expect(() => parseSkill("openrouter", "/x", text)).toThrow(`SKILLS_INVALID: The "openrouter" skill was not loaded: ${message}. Next step: Reinstall the plugin.`)
-  })
-
-  test("a frontmatter line without a colon is ignored", () => {
-    expect(parseSkill("openrouter", "/x", "---\nname: openrouter\nstray line\ndescription: d\n---\nBody").description).toBe("d")
-  })
-
-  test("loads every skill and reports each as loaded with its path", async () => {
-    const directory = everySkill()
-    const loaded = await loadSkills(directory)
-    expect(loaded.skills.map((skill): string => skill.id)).toEqual([...SKILL_NAMES])
-    expect(loaded.problems).toEqual([])
-    expect(loaded.status).toEqual(SKILL_NAMES.map((name) => ({ name, state: "loaded", path: join(directory, name, "SKILL.md") })))
-  })
-
-  test("the packaged skills load from the repository", async () => {
-    const loaded = await loadSkills()
-    expect(loaded.problems).toEqual([])
-    expect(loaded.skills.map((skill): string => skill.id)).toEqual([...SKILL_NAMES])
-  })
-
-  test("a broken skill is an invalid problem and a missing one a missing problem, not a failure", async () => {
-    const broken = skills({ openrouter: "---\nname: openrouter\n---\n", "openrouter-evaluate": ok("openrouter-evaluate") })
-    const loaded = await loadSkills(broken)
-    expect(loaded.skills.map((skill): string => skill.id)).toEqual(["openrouter-evaluate"])
-    expect(loaded.status.map(({ name, state }) => [name, state])).toEqual([
-      ["openrouter", "invalid"],
-      ["openrouter-evaluate", "loaded"],
-      ["openrouter-images", "missing"],
-      ["openrouter-troubleshoot", "missing"],
-    ])
-    expect(loaded.problems).toEqual([
-      'SKILLS_INVALID: The "openrouter" skill was not loaded: skills/openrouter/SKILL.md has no description. Next step: Reinstall the plugin.',
-      'SKILLS_INVALID: The "openrouter-images" skill was not loaded: skills/openrouter-images/SKILL.md is missing. Next step: Reinstall the plugin.',
-      'SKILLS_INVALID: The "openrouter-troubleshoot" skill was not loaded: skills/openrouter-troubleshoot/SKILL.md is missing. Next step: Reinstall the plugin.',
-    ])
-  })
-
-  test("a skill folder that is missing altogether loads nothing and does not throw", async () => {
-    const loaded = await loadSkills(join(root, "nowhere"))
-    expect(loaded.skills).toEqual([])
-    expect(loaded.status.map((entry) => entry.state)).toEqual(["missing", "missing", "missing", "missing"])
-  })
-
-  test("an unreadable skill file is invalid and reported as unreadable, not missing", async () => {
-    const directory = skills({ "openrouter-evaluate": ok("openrouter-evaluate") })
-    mkdirSync(join(directory, "openrouter", "SKILL.md"), { recursive: true })
-    const loaded = await loadSkills(directory)
-    expect(loaded.status[0]).toEqual({ name: "openrouter", state: "invalid" })
-    expect(loaded.problems[0]).toBe('SKILLS_INVALID: The "openrouter" skill was not loaded: skills/openrouter/SKILL.md cannot be read (EISDIR). Next step: Reinstall the plugin.')
-  })
+test("the packaged skills are checked with their names, descriptions and bodies", () => {
+  const skills = readSkills()
+  assert.deepEqual(skills.map((skill) => skill.id), ["openrouter", "openrouter-evaluate", "openrouter-images", "openrouter-troubleshoot"])
+  const skill = skills.find((candidate) => candidate.id === "openrouter")
+  assert.ok(skill !== undefined)
+  assert.equal(skill.name, "openrouter")
+  assert.match(skill.description, /^Find and compare OpenRouter models/)
+  assert.match(skill.description, /openrouter-evaluate, openrouter-images or openrouter-troubleshoot/)
+  assert.match(skill.content, /^# OpenRouter research and integration\n/)
+  assert.equal(skill.content.includes("---"), false)
+  assert.equal(skill.path, join(root, "skills", "openrouter", "SKILL.md"))
 })
 
-describe("registering skills", () => {
-  const parsed = (name: string, path: string) => parseSkill(name, path, ok(name))
-
-  /** A skill editor over a map, as the host's is: `add` replaces whatever has the id. */
-  function editor(initial: Record<string, string> = {}) {
-    const present = new Map(Object.entries(initial).map(([id, path]) => [id, { id, name: id, path, content: "theirs" }]))
-    const api = {
-      list: () => [...present.values()],
-      get: (id: string) => present.get(id),
-      add: (skill: { id: string }) => void present.set(skill.id, skill as never),
-    } as unknown as SkillEditor
-    return { api, present }
-  }
-
-  test("adds every loaded skill through ctx.skill.transform, and the cleanup removes the transform", async () => {
-    const fake = transforms<SkillEditor>()
-    const stop = await registerSkills({ transform: fake.transform }, [parsed("openrouter", "/pkg/a"), parsed("openrouter-images", "/pkg/b")])
-    const { api, present } = editor()
-    fake.run(api)
-    expect([...present.values()].map((skill) => [skill.id, skill.path])).toEqual([["openrouter", "/pkg/a"], ["openrouter-images", "/pkg/b"]])
-    await stop.dispose()
-    expect(fake.callbacks).toHaveLength(0)
-  })
-
-  test("keeps a user's skill of the same name, and a replay never stacks or replaces it", async () => {
-    const fake = transforms<SkillEditor>()
-    await registerSkills({ transform: fake.transform }, [parsed("openrouter", "/pkg/a"), parsed("openrouter-images", "/pkg/b")])
-    const { api, present } = editor({ openrouter: "/projects/acme/skills/openrouter/SKILL.md" })
-    fake.run(api)
-    fake.run(api)
-    expect(present.get("openrouter")?.path).toBe("/projects/acme/skills/openrouter/SKILL.md")
-    expect(present.get("openrouter")?.content).toBe("theirs")
-    expect(present.get("openrouter-images")?.path).toBe("/pkg/b")
-    expect(present.size).toBe(2)
-  })
-})
-
-describe("shadowing", () => {
-  const loaded: readonly SkillStatus[] = [
-    { name: "openrouter", state: "loaded", path: "/pkg/skills/openrouter/SKILL.md" },
-    { name: "openrouter-images", state: "loaded", path: "/pkg/skills/openrouter-images/SKILL.md" },
-    { name: "openrouter-evaluate", state: "missing" },
+test("YAML block scalars are folded, literal or stripped as YAML specifies", () => {
+  const cases: readonly [string, string, string][] = [
+    ["folded", ">", "first line second line\n"],
+    ["literal", "|", "first line\nsecond line\n"],
+    ["folded-strip", ">-", "first line second line"],
+    ["literal-strip", "|-", "first line\nsecond line"],
   ]
-  const list = (data: { id: string; path: string }[]) => ({ list: async () => ({ data }) }) as unknown as Pick<Plugin.Context["skill"], "list">
+  for (const [name, marker, expected] of cases) {
+    const directory = fixture({ [name]: `---\nname: ${name}\ndescription: ${marker}\n  first line\n  second line\n---\n\n# Body\n` })
+    try {
+      assert.equal(readSkills(directory)[0]?.description, expected, name)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  const empty = fixture({ empty: "---\nname: empty\ndescription: >\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(empty), /has no frontmatter description/)
+  } finally {
+    rmSync(empty, { recursive: true, force: true })
+  }
+  const marker = fixture({ marker: "---\nname: marker\ndescription: '>'\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(marker), /only a block marker/)
+  } finally {
+    rmSync(marker, { recursive: true, force: true })
+  }
+  const broken = fixture({ broken: "---\nname: broken\ndescription: [unclosed\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(broken), /has frontmatter that is not valid YAML/)
+  } finally {
+    rmSync(broken, { recursive: true, force: true })
+  }
+})
 
-  test("a skill OpenCode lists from another path is shadowed, with that path", async () => {
-    const status = await observeSkills(
-      list([
-        { id: "openrouter", path: "/projects/acme/.opencode/skills/openrouter/SKILL.md" },
-        { id: "openrouter-images", path: "/pkg/skills/openrouter-images/SKILL.md" },
-        { id: "openrouter-evaluate", path: "/elsewhere/SKILL.md" },
-      ]),
-      loaded,
-    )
-    expect(status).toEqual([
-      { name: "openrouter", state: "shadowed", path: "/pkg/skills/openrouter/SKILL.md", shadowedBy: "/projects/acme/.opencode/skills/openrouter/SKILL.md" },
-      { name: "openrouter-images", state: "loaded", path: "/pkg/skills/openrouter-images/SKILL.md" },
-      // A skill that did not load is not "shadowed": it stays missing.
-      { name: "openrouter-evaluate", state: "missing" },
-    ])
-  })
+test("a skill file must have the frontmatter shape the plugin registers", () => {
+  const cases: readonly [string, Readonly<Record<string, string>>, RegExp][] = [
+    ["no frontmatter", { broken: "# Broken\n" }, /SCHEMA_VIOLATION: skills\/broken\/SKILL.md has no frontmatter\. Next step: /],
+    ["no name", { broken: "---\ndescription: A description.\n---\n\n# Body\n" }, /has no frontmatter name/],
+    ["another name", { broken: "---\nname: other\ndescription: A description.\n---\n\n# Body\n" }, /names "other", not its directory "broken"/],
+    ["no description", { broken: "---\nname: broken\n---\n\n# Body\n" }, /has no frontmatter description/],
+    ["empty content", { broken: "---\nname: broken\ndescription: A description.\n---\n\n" }, /has no content below its frontmatter/],
+  ]
+  for (const [name, files, expected] of cases) {
+    const directory = fixture(files)
+    try {
+      assert.throws(() => readSkills(directory), expected, name)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  const missing = mkdtempSync(join(tmpdir(), "plugin-skills-"))
+  try {
+    mkdirSync(join(missing, "empty"), { recursive: true })
+    assert.throws(() => readSkills(missing), /skills\/empty\/SKILL.md is missing/)
+  } finally {
+    rmSync(missing, { recursive: true, force: true })
+  }
+  const none = mkdtempSync(join(tmpdir(), "plugin-skills-"))
+  try {
+    assert.throws(() => readSkills(none), /skills\/ holds no <name>\/SKILL\.md/)
+  } finally {
+    rmSync(none, { recursive: true, force: true })
+  }
+})
 
-  test("a skill the host does not list stays loaded, and a failed list changes nothing", async () => {
-    expect(await observeSkills(list([]), loaded)).toEqual(loaded)
-    const failing = { list: async () => Promise.reject(new Error("host busy")) } as unknown as Pick<Plugin.Context["skill"], "list">
-    expect(await observeSkills(failing, loaded)).toEqual(loaded)
-  })
+test("registerSkills adds every checked skill and returns a disposer", async () => {
+  const added: { id: string; name: string; description?: string; path: string; content: string }[] = []
+  let disposed = false
+  const context = {
+    skill: {
+      async transform(callback: (editor: { add: (skill: (typeof added)[number]) => void }) => void) {
+        callback({ add: (skill) => added.push(skill) })
+        return {
+          async dispose() {
+            disposed = true
+          },
+        }
+      },
+    },
+  } as unknown as Plugin.Context
+  const registration = await registerSkills(context)
+  assert.equal(added.length, 4)
+  const skill = added.find((candidate) => candidate.id === "openrouter")
+  assert.ok(skill !== undefined)
+  assert.equal(skill.name, "openrouter")
+  assert.match(skill.description ?? "", /^Find and compare OpenRouter models/)
+  assert.equal(skill.path, join(root, "skills", "openrouter", "SKILL.md"))
+  assert.match(skill.content, /^# OpenRouter research and integration\n/)
+  await registration.dispose()
+  assert.equal(disposed, true)
 })

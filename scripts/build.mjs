@@ -1,52 +1,33 @@
-// Bundles each entry the host loads into one self-contained file: src/index.ts to dist/index.js (the server part) and
-// src/tui.ts to dist/tui.js (the terminal UI part). Shared code, such as the status model and the RPC contract, is
-// inlined into both. No chunks and no relative imports, because OpenCode reloads a plugin in place and reuses the
-// module records it already holds for unchanged paths: a new entry must never import an older sibling module.
-// Only the modules the host provides stay external. The build fails if an output imports anything else.
-import { build } from "esbuild"
-import { readdirSync, readFileSync, rmSync } from "node:fs"
-import { join } from "node:path"
+// Builds dist/index.js: the one server entry package.json exports, as one self-contained ES module.
+//
+//   npm run bundle
+//
+// @opencode/* stays external, because OpenCode provides it at run time. The contract modules are bundled, so a tag
+// installs and runs with no build and no runtime dependency. dist/index.js is committed, so a tag installs with no
+// build step; run `npm run bundle` after a source change and commit the result. CI fails when it is stale. Never edit
+// dist/index.js by hand.
+import { readFileSync, rmSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { build } from "esbuild"
 
-const root = fileURLToPath(new URL("..", import.meta.url))
-const HOST = ["@opencode/plugin", "@opencode/plugin/*", "@opentui/*", "solid-js", "solid-js/*"]
-const provided = (path) => path.startsWith("node:") || HOST.some((name) => (name.endsWith("/*") ? path.startsWith(name.slice(0, -1)) : path === name))
+const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+const dist = join(root, "dist")
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 
-/** The plugin's version, from package.json, as one string: the bundles carry nothing else of package.json. */
-const version = {
-  name: "version",
-  setup(editor) {
-    editor.onLoad({ filter: /[\\/]src[\\/]version\.ts$/ }, () => {
-      const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
-      return { contents: `export const VERSION = ${JSON.stringify(version)}`, loader: "ts" }
-    })
-  },
-}
-
-rmSync(join(root, "dist"), { recursive: true, force: true })
-const result = await build({
-  absWorkingDir: root,
-  entryPoints: { index: "src/index.ts", tui: "src/tui.ts" },
-  outdir: "dist",
+rmSync(dist, { recursive: true, force: true })
+await build({
+  entryPoints: [{ in: join(root, "src", "index.ts"), out: "index" }],
+  outdir: dist,
   bundle: true,
-  splitting: false,
   format: "esm",
   platform: "node",
-  target: "es2023",
-  external: HOST,
+  target: "node24",
+  external: ["@opencode/*"],
   legalComments: "none",
-  metafile: true,
   logLevel: "warning",
-  plugins: [version],
+  // The YAML parser is CommonJS and reads `process` with require(); the bundle is ESM, so give it a real require.
+  banner: { js: `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\n// ${pkg.name} ${pkg.version}. Built by scripts/build.mjs; do not edit.` },
 })
 
-const problems = Object.entries(result.metafile.outputs).flatMap(([file, output]) =>
-  output.imports.filter((entry) => !entry.external || !provided(entry.path)).map((entry) => `${file} imports ${entry.path}`),
-)
-const files = readdirSync(join(root, "dist")).sort()
-if (JSON.stringify(files) !== JSON.stringify(["index.js", "tui.js"])) problems.push(`dist/ must hold exactly index.js and tui.js, found ${files.join(", ")}`)
-if (problems.length) {
-  console.error(`build: the bundles are not self-contained:\n  ${problems.join("\n  ")}`)
-  process.exit(1)
-}
-console.log("build: dist/index.js and dist/tui.js are self-contained.")
+console.log(`built ${pkg.name} ${pkg.version} into dist/index.js`)
