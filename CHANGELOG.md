@@ -12,6 +12,7 @@
   block-scalar description registers its text. The contract's `register` does not touch skills, and invalid YAML, a
   missing field or a marker-only description refuses setup with `SCHEMA_VIOLATION`.
 - `dist/index.js` is committed and rebuilt with `npm run bundle`, so a git install needs no build or prepare script.
+- `NOTICE` lists the licences of the packages bundled into `dist/index.js`: `@we-the-rebel-alliance/plugin-contract`, `yaml` and `zod`.
 
 ### Removed since v0.0.7
 
