@@ -55,6 +55,17 @@ the contract's `SCHEMA_VIOLATION`. The skill registration is disposed before the
 There is no network client. The plugin never talks to OpenRouter: the vendor's MCP server owns every call, and the
 plugin only reads OpenCode's local server list.
 
+## Contract-backed decisions
+
+- OpenRouter's 31 tools are pass-through `mcp:` methods. The plugin performs no write of its own, so there is no plugin
+  write to emit `changed` for; `capabilities.events` is `{}`.
+- A pass-through `mcp:` method has no handler (the contract's `register` refuses one) and takes no `account` input, so it
+  cannot be a `sources` read or an `actions` preview/commit. `capabilities.sources` and `capabilities.actions` are
+  therefore `[]`. Spend is expressed in each billed tool row's class and `effect: "ask"`, plus the docs and skills.
+- The recorded decisions are [Resolutions (4b): 34 methods](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7170504331),
+  [Lead decisions requested (4b)](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7179966441)
+  and [plugin-contract#74](https://github.com/we-the-rebel-alliance/plugin-contract/issues/74).
+
 ## OpenCode APIs
 
 | API | Who calls it |
