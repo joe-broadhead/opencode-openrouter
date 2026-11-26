@@ -49,6 +49,19 @@ A new method starts in `package.json` `capabilities`, then its handler if the pl
 `npx plugin-kit docs`, then `npx plugin-kit check`. An OpenRouter tool is declared as an `mcp:<tool>` row and has no
 handler. Every capability has tests, including its negative cases.
 
+## Contract decisions for a pass-through plugin
+
+OpenRouter's 31 tools are pass-through `mcp:` methods. The plugin performs no write of its own, so there is no plugin
+write to emit a `changed` nudge for; `capabilities.events` is `{}` (task item 8 / standard §4.7).
+
+A pass-through `mcp:` method has no handler — the contract's `register` refuses one — and takes no `account` input, so it
+cannot be a `sources` read or an `actions` preview/commit. `capabilities.sources` and `capabilities.actions` are
+therefore `[]`; spend is expressed in each billed row's class and `effect: "ask"`, plus the docs and skills.
+
+The recorded decisions are [Lead decisions requested (4b)](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7179966441),
+[Resolutions (4b): 34 methods](https://github.com/we-the-rebel-alliance/openrouter-plugin/issues/23#issuecomment-7170504331)
+and [plugin-contract#74](https://github.com/we-the-rebel-alliance/plugin-contract/issues/74).
+
 ## Fixtures
 
 `fixtures/conformance.json` is the plugin's evidence to the conformance kit. This repository has no live OpenRouter
