@@ -37,11 +37,15 @@ test("NOTICE names every inlined package with its heading and verbatim licence",
       banner: { js: `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\n// ${pkg.name} ${pkg.version}. Built by scripts/build.mjs; do not edit.` },
     })
     const inputs = Object.keys(result.metafile?.inputs ?? {})
-    const names = [...new Set(inputs.map(packageOf).filter((name): name is string => name !== undefined))].sort()
-    assert.deepEqual(names, ["@we-the-rebel-alliance/plugin-contract", "yaml"], "the inlined package set changed without a NOTICE review")
+    const names = new Set(inputs.map(packageOf).filter((name): name is string => name !== undefined))
+    // zod is inlined inside the contract's dist, so esbuild reports no zod input file: detect its code in the bundle.
+    const bundle = readFileSync(join(outdir, "index.js"), "utf8")
+    if (bundle.includes("$ZodType") || bundle.includes("ZodError")) names.add("zod")
+    const sorted = [...names].sort()
+    assert.deepEqual(sorted, ["@we-the-rebel-alliance/plugin-contract", "yaml", "zod"], "the inlined package set changed without a NOTICE review")
 
     const notice = readFileSync(join(root, "NOTICE"), "utf8")
-    for (const name of names) {
+    for (const name of sorted) {
       const directory = join(root, "node_modules", ...name.split("/"))
       const installed = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { readonly version: string; readonly license: string }
       const licence = readFileSync(join(directory, "LICENSE"), "utf8")
